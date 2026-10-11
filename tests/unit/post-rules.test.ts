@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { checkPostInput, POST_ERRORS, rawPostInput, type RawPostInput } from "@/lib/post-rules";
 
-const ok: RawPostInput = { postId: "", title: "첫 글", contentHtml: "<p>안녕</p>", categoryId: "", subcategoryId: "", visibility: "public" };
+const ok: RawPostInput = { postId: "", title: "첫 글", contentHtml: "<p>안녕</p>", categoryId: "", subcategoryId: "", visibility: "public", tags: "" };
 const error = (patch: Partial<RawPostInput>) => {
   const r = checkPostInput({ ...ok, ...patch });
   return r.ok ? null : r.error;

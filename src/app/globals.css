@@ -92,6 +92,22 @@ body {
   .header-my-blog { display: none; }
 }
 
+/* 태그 (POST-04) */
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 44px;
+  padding: 0 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #f4f1ea;
+  color: var(--ink);
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+}
+.tag-chip:hover { border-color: var(--accent); color: var(--accent); }
+
 /* 첨부 (POST-07·09) */
 .prose-post img { display: block; max-width: 100%; height: auto; border-radius: 0.5rem; }
 .prose-post a[data-file] {

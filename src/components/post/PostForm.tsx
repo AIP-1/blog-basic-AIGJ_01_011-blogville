@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { savePost, type PostFormState } from "@/app/write/actions";
-import { checkPostInput, CONTENT_BYTES_MAX, POST_ERRORS, TITLE_MAX, utf8Bytes } from "@/lib/post-rules";
+import { checkPostInput, CONTENT_BYTES_MAX, POST_ERRORS, TAGS_MAX_CHARS, TITLE_MAX, utf8Bytes } from "@/lib/post-rules";
 import { RichEditor } from "../editor/RichEditor";
 
 export type CategoryOption = { id: number; name: string; subs: { id: number; name: string }[] };
@@ -16,6 +16,7 @@ type Props = {
     categoryId: number | null;
     subcategoryId: number | null;
     isPublic: boolean;
+    tags: string[];
   };
 };
 
@@ -27,6 +28,8 @@ export function PostForm({ categories, initial }: Props) {
   const [categoryId, setCategoryId] = useState(initial?.categoryId ? String(initial.categoryId) : "");
   const [subcategoryId, setSubcategoryId] = useState(initial?.subcategoryId ? String(initial.subcategoryId) : "");
   const [visibility, setVisibility] = useState<"public" | "private">(initial?.isPublic === false ? "private" : "public");
+  // 수정 화면은 저장된 태그를 이름순으로 `, `로 이어 채운다 (POST-04)
+  const [tags, setTags] = useState(initial?.tags.join(", ") ?? "");
   const [localError, setLocalError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -52,7 +55,7 @@ export function PostForm({ categories, initial }: Props) {
   const submit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (uploading) return;
-    const raw = { postId: initial ? String(initial.postId) : "", title, contentHtml, categoryId, subcategoryId, visibility };
+    const raw = { postId: initial ? String(initial.postId) : "", title, contentHtml, categoryId, subcategoryId, visibility, tags };
     const checked = checkPostInput(raw);
     if (!checked.ok) return setLocalError(checked.error);
     if (utf8Bytes(contentHtml) > CONTENT_BYTES_MAX) return setLocalError(POST_ERRORS.tooLong);
@@ -107,6 +110,15 @@ export function PostForm({ categories, initial }: Props) {
       </div>
 
       <RichEditor initialHtml={initial?.contentHtml ?? ""} onChange={(html) => setContentHtml(html)} onUploadingChange={setUploading} />
+
+      <input
+        aria-label="태그"
+        placeholder="태그 (쉼표로 구분, 최대 10개)  예: git, 회고"
+        className="field"
+        maxLength={TAGS_MAX_CHARS}
+        value={tags}
+        onChange={(e) => setTags(e.target.value)}
+      />
 
       <fieldset className="flex gap-2">
         <legend className="sr-only">공개 설정</legend>

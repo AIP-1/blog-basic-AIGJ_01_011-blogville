@@ -7,6 +7,7 @@ import { POST_ERRORS, type PostInput } from "@/lib/post-rules";
 import { htmlToText, sanitizePostHtml } from "@/lib/sanitize";
 import { lockLinkable, syncPostAttachments } from "./attachments";
 import { resolveCategory } from "./category";
+import { syncPostTags } from "./tags";
 
 export const PAGE_SIZE = 8;
 
@@ -46,6 +47,7 @@ export async function savePost(blogId: number, ownerId: string, input: PostInput
       postId = input.postId;
     }
     await syncPostAttachments(tx, postId, extractFileKeys(contentHtml));
+    await syncPostTags(tx, postId, input.tags);
     return postId;
   });
 }

@@ -4,6 +4,7 @@ import { parseId } from "@/lib/ids";
 import { getCategoryOptions } from "@/server/category";
 import { getMyBlog, requireMember } from "@/server/dal";
 import { getPostForEdit } from "@/server/post";
+import { getPostTags } from "@/server/tags";
 
 export const metadata = { title: "글 수정 | Blogville" };
 
@@ -25,6 +26,7 @@ export default async function EditPage({ params }: PageProps<"/write/[postId]">)
           categoryId: post.categoryId,
           subcategoryId: post.subcategoryId,
           isPublic: post.isPublic,
+          tags: await getPostTags(post.id),
         }}
       />
     </div>

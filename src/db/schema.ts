@@ -5,6 +5,7 @@ import {
   index,
   integer,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -240,6 +241,26 @@ export const attachments = pgTable(
     check("attachments_name_check", sql`char_length(${t.name}) between 1 and 255`),
     check("attachments_size_check", sql`${t.size} > 0`),
   ],
+);
+
+// 태그 (POST-04, specs/003-tags/data-model.md)
+export const tags = pgTable("tags", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  name: text("name").notNull().unique(),
+  createdAt: createdAt(),
+});
+
+export const postTags = pgTable(
+  "post_tags",
+  {
+    postId: integer("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    tagId: integer("tag_id")
+      .notNull()
+      .references(() => tags.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.tagId] }), index("post_tags_tag_idx").on(t.tagId)],
 );
 
 export type Blog = typeof blogs.$inferSelect;

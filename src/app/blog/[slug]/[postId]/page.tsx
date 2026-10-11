@@ -3,11 +3,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CategoryBadge } from "@/components/post/CategoryBadge";
 import { DeletePostButton } from "@/components/post/DeletePostButton";
+import { TagList } from "@/components/post/TagList";
 import { parseId } from "@/lib/ids";
 import { formatDate } from "@/lib/text";
 import { getBlogBySlug } from "@/server/blog";
 import { getSession } from "@/server/dal";
 import { getPostForView } from "@/server/post";
+import { getPostTags } from "@/server/tags";
 
 async function load(slug: string, rawId: string) {
   const postId = parseId(rawId);
@@ -47,6 +49,7 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]/[post
       </p>
       {/* content_html은 저장할 때 허용 태그만 남긴 HTML이다 (NF-03) */}
       <div className="prose-post mt-6" dangerouslySetInnerHTML={{ __html: post.contentHtml }} />
+      <TagList tags={await getPostTags(post.id)} />
       <footer className="mt-8 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4">
         <Link href={`/@${blog.slug}`} className="btn">
           목록으로
