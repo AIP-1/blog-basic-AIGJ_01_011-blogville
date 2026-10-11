@@ -9,6 +9,7 @@ import {
   text,
   timestamp,
   unique,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
@@ -261,6 +262,53 @@ export const postTags = pgTable(
       .references(() => tags.id, { onDelete: "cascade" }),
   },
   (t) => [primaryKey({ columns: [t.postId, t.tagId] }), index("post_tags_tag_idx").on(t.tagId)],
+);
+
+// 댓글과 답글 (SOC-01·02, specs/004-comments/data-model.md).
+// 삭제는 행을 지우지 않고 내용을 비운 자리로 남긴다.
+const liveContentCheck = (name: string, content: AnyPgColumn, deletedAt: AnyPgColumn) =>
+  check(
+    name,
+    sql`(${deletedAt} is null and char_length(${content}) between 1 and 1000) or (${deletedAt} is not null and ${content} = '')`,
+  );
+
+export const comments = pgTable(
+  "comments",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    postId: integer("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    authorId: text("author_id").references(() => users.id, { onDelete: "set null" }),
+    content: text("content").notNull(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("comments_post_created_idx").on(t.postId, t.createdAt),
+    liveContentCheck("comments_content_check", t.content, t.deletedAt),
+  ],
+);
+
+// 답글은 댓글만 가리켜서 답글의 답글은 구조상 만들 수 없다 (1단계)
+export const replies = pgTable(
+  "replies",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    commentId: integer("comment_id")
+      .notNull()
+      .references(() => comments.id, { onDelete: "cascade" }),
+    authorId: text("author_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    content: text("content").notNull(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("replies_comment_created_idx").on(t.commentId, t.createdAt),
+    liveContentCheck("replies_content_check", t.content, t.deletedAt),
+  ],
 );
 
 export type Blog = typeof blogs.$inferSelect;

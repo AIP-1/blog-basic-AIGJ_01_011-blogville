@@ -10,9 +10,11 @@ type Props = {
   subcategoryName: string | null;
   /** 여러 블로그의 글을 모아 보여 줄 때 (태그별 글) */
   blogTitle?: string;
+  /** 삭제되지 않은 댓글 + 답글 (SOC-01·02) */
+  commentCount?: number;
 };
 
-export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle }: Props) {
+export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle, commentCount = 0 }: Props) {
   return (
     <article>
       <Link href={`/@${slug}/${post.id}`} className="block rounded-xl border border-line bg-surface p-4 hover:border-accent">
@@ -25,6 +27,7 @@ export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle 
         <p className="mt-2 text-sm text-ink-soft">
           {blogTitle && `${blogTitle} · `}
           {formatDate(post.createdAt)}
+          {commentCount > 0 && <span aria-label={`댓글 ${commentCount}개`}> · 💬 {commentCount}</span>}
         </p>
       </Link>
     </article>

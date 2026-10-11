@@ -51,6 +51,7 @@ export default async function TagPage({ params, searchParams }: PageProps<"/tags
                 categoryName={row.categoryName}
                 subcategoryName={row.subcategoryName}
                 blogTitle={row.blogTitle}
+                commentCount={row.commentCount}
               />
             ))}
           </div>

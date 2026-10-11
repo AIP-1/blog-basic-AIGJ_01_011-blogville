@@ -3,12 +3,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CategoryBadge } from "@/components/post/CategoryBadge";
 import { DeletePostButton } from "@/components/post/DeletePostButton";
+import { CommentSection } from "@/components/post/CommentSection";
 import { TagList } from "@/components/post/TagList";
 import { parseId } from "@/lib/ids";
 import { formatDate } from "@/lib/text";
 import { getBlogBySlug } from "@/server/blog";
 import { getSession } from "@/server/dal";
 import { getPostForView } from "@/server/post";
+import { getCommentThread } from "@/server/comments";
 import { getPostTags } from "@/server/tags";
 
 async function load(slug: string, rawId: string) {
@@ -19,7 +21,7 @@ async function load(slug: string, rawId: string) {
   const member = await getSession();
   const isOwner = member?.userId === found.blog.ownerId;
   const row = await getPostForView(found.blog.id, postId, isOwner);
-  return row ? { ...found, ...row, isOwner } : null;
+  return row ? { ...found, ...row, isOwner, member } : null;
 }
 
 export async function generateMetadata({ params }: PageProps<"/blog/[slug]/[postId]">): Promise<Metadata> {
@@ -32,7 +34,8 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]/[post
   const { slug, postId } = await params;
   const data = await load(slug, postId);
   if (!data) notFound();
-  const { blog, nickname, post, categoryName, subcategoryName, isOwner } = data;
+  const { blog, nickname, post, categoryName, subcategoryName, isOwner, member } = data;
+  const thread = await getCommentThread(post.id, blog.ownerId, member);
   const categoryHref = post.categoryId
     ? `/@${blog.slug}?category=${post.categoryId}${post.subcategoryId ? `&sub=${post.subcategoryId}` : ""}`
     : undefined;
@@ -63,6 +66,7 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]/[post
           </div>
         )}
       </footer>
+      <CommentSection postId={post.id} items={thread.items} count={thread.count} signedIn={member !== null} />
     </article>
   );
 }

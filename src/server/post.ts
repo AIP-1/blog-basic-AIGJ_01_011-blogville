@@ -6,6 +6,7 @@ import { extractFileKeys } from "@/lib/attachments";
 import { POST_ERRORS, type PostInput } from "@/lib/post-rules";
 import { htmlToText, sanitizePostHtml } from "@/lib/sanitize";
 import { lockLinkable, syncPostAttachments } from "./attachments";
+import { commentCountSql } from "./comments";
 import { resolveCategory } from "./category";
 import { syncPostTags } from "./tags";
 
@@ -59,6 +60,7 @@ export async function deletePost(blogId: number, postId: number) {
 
 const postWithCategory = {
   post: posts,
+  commentCount: commentCountSql(posts.id),
   categoryName: categories.name,
   subcategoryName: subcategories.name,
 };

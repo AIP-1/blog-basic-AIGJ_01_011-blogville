@@ -4,11 +4,12 @@
 
 | 경로 | 내용 |
 |---|---|
-| `docs/01-requirements.md` | 요구사항 명세서 (v1.29) |
+| `docs/01-requirements.md` | 요구사항 명세서 (v1.30) |
 | `.specify/memory/constitution.md` | 프로젝트 원칙 |
 | `specs/001-blog-core/` | 첫 기능(가입·블로그·글·카테고리)의 spec·plan·tasks |
 | `specs/002-attachments/` | 사진·파일 첨부의 spec·plan·tasks |
 | `specs/003-tags/` | 태그의 spec·plan·tasks |
+| `specs/004-comments/` | 댓글·답글의 spec·plan·tasks |
 | `src/` | Next.js 16 앱 |
 
 ## 실행
