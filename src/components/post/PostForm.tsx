@@ -1,0 +1,150 @@
+"use client";
+
+import { useActionState, useEffect, useState, useTransition } from "react";
+import { savePost, type PostFormState } from "@/app/write/actions";
+import { checkPostInput, CONTENT_BYTES_MAX, POST_ERRORS, TAGS_MAX_CHARS, TITLE_MAX, utf8Bytes } from "@/lib/post-rules";
+import { RichEditor } from "../editor/RichEditor";
+
+export type CategoryOption = { id: number; name: string; subs: { id: number; name: string }[] };
+
+type Props = {
+  categories: CategoryOption[];
+  initial?: {
+    postId: number;
+    title: string;
+    contentHtml: string;
+    categoryId: number | null;
+    subcategoryId: number | null;
+    isPublic: boolean;
+    tags: string[];
+  };
+};
+
+export function PostForm({ categories, initial }: Props) {
+  const [state, action] = useActionState<PostFormState, FormData>(savePost, null);
+  const [pending, startTransition] = useTransition();
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [contentHtml, setContentHtml] = useState(initial?.contentHtml ?? "");
+  const [categoryId, setCategoryId] = useState(initial?.categoryId ? String(initial.categoryId) : "");
+  const [subcategoryId, setSubcategoryId] = useState(initial?.subcategoryId ? String(initial.subcategoryId) : "");
+  const [visibility, setVisibility] = useState<"public" | "private">(initial?.isPublic === false ? "private" : "public");
+  // 수정 화면은 저장된 태그를 이름순으로 `, `로 이어 채운다 (POST-04)
+  const [tags, setTags] = useState(initial?.tags.join(", ") ?? "");
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  // 파일을 에디터 밖에 떨어뜨려도 브라우저가 그 파일을 열어 쓰던 글을 잃지 않게 한다 (POST-07)
+  useEffect(() => {
+    const guard = (e: DragEvent) => {
+      if (!e.dataTransfer?.types.includes("Files")) return;
+      if ((e.target as Element | null)?.closest?.(".tiptap")) return;
+      e.preventDefault();
+    };
+    window.addEventListener("dragover", guard);
+    window.addEventListener("drop", guard);
+    return () => {
+      window.removeEventListener("dragover", guard);
+      window.removeEventListener("drop", guard);
+    };
+  }, []);
+
+  const subs = categories.find((c) => String(c.id) === categoryId)?.subs ?? [];
+  const error = localError ?? state?.error;
+
+  // 값은 모두 화면 상태에 두고 onSubmit에서 보낸다. 오류가 나도 입력이 남는다 (POST-01).
+  const submit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (uploading) return;
+    const raw = { postId: initial ? String(initial.postId) : "", title, contentHtml, categoryId, subcategoryId, visibility, tags };
+    const checked = checkPostInput(raw);
+    if (!checked.ok) return setLocalError(checked.error);
+    if (utf8Bytes(contentHtml) > CONTENT_BYTES_MAX) return setLocalError(POST_ERRORS.tooLong);
+    setLocalError(null);
+    const formData = new FormData();
+    Object.entries(raw).forEach(([k, v]) => formData.set(k, v));
+    startTransition(() => action(formData));
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-4" noValidate>
+      <input
+        aria-label="제목"
+        placeholder="제목"
+        className="field text-2xl font-bold"
+        maxLength={TITLE_MAX}
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+      />
+
+      <div className="flex flex-wrap gap-2">
+        <select
+          aria-label="대분류"
+          className="field field-auto"
+          value={categoryId}
+          onChange={(e) => {
+            setCategoryId(e.target.value);
+            setSubcategoryId("");
+          }}
+        >
+          <option value="">카테고리 없음</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="소분류"
+          className="field field-auto"
+          value={subcategoryId}
+          disabled={categoryId === ""}
+          onChange={(e) => setSubcategoryId(e.target.value)}
+        >
+          <option value="">소분류 없음</option>
+          {subs.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <RichEditor initialHtml={initial?.contentHtml ?? ""} onChange={(html) => setContentHtml(html)} onUploadingChange={setUploading} />
+
+      <input
+        aria-label="태그"
+        placeholder="태그 (쉼표로 구분, 최대 10개)  예: git, 회고"
+        className="field"
+        maxLength={TAGS_MAX_CHARS}
+        value={tags}
+        onChange={(e) => setTags(e.target.value)}
+      />
+
+      <fieldset className="flex gap-2">
+        <legend className="sr-only">공개 설정</legend>
+        {(
+          [
+            ["public", "🌍 공개"],
+            ["private", "🔒 비공개"],
+          ] as const
+        ).map(([value, label]) => (
+          <label key={value} className={`btn cursor-pointer ${visibility === value ? "btn-selected" : ""}`}>
+            <input type="radio" name="visibility" value={value} checked={visibility === value} onChange={() => setVisibility(value)} className="sr-only" />
+            {label}
+          </label>
+        ))}
+      </fieldset>
+
+      <div className="flex items-center justify-end gap-3">
+        {error && (
+          <p role="alert" className="form-error">
+            {error}
+          </p>
+        )}
+        <button type="submit" className="btn btn-primary" disabled={pending || uploading}>
+          {uploading ? "첨부를 올리는 중..." : pending ? "저장하는 중..." : initial ? "수정 완료" : "발행하기"}
+        </button>
+      </div>
+    </form>
+  );
+}
