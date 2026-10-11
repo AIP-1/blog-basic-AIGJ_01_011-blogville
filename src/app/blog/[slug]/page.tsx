@@ -10,7 +10,7 @@ import { parseId, parsePage } from "@/lib/ids";
 import { getBlogBySlug } from "@/server/blog";
 import { getCategoryTree } from "@/server/category";
 import { getSession } from "@/server/dal";
-import { listBlogPosts, PAGE_SIZE } from "@/server/post";
+import { countMyPosts, listBlogPosts, PAGE_SIZE } from "@/server/post";
 import { getBlogSidebar } from "@/server/sidebar";
 import { getBlogVisitStats } from "@/server/stats";
 
@@ -44,7 +44,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
   const tag = search || searchParam === "empty" ? null : parseTagFilter(query.tag);
   const filtered = search !== null || tag !== null || searchParam === "empty";
 
-  const [{ items, total }, { total: allTotal }, sidebar, visits] = await Promise.all([
+  const [{ items, total }, { total: allTotal }, sidebar, visits, myPostCount] = await Promise.all([
     searchParam === "empty"
       ? { items: [], total: 0 }
       : listBlogPosts(blog.id, { viewerIsOwner: isOwner, categoryId, subcategoryId: subId, search, tag, page }),
@@ -52,6 +52,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
     listBlogPosts(blog.id, { viewerIsOwner: false, page: 1 }),
     getBlogSidebar(blog.id, isOwner),
     getBlogVisitStats(blog.id),
+    isOwner ? countMyPosts(blog.id).then((c) => c.all) : 0,
   ]);
   const filterQuery: Record<string, string> = {};
   if (search) filterQuery.s = search;
@@ -80,14 +81,21 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
         {blog.intro && <p className="mt-2 text-ink-soft">{blog.intro}</p>}
         <p className="mt-2 text-sm text-ink-soft">by {nickname}</p>
         {isOwner && (
-          <div className="mt-4 flex flex-wrap gap-2">
+          // 주인 도구 막대 (BLOG-08)
+          <nav aria-label="주인 도구" className="mt-4 flex flex-wrap gap-2">
             <Link href="/write" className="btn btn-primary">
               ✏️ 새 글 쓰기
             </Link>
-            <Link href="/settings/blog" className="btn">
-              ⚙️ 블로그 관리
+            <Link href="/settings/posts" className="btn">
+              📝 글 관리 {myPostCount}
             </Link>
-          </div>
+            <Link href="/settings/blog#categories" className="btn">
+              🗂 카테고리 관리
+            </Link>
+            <Link href="/settings/blog" className="btn">
+              ⚙️ 블로그 설정
+            </Link>
+          </nav>
         )}
       </header>
 
