@@ -12,9 +12,11 @@ type Props = {
   blogTitle?: string;
   /** 삭제되지 않은 댓글 + 답글 (SOC-01·02) */
   commentCount?: number;
+  /** 공감 수 (SOC-03), 0이어도 보인다 */
+  likeCount?: number;
 };
 
-export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle, commentCount = 0 }: Props) {
+export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle, commentCount = 0, likeCount = 0 }: Props) {
   return (
     <article>
       <Link href={`/@${slug}/${post.id}`} className="block rounded-xl border border-line bg-surface p-4 hover:border-accent">
@@ -27,6 +29,7 @@ export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle,
         <p className="mt-2 text-sm text-ink-soft">
           {blogTitle && `${blogTitle} · `}
           {formatDate(post.createdAt)}
+          <span aria-label={`공감 ${likeCount}`}> · ♥ {likeCount}</span>
           {commentCount > 0 && <span aria-label={`댓글 ${commentCount}개`}> · 💬 {commentCount}</span>}
           <span aria-label={`조회 ${post.viewCount}`}> · 👀 {post.viewCount}</span>
         </p>

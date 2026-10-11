@@ -83,7 +83,8 @@ export async function getCommentThread(postId: number, blogOwnerId: string, view
 }
 
 /** 공개 글이거나 내 글이면 잠그고 true. 댓글을 쓰는 동안 글이 지워지지 않게 한다. */
-async function lockVisiblePost(tx: Tx, userId: string, postId: number) {
+/** 공개 글이거나 내 글이면 글 행을 잠그고 true (댓글·공감) */
+export async function lockVisiblePost(tx: Tx, userId: string, postId: number) {
   const [row] = await tx
     .select({ id: posts.id })
     .from(posts)

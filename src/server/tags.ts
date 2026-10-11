@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, inArray, notInArray } from "drizzle-orm";
 import { db, type Tx } from "@/db";
 import { blogs, categories, posts, postTags, subcategories, tags } from "@/db/schema";
 import { commentCountSql } from "./comments";
+import { likeCountSql } from "./likes";
 import { PAGE_SIZE } from "./post";
 
 /** 이 글의 태그를 새 목록에 맞춘다. 글 저장과 같은 트랜잭션에서 부른다 (POST-04). */
@@ -48,6 +49,7 @@ export async function listTagPosts(name: string, page: number) {
       .select({
         post: posts,
         commentCount: commentCountSql(posts.id),
+        likeCount: likeCountSql(posts.id),
         categoryName: categories.name,
         subcategoryName: subcategories.name,
         blogSlug: blogs.slug,

@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { blogs, posts } from "@/db/schema";
 import { createComment, createReply, removeComment, removeReply } from "@/server/comments";
 import { getSession, requireMember } from "@/server/dal";
+import { toggleLike as storeLike } from "@/server/likes";
 import { getBlogVisitStats, recordView, recordVisit, type VisitStats } from "@/server/stats";
 import { ensureVisitorId } from "@/server/visitor";
 
@@ -88,4 +89,12 @@ export async function recordBlogVisit(rawBlogId: unknown): Promise<VisitStats | 
   const member = await getSession();
   if (member?.userId !== blog.ownerId) await recordVisit(blogId, await ensureVisitorId());
   return getBlogVisitStats(blogId);
+}
+
+/** 공감·취소 (SOC-03). 공감인지 취소인지는 서버가 정한다. 볼 수 없는 글·이상한 ID는 아무것도 하지 않는다. */
+export async function toggleLike(rawPostId: unknown): Promise<void> {
+  const member = await requireMember();
+  const postId = parseId(rawPostId);
+  if (postId === null) return;
+  if (await storeLike(member.userId, postId)) revalidatePath("/", "layout");
 }

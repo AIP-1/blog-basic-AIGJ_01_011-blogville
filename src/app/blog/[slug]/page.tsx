@@ -127,7 +127,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
           ) : (
             <div className="space-y-3">
               {items.map((row) => (
-                <PostCard key={row.post.id} slug={blog.slug} post={row.post} categoryName={row.categoryName} subcategoryName={row.subcategoryName} commentCount={row.commentCount} />
+                <PostCard key={row.post.id} slug={blog.slug} post={row.post} categoryName={row.categoryName} subcategoryName={row.subcategoryName} commentCount={row.commentCount} likeCount={row.likeCount} />
               ))}
             </div>
           )}
