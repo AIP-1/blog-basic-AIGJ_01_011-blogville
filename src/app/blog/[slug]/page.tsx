@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BlogSidebar } from "@/components/blog/BlogSidebar";
 import { CategoryNav } from "@/components/blog/CategoryNav";
+import { FollowButton } from "@/components/blog/FollowButton";
 import { Pagination } from "@/components/blog/Pagination";
 import { PostCard } from "@/components/blog/PostCard";
 import { parseSearchQuery, parseTagFilter, SEARCH_EMPTY } from "@/lib/blog-search";
@@ -10,6 +11,7 @@ import { parseId, parsePage } from "@/lib/ids";
 import { getBlogBySlug } from "@/server/blog";
 import { getCategoryTree } from "@/server/category";
 import { getSession } from "@/server/dal";
+import { countFollowers, isFollowing } from "@/server/follows";
 import { countMyPosts, listBlogPosts, PAGE_SIZE } from "@/server/post";
 import { getBlogSidebar } from "@/server/sidebar";
 import { getBlogVisitStats } from "@/server/stats";
@@ -44,7 +46,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
   const tag = search || searchParam === "empty" ? null : parseTagFilter(query.tag);
   const filtered = search !== null || tag !== null || searchParam === "empty";
 
-  const [{ items, total }, { total: allTotal }, sidebar, visits, myPostCount] = await Promise.all([
+  const [{ items, total }, { total: allTotal }, sidebar, visits, myPostCount, followers, following] = await Promise.all([
     searchParam === "empty"
       ? { items: [], total: 0 }
       : listBlogPosts(blog.id, { viewerIsOwner: isOwner, categoryId, subcategoryId: subId, search, tag, page }),
@@ -53,6 +55,9 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
     getBlogSidebar(blog.id, isOwner),
     getBlogVisitStats(blog.id),
     isOwner ? countMyPosts(blog.id).then((c) => c.all) : 0,
+    countFollowers(blog.ownerId),
+    // 이웃 버튼은 회원이 남의 블로그를 볼 때만 (SOC-04)
+    member && !isOwner ? isFollowing(member.userId, blog.ownerId) : false,
   ]);
   const filterQuery: Record<string, string> = {};
   if (search) filterQuery.s = search;
@@ -79,7 +84,12 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
       <header className="rounded-2xl border border-line bg-surface p-5">
         <h1 className="text-2xl font-extrabold">{blog.title}</h1>
         {blog.intro && <p className="mt-2 text-ink-soft">{blog.intro}</p>}
-        <p className="mt-2 text-sm text-ink-soft">by {nickname}</p>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-ink-soft" aria-label="블로그 정보">
+            by {nickname} · @{blog.slug} · 글 {allTotal} · <span data-followers>이웃 {followers}</span>
+          </p>
+          {member && !isOwner && <FollowButton ownerId={blog.ownerId} following={following} />}
+        </div>
         {isOwner && (
           // 주인 도구 막대 (BLOG-08)
           <nav aria-label="주인 도구" className="mt-4 flex flex-wrap gap-2">

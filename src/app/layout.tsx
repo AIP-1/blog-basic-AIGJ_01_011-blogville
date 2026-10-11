@@ -18,17 +18,23 @@ async function Header() {
         <Link href={blog ? `/@${blog.slug}` : "/"} className="flex min-h-11 shrink-0 items-center whitespace-nowrap text-xl font-extrabold text-accent">
           Blogville
         </Link>
-        {blog && (
-          <nav className="flex items-center gap-1" aria-label="회원 메뉴">
-            <Link href={`/@${blog.slug}`} className="btn btn-ghost header-my-blog">
-              내 블로그
-            </Link>
-            <Link href="/write" className="btn btn-primary">
-              ✏️ 글쓰기
-            </Link>
-            <SignOutButton />
-          </nav>
-        )}
+        <nav className="flex items-center gap-1" aria-label="메뉴">
+          {/* 마을(광장)이 아직 없어 마을 소식은 헤더에서 들어간다 (SOC-05, 요구사항 1.34 메모) */}
+          <Link href="/feed" className="btn btn-ghost px-2" aria-label="마을 소식">
+            📋<span className="hidden sm:inline">마을 소식</span>
+          </Link>
+          {blog && (
+            <>
+              <Link href={`/@${blog.slug}`} className="btn btn-ghost header-my-blog">
+                내 블로그
+              </Link>
+              <Link href="/write" className="btn btn-primary">
+                ✏️ 글쓰기
+              </Link>
+              <SignOutButton />
+            </>
+          )}
+        </nav>
       </div>
     </header>
   );

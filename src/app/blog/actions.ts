@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { blogs, posts } from "@/db/schema";
 import { createComment, createReply, removeComment, removeReply } from "@/server/comments";
 import { getSession, requireMember } from "@/server/dal";
+import { toggleFollow as storeFollow } from "@/server/follows";
 import { toggleLike as storeLike } from "@/server/likes";
 import { getBlogVisitStats, recordView, recordVisit, type VisitStats } from "@/server/stats";
 import { ensureVisitorId } from "@/server/visitor";
@@ -97,4 +98,17 @@ export async function toggleLike(rawPostId: unknown): Promise<void> {
   const postId = parseId(rawPostId);
   if (postId === null) return;
   if (await storeLike(member.userId, postId)) revalidatePath("/", "layout");
+}
+
+/**
+ * 이웃 추가·취소 (SOC-04). 상대 회원 ID(블로그 주인)를 받는다.
+ * 1~64자 문자열이 아니거나 나 자신이면 아무것도 하지 않는다 (#22). 블로그가 없는 회원은 저장되지 않는다.
+ */
+export async function toggleFollow(formData: FormData): Promise<void> {
+  const member = await requireMember();
+  const followeeId = formData.get("followeeId");
+  if (typeof followeeId !== "string" || followeeId.length < 1 || followeeId.length > 64) return;
+  if (followeeId === member.userId) return;
+  await storeFollow(member.userId, followeeId);
+  revalidatePath("/", "layout");
 }

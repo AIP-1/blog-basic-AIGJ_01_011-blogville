@@ -15,3 +15,20 @@ export function parseId(value: unknown): number | null {
 export function parsePage(value: unknown): number {
   return parseId(value) ?? 1;
 }
+
+/**
+ * 보여줄 페이지 번호 (POST-05): 첫 페이지, 마지막 페이지, 현재 페이지 앞뒤 2개. 사이가 비면 "…".
+ * 1페이지뿐이면 빈 배열. 마지막보다 큰 현재 페이지는 앞뒤를 붙이지 않는다.
+ */
+export function pageNumbers(page: number, totalPages: number): (number | "…")[] {
+  if (totalPages <= 1) return [];
+  const shown = new Set([1, totalPages]);
+  for (let n = page - 2; n <= page + 2; n++) if (n >= 1 && n <= totalPages) shown.add(n);
+  const sorted = [...shown].sort((a, b) => a - b);
+  const out: (number | "…")[] = [];
+  sorted.forEach((n, i) => {
+    if (i > 0 && n - sorted[i - 1] > 1) out.push(n - sorted[i - 1] === 2 ? n - 1 : "…");
+    out.push(n);
+  });
+  return out;
+}

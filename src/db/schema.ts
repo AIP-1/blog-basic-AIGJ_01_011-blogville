@@ -359,6 +359,26 @@ export const postLikes = pgTable(
   (t) => [primaryKey({ columns: [t.postId, t.userId] }), index("post_likes_user_idx").on(t.userId)],
 );
 
+// 이웃 (SOC-04). 기본 키가 "같은 이웃은 한 번만"을, CHECK가 "나는 내 이웃이 아님"을 지킨다.
+// 즐겨찾기(is_favorite)는 마을(TOWN-04)이 생길 때 더한다.
+export const follows = pgTable(
+  "follows",
+  {
+    followerId: text("follower_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    followeeId: text("followee_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.followerId, t.followeeId] }),
+    index("follows_followee_idx").on(t.followeeId),
+    check("follows_not_self_check", sql`${t.followerId} <> ${t.followeeId}`),
+  ],
+);
+
 export type Blog = typeof blogs.$inferSelect;
 export type Post = typeof posts.$inferSelect;
 export type Category = typeof categories.$inferSelect;
