@@ -23,7 +23,7 @@ async function Header() {
           <Link href="/feed" className="btn btn-ghost px-2" aria-label="마을 소식">
             📋<span className="hidden sm:inline">마을 소식</span>
           </Link>
-          {blog && (
+          {member && blog && (
             <>
               <Link href={`/@${blog.slug}`} className="btn btn-ghost header-my-blog">
                 내 블로그
@@ -31,7 +31,7 @@ async function Header() {
               <Link href="/write" className="btn btn-primary">
                 ✏️ 글쓰기
               </Link>
-              <SignOutButton />
+              <SignOutButton userId={member.userId} />
             </>
           )}
         </nav>
