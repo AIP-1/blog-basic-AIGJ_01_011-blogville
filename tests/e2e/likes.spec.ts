@@ -47,6 +47,9 @@ test.describe("SOC-03 공감", () => {
     await page.goto(`/@${owner}/${id}`);
     await like(page).click();
     await expect(like(page)).toHaveText("♥ 공감 1");
+    // 화면은 누르자마자 바뀌므로, 첫 탭의 공감이 서버에 저장될 때까지 기다린 뒤 둘째 탭을 누른다
+    await expect(like(page)).toBeEnabled();
+    await expect.poll(async () => (await sql`select 1 from post_likes where post_id = ${id}`).length).toBe(1);
     await expect(like(tab2)).toHaveText("♡ 공감 0");
     await like(tab2).click();
     await expect(like(tab2)).toHaveText("♡ 공감 0");

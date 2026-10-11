@@ -33,7 +33,10 @@ test.describe("POST-06 조회수", () => {
     await a.goto(`/@${o.username}/${id}`);
     await expect(views(a)).toHaveText("👀 1");
     await expect.poll(async () => (await sql`select view_count from posts where id = ${id}`)[0].view_count).toBe(1);
-    const cookie = (await a.context().cookies()).find((c) => c.name === "bv_visitor")!;
+    // 쿠키는 기록 요청의 응답으로 심긴다: 응답이 올 때까지 기다린다
+    const visitorCookie = async () => (await a.context().cookies()).find((c) => c.name === "bv_visitor");
+    await expect.poll(visitorCookie).toBeTruthy();
+    const cookie = (await visitorCookie())!;
     expect(cookie.value).toMatch(/^[0-9a-f-]{36}$/);
     expect(cookie.httpOnly).toBe(true);
     expect(cookie.sameSite).toBe("Lax");
