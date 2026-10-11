@@ -1,7 +1,7 @@
 import "server-only";
 import { and, eq, lt, sql } from "drizzle-orm";
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { db } from "@/db";
 import { blogs, profiles, sessions } from "@/db/schema";
@@ -43,6 +43,13 @@ export const getSession = cache(async (): Promise<Member | null> => {
 export async function requireMember(): Promise<Member> {
   const member = await getSession();
   if (!member) redirect("/");
+  return member;
+}
+
+/** 관리자 화면·Action의 첫 줄. 로그인하지 않았거나 일반 회원이면 404 (관리자 화면이 있다는 것도 숨김, AUTH-08). */
+export async function requireAdmin(): Promise<Member> {
+  const member = await getSession();
+  if (member?.role !== "admin") notFound();
   return member;
 }
 
