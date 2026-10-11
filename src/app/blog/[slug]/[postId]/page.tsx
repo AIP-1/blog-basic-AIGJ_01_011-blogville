@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ViewCount } from "@/components/blog/ViewCount";
 import { CategoryBadge } from "@/components/post/CategoryBadge";
 import { DeletePostButton } from "@/components/post/DeletePostButton";
 import { CommentSection } from "@/components/post/CommentSection";
@@ -11,7 +12,9 @@ import { getBlogBySlug } from "@/server/blog";
 import { getSession } from "@/server/dal";
 import { getPostForView } from "@/server/post";
 import { getCommentThread } from "@/server/comments";
+import { hasViewedToday } from "@/server/stats";
 import { getPostTags } from "@/server/tags";
+import { readVisitorId } from "@/server/visitor";
 
 async function load(slug: string, rawId: string) {
   const postId = parseId(rawId);
@@ -40,6 +43,9 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]/[post
     ? `/@${blog.slug}?category=${post.categoryId}${post.subcategoryId ? `&sub=${post.subcategoryId}` : ""}`
     : undefined;
   const edited = post.updatedAt.getTime() - post.createdAt.getTime() > 1000;
+  // 조회수 (POST-06): 서버 렌더는 바꾸지 않는다. 오늘 처음 연 브라우저면 +1 한 값으로 시작한다.
+  const countsView = !isOwner && post.isPublic;
+  const firstToday = countsView && !(await hasViewedToday(post.id, await readVisitorId()));
 
   return (
     <article className="mx-auto max-w-3xl rounded-2xl border border-line bg-surface p-5 md:p-8">
@@ -48,6 +54,8 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]/[post
       <p className="mt-2 text-sm text-ink-soft">
         {nickname} · {formatDate(post.createdAt)}
         {edited && " · 수정됨"}
+        {" · "}
+        <ViewCount postId={post.id} initial={post.viewCount + (firstToday ? 1 : 0)} record={countsView} />
         {!post.isPublic && <span className="ml-2 font-semibold">🔒 비공개</span>}
       </p>
       {/* content_html은 저장할 때 허용 태그만 남긴 HTML이다 (NF-03) */}

@@ -1,14 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { BlogSidebar } from "@/components/blog/BlogSidebar";
 import { CategoryNav } from "@/components/blog/CategoryNav";
 import { Pagination } from "@/components/blog/Pagination";
 import { PostCard } from "@/components/blog/PostCard";
+import { parseSearchQuery, parseTagFilter, SEARCH_EMPTY } from "@/lib/blog-search";
 import { parseId, parsePage } from "@/lib/ids";
 import { getBlogBySlug } from "@/server/blog";
 import { getCategoryTree } from "@/server/category";
 import { getSession } from "@/server/dal";
 import { listBlogPosts, PAGE_SIZE } from "@/server/post";
+import { getBlogSidebar } from "@/server/sidebar";
+import { getBlogVisitStats } from "@/server/stats";
 
 export async function generateMetadata({ params }: PageProps<"/blog/[slug]">): Promise<Metadata> {
   const found = await getBlogBySlug((await params).slug);
@@ -34,11 +38,33 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
   const categoryId = sub ? sub.parent : tree.some((c) => c.id === catParam) ? catParam : null;
   const subId = sub?.id ?? null;
 
-  const { items, total } = await listBlogPosts(blog.id, { viewerIsOwner: isOwner, categoryId, subcategoryId: subId, page });
-  const { total: allTotal } = categoryId === null ? { total } : await listBlogPosts(blog.id, { viewerIsOwner: isOwner, page: 1 });
+  // 검색 → 태그 → 카테고리 순서로 하나만 쓴다 (BLOG-09)
+  const searchParam = parseSearchQuery(query.s);
+  const search = searchParam === "empty" ? null : searchParam;
+  const tag = search || searchParam === "empty" ? null : parseTagFilter(query.tag);
+  const filtered = search !== null || tag !== null || searchParam === "empty";
+
+  const [{ items, total }, { total: allTotal }, sidebar, visits] = await Promise.all([
+    searchParam === "empty"
+      ? { items: [], total: 0 }
+      : listBlogPosts(blog.id, { viewerIsOwner: isOwner, categoryId, subcategoryId: subId, search, tag, page }),
+    // `전체 글 (N)`은 누가 보든 공개 글 수다
+    listBlogPosts(blog.id, { viewerIsOwner: false, page: 1 }),
+    getBlogSidebar(blog.id, isOwner),
+    getBlogVisitStats(blog.id),
+  ]);
   const filterQuery: Record<string, string> = {};
-  if (categoryId !== null) filterQuery.category = String(categoryId);
-  if (subId !== null) filterQuery.sub = String(subId);
+  if (search) filterQuery.s = search;
+  else if (tag) filterQuery.tag = tag;
+  else {
+    if (categoryId !== null) filterQuery.category = String(categoryId);
+    if (subId !== null) filterQuery.sub = String(subId);
+  }
+  const listTitle = search
+    ? `🔍 '${search}' 블로그 검색 ${total}개`
+    : tag
+      ? `#${tag} ${total}개`
+      : `${sub?.name ?? tree.find((c) => c.id === categoryId)?.name ?? "전체 글"} ${total}개`;
 
   return (
     <div className="space-y-6">
@@ -65,15 +91,26 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
         )}
       </header>
 
-      <div className="grid gap-6 md:grid-cols-[220px_1fr]">
-        <aside>
-          <CategoryNav slug={blog.slug} tree={tree} total={allTotal} categoryId={categoryId} subId={subId} />
-        </aside>
-        <section aria-label="글 목록">
-          {items.length === 0 ? (
+      <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_260px] lg:grid-cols-[minmax(0,1fr)_300px]">
+        <section aria-labelledby="list-title" className="min-w-0">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 id="list-title" className="text-lg font-bold">
+              {listTitle}
+            </h2>
+            {filtered && (
+              <Link href={`/@${blog.slug}`} className="btn btn-ghost">
+                ← 전체 글 보기
+              </Link>
+            )}
+          </div>
+          {searchParam === "empty" ? (
+            <p role="alert" className="form-error">
+              {SEARCH_EMPTY}
+            </p>
+          ) : items.length === 0 ? (
             <div className="rounded-xl border border-dashed border-line p-8 text-center text-ink-soft">
-              <p>{categoryId === null ? "아직 쓴 글이 없어요." : "이 카테고리에 글이 없어요."}</p>
-              {isOwner && (
+              <p>{filtered ? "이 블로그에서 찾은 글이 없어요" : categoryId === null ? "아직 쓴 글이 없어요." : "이 카테고리에 글이 없어요."}</p>
+              {isOwner && !filtered && (
                 <Link href="/write" className="btn btn-primary mt-4">
                   ✏️ 첫 글 쓰기
                 </Link>
@@ -88,6 +125,19 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
           )}
           <Pagination basePath={`/@${blog.slug}`} query={filterQuery} page={page} totalPages={Math.ceil(total / PAGE_SIZE)} />
         </section>
+        <BlogSidebar
+          blogId={blog.id}
+          slug={blog.slug}
+          sidebar={sidebar}
+          visits={visits}
+          recordVisit={!isOwner}
+          search={search ?? ""}
+          activeTag={tag}
+          // 검색·태그로 볼 때는 카테고리에서 고른 항목이 없다
+          categoryNav={
+            <CategoryNav slug={blog.slug} tree={tree} total={allTotal} categoryId={filtered ? -1 : categoryId} subId={filtered ? -1 : subId} />
+          }
+        />
       </div>
     </div>
   );

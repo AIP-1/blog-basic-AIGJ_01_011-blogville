@@ -3,8 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { checkComment, COMMENT_ERRORS } from "@/lib/comment-rules";
 import { parseId } from "@/lib/ids";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { blogs, posts } from "@/db/schema";
 import { createComment, createReply, removeComment, removeReply } from "@/server/comments";
-import { requireMember } from "@/server/dal";
+import { getSession, requireMember } from "@/server/dal";
+import { getBlogVisitStats, recordView, recordVisit, type VisitStats } from "@/server/stats";
+import { ensureVisitorId } from "@/server/visitor";
 
 // 댓글·답글 (SOC-01·02, specs/004-comments). 실패하면 문구만 돌려주고 입력은 화면에 남는다.
 
@@ -51,4 +56,36 @@ export async function deleteReply(formData: FormData): Promise<void> {
   const id = parseId(formData.get("id"));
   if (id === null) return;
   if ((await removeReply(member, id)) !== null) revalidatePath("/", "layout");
+}
+
+// 조회수·방문자 (POST-06, BLOG-06). 화면이 브라우저에 열릴 때 한 번 부른다.
+// 방문자도 부르므로 로그인 검사가 없다. 주인인지는 여기서 다시 본다.
+// revalidatePath는 부르지 않는다: 돌려준 숫자로 그 자리만 바꾼다.
+
+/** 글 상세: 조회수 +1(오늘 처음이면)과 그 블로그 방문 기록. 지금 조회수, 셀 수 없는 글이면 null. */
+export async function recordPostView(rawPostId: unknown): Promise<number | null> {
+  const postId = parseId(rawPostId);
+  if (postId === null) return null;
+  const [row] = await db
+    .select({ blogId: posts.blogId, isPublic: posts.isPublic, viewCount: posts.viewCount, ownerId: blogs.ownerId })
+    .from(posts)
+    .innerJoin(blogs, eq(blogs.id, posts.blogId))
+    .where(eq(posts.id, postId));
+  if (!row || !row.isPublic) return null;
+  const member = await getSession();
+  if (member?.userId === row.ownerId) return row.viewCount;
+  const visitorId = await ensureVisitorId();
+  await recordVisit(row.blogId, visitorId);
+  return recordView(postId, visitorId);
+}
+
+/** 블로그 홈: 오늘 처음 온 브라우저면 1번 기록하고 지금 숫자. 없는 블로그면 null. */
+export async function recordBlogVisit(rawBlogId: unknown): Promise<VisitStats | null> {
+  const blogId = parseId(rawBlogId);
+  if (blogId === null) return null;
+  const [blog] = await db.select({ ownerId: blogs.ownerId }).from(blogs).where(eq(blogs.id, blogId));
+  if (!blog) return null;
+  const member = await getSession();
+  if (member?.userId !== blog.ownerId) await recordVisit(blogId, await ensureVisitorId());
+  return getBlogVisitStats(blogId);
 }

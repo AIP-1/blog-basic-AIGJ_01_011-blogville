@@ -52,7 +52,7 @@ function CommentItem({ postId, item }: { postId: number; item: CommentThreadItem
   const [replying, setReplying] = useState(false);
   return (
     <li>
-      <Line line={item} remove={deleteComment}>
+      <Line line={item} anchor={`comment-${item.id}`} remove={deleteComment}>
         {item.canReply && !replying && (
           <button type="button" className="btn btn-ghost px-2" onClick={() => setReplying(true)}>
             답글
@@ -76,7 +76,7 @@ function CommentItem({ postId, item }: { postId: number; item: CommentThreadItem
         <ul aria-label="답글" className="ml-10 mt-3 space-y-3 border-l-2 border-line pl-4">
           {item.replies.map((reply) => (
             <li key={reply.id}>
-              <Line line={reply} remove={deleteReply} />
+              <Line line={reply} anchor={`reply-${reply.id}`} remove={deleteReply} />
             </li>
           ))}
         </ul>
@@ -85,9 +85,12 @@ function CommentItem({ postId, item }: { postId: number; item: CommentThreadItem
   );
 }
 
-function Line({ line, remove, children }: { line: CommentLine; remove: (data: FormData) => Promise<void>; children?: React.ReactNode }) {
+type LineProps = { line: CommentLine; anchor: string; remove: (data: FormData) => Promise<void>; children?: React.ReactNode };
+
+function Line({ line, anchor, remove, children }: LineProps) {
   return (
-    <article aria-label={line.deleted ? "삭제된 댓글" : `${line.nickname ?? "알 수 없음"}의 댓글`}>
+    // 옆 칸 `💬 최근 댓글`에서 `#comment-ID`·`#reply-ID`로 온다 (BLOG-09)
+    <article id={anchor} className="scroll-mt-20" aria-label={line.deleted ? "삭제된 댓글" : `${line.nickname ?? "알 수 없음"}의 댓글`}>
       <p className="flex flex-wrap items-center gap-x-2 text-sm">
         {line.authorSlug ? (
           <Link href={`/@${line.authorSlug}`} className="inline-flex min-h-11 items-center font-bold">
