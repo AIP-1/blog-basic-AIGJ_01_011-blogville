@@ -50,6 +50,13 @@
       "when": 1791723682534,
       "tag": "0006_views_visits",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791727367479,
+      "tag": "0007_likes",
+      "breakpoints": true
     }
   ]
 }

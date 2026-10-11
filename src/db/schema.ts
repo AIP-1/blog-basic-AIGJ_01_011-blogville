@@ -344,6 +344,21 @@ export const blogVisits = pgTable(
   (t) => [primaryKey({ columns: [t.blogId, t.date, t.visitorId] })],
 );
 
+// 공감 (SOC-03). 기본 키가 "한 글에 한 번"을 지킨다.
+export const postLikes = pgTable(
+  "post_likes",
+  {
+    postId: integer("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.userId] }), index("post_likes_user_idx").on(t.userId)],
+);
+
 export type Blog = typeof blogs.$inferSelect;
 export type Post = typeof posts.$inferSelect;
 export type Category = typeof categories.$inferSelect;

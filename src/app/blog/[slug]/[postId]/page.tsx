@@ -5,6 +5,7 @@ import { ViewCount } from "@/components/blog/ViewCount";
 import { CategoryBadge } from "@/components/post/CategoryBadge";
 import { DeletePostButton } from "@/components/post/DeletePostButton";
 import { CommentSection } from "@/components/post/CommentSection";
+import { LikeButton } from "@/components/post/LikeButton";
 import { TagList } from "@/components/post/TagList";
 import { parseId } from "@/lib/ids";
 import { formatDate } from "@/lib/text";
@@ -12,6 +13,7 @@ import { getBlogBySlug } from "@/server/blog";
 import { getSession } from "@/server/dal";
 import { getPostForView } from "@/server/post";
 import { getCommentThread } from "@/server/comments";
+import { getLikeState } from "@/server/likes";
 import { hasViewedToday } from "@/server/stats";
 import { getPostTags } from "@/server/tags";
 import { readVisitorId } from "@/server/visitor";
@@ -61,6 +63,7 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]/[post
       {/* content_html은 저장할 때 허용 태그만 남긴 HTML이다 (NF-03) */}
       <div className="prose-post mt-6" dangerouslySetInnerHTML={{ __html: post.contentHtml }} />
       <TagList tags={await getPostTags(post.id)} />
+      <LikeButton postId={post.id} {...await getLikeState(post.id, member?.userId ?? null)} canLike={member !== null} />
       <footer className="mt-8 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4">
         <Link href={`/@${blog.slug}`} className="btn">
           목록으로
