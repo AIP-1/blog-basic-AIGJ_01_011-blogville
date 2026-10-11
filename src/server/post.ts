@@ -1,8 +1,9 @@
 import "server-only";
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import { db } from "@/db";
-import { blogs, categories, posts, subcategories } from "@/db/schema";
+import { blogs, categories, posts, postTags, subcategories, tags } from "@/db/schema";
 import { extractFileKeys } from "@/lib/attachments";
+import { likePattern } from "@/lib/blog-search";
 import { POST_ERRORS, type PostInput } from "@/lib/post-rules";
 import { htmlToText, sanitizePostHtml } from "@/lib/sanitize";
 import { lockLinkable, syncPostAttachments } from "./attachments";
@@ -89,16 +90,34 @@ export async function getPostForEdit(ownerId: string, postId: number) {
   return row?.post ?? null;
 }
 
-/** 블로그 홈 글 목록 (POST-05): 최신순 8개씩. 주인이 아니면 공개 글만. */
+/**
+ * 블로그 홈 글 목록 (POST-05): 최신순 8개씩. 주인이 아니면 공개 글만.
+ * 검색(`?s=`, 제목·본문)과 태그(`?tag=`)는 카테고리보다 먼저 쓴다 (BLOG-09).
+ */
 export async function listBlogPosts(
   blogId: number,
-  opts: { viewerIsOwner: boolean; categoryId?: number | null; subcategoryId?: number | null; page: number },
+  opts: {
+    viewerIsOwner: boolean;
+    categoryId?: number | null;
+    subcategoryId?: number | null;
+    search?: string | null;
+    tag?: string | null;
+    page: number;
+  },
 ) {
-  const where = and(
-    eq(posts.blogId, blogId),
-    opts.viewerIsOwner ? undefined : eq(posts.isPublic, true),
-    opts.subcategoryId ? eq(posts.subcategoryId, opts.subcategoryId) : opts.categoryId ? eq(posts.categoryId, opts.categoryId) : undefined,
-  );
+  const filter = opts.search
+    ? or(ilike(posts.title, likePattern(opts.search)), ilike(posts.contentText, likePattern(opts.search)))
+    : opts.tag
+      ? inArray(
+          posts.id,
+          db.select({ postId: postTags.postId }).from(postTags).innerJoin(tags, eq(tags.id, postTags.tagId)).where(eq(tags.name, opts.tag)),
+        )
+      : opts.subcategoryId
+        ? eq(posts.subcategoryId, opts.subcategoryId)
+        : opts.categoryId
+          ? eq(posts.categoryId, opts.categoryId)
+          : undefined;
+  const where = and(eq(posts.blogId, blogId), opts.viewerIsOwner ? undefined : eq(posts.isPublic, true), filter);
   const [items, [{ total }]] = await Promise.all([
     db
       .select(postWithCategory)

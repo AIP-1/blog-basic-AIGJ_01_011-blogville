@@ -28,6 +28,7 @@ export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle,
           {blogTitle && `${blogTitle} · `}
           {formatDate(post.createdAt)}
           {commentCount > 0 && <span aria-label={`댓글 ${commentCount}개`}> · 💬 {commentCount}</span>}
+          <span aria-label={`조회 ${post.viewCount}`}> · 👀 {post.viewCount}</span>
         </p>
       </Link>
     </article>

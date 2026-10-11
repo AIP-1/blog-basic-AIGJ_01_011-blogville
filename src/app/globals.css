@@ -107,6 +107,12 @@ body {
   overflow-wrap: anywhere;
 }
 .tag-chip:hover { border-color: var(--accent); color: var(--accent); }
+.tag-chip[aria-current="page"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, white); color: var(--accent); font-weight: 700; }
+.tag-count { color: var(--ink-soft); font-size: 0.85em; }
+
+/* 블로그 홈 옆 칸 (BLOG-09) */
+.widget { border: 1px solid var(--line); border-radius: 0.75rem; background: var(--surface); padding: 0.75rem; }
+.widget-title { padding: 0.25rem 0.5rem 0.5rem; font-weight: 700; }
 
 /* 첨부 (POST-07·09) */
 .prose-post img { display: block; max-width: 100%; height: auto; border-radius: 0.5rem; }

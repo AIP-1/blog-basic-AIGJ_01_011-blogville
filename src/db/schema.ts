@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  date,
   index,
   integer,
   pgTable,
@@ -9,6 +10,7 @@ import {
   text,
   timestamp,
   unique,
+  uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
@@ -199,11 +201,15 @@ export const posts = pgTable(
     contentHtml: text("content_html").notNull(),
     contentText: text("content_text").notNull(),
     isPublic: boolean("is_public").notNull().default(true),
+    /** post_views에서 셀 수 있는 합계를 일부러 저장한 값 (POST-06) */
+    viewCount: integer("view_count").notNull().default(0),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     index("posts_blog_list_idx").on(t.blogId, t.createdAt.desc(), t.id.desc()),
+    index("posts_blog_popular_idx").on(t.blogId, t.viewCount.desc()),
+    check("posts_view_count_check", sql`${t.viewCount} >= 0`),
     index("posts_category_idx").on(t.categoryId),
     index("posts_subcategory_idx").on(t.subcategoryId),
     check("posts_title_check", sql`char_length(${t.title}) between 1 and 100`),
@@ -309,6 +315,33 @@ export const replies = pgTable(
     index("replies_comment_created_idx").on(t.commentId, t.createdAt),
     liveContentCheck("replies_content_check", t.content, t.deletedAt),
   ],
+);
+
+// 조회수·방문자 (POST-06, BLOG-06, specs/005-blog-sidebar/data-model.md).
+// 기본 키가 "같은 브라우저는 하루 1번"을 보장한다. 날짜는 한국 날짜, IP·회원 ID는 저장하지 않는다.
+export const postViews = pgTable(
+  "post_views",
+  {
+    postId: integer("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    date: date("date").notNull(),
+    visitorId: uuid("visitor_id").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.date, t.visitorId] })],
+);
+
+export const blogVisits = pgTable(
+  "blog_visits",
+  {
+    blogId: integer("blog_id")
+      .notNull()
+      .references(() => blogs.id, { onDelete: "cascade" }),
+    date: date("date").notNull(),
+    visitorId: uuid("visitor_id").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.blogId, t.date, t.visitorId] })],
 );
 
 export type Blog = typeof blogs.$inferSelect;

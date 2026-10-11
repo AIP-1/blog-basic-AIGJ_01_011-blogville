@@ -67,6 +67,8 @@ test.describe("US2 글쓰기·발행·상세", () => {
   });
 
   test("남의 글 수정 화면과 이상한 주소는 404, 비로그인 글쓰기는 첫 화면", async ({ page, browser }) => {
+    // 화면을 열두 번 오가서 전체 테스트를 함께 돌릴 때는 기본 30초가 빠듯하다
+    test.slow();
     const owner = await signUpOk(page);
     const id = await writePost(page, "주인 글", "본문");
 
