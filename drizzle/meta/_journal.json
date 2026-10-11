@@ -57,6 +57,13 @@
       "when": 1791727367479,
       "tag": "0007_likes",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791728264954,
+      "tag": "0008_follows",
+      "breakpoints": true
     }
   ]
 }
