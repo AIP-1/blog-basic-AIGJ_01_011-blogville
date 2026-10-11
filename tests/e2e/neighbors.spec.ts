@@ -142,37 +142,42 @@ test.describe("SOC-04 이웃", () => {
 test.describe("SOC-05 마을 소식", () => {
   test("모든 블로그의 공개 글 최신순 8개, 작성자 줄, 비공개 없음, 페이지 번호, 이상한 page는 1페이지", async ({ page }) => {
     const a = await signUpOk(page);
-    await insertPosts(a, 9);
-    // 다른 시험이 동시에 글을 써도 이 글들이 맨 앞에 오도록 하루 뒤로 옮긴다
-    // (글 사이 간격은 1초라서 몇 분 전에 돈 같은 시험의 글과도 섞이지 않는다)
-    await sql`update posts p set created_at = now() + interval '1 day' + (p.id - m.first) * interval '1 second'
-      from (select min(id) as first, blog_id from posts group by blog_id) m
-      where m.blog_id = p.blog_id
-        and p.blog_id = (select b.id from blogs b join users u on u.id = b.owner_id where u.username = ${a})`;
-    await sql`insert into posts (blog_id, title, content_html, content_text, is_public)
-      select b.id, '숨은 글', '<p>x</p>', 'x', false from blogs b join users u on u.id = b.owner_id where u.username = ${a}`;
-    await page.goto("/feed");
-    await expect(page).toHaveTitle("마을 소식 | Blogville");
-    await expect(page.getByRole("heading", { name: "📋 마을 소식" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "💛 이웃 새 글" })).toBeVisible();
-    const cards = page.locator("article");
-    await expect(cards).toHaveCount(8);
-    await expect(cards.first().getByRole("heading")).toHaveText("글 9");
-    await expect(page.getByRole("heading", { name: "숨은 글" })).toHaveCount(0);
-    await expect(page.getByText("🔒 비공개")).toHaveCount(0);
-    await expect(cards.first().getByRole("link", { name: new RegExp(`^${a}의 블로그`) })).toHaveAttribute("href", `/@${a}`);
-    await expect(page.getByRole("heading", { name: "🏷 인기 태그" })).toBeVisible();
-
-    for (const bad of ["abc", "0", "2.5", "1e300"]) {
-      await page.goto(`/feed?page=${bad}`);
+    try {
+      await insertPosts(a, 9);
+      // 다른 시험이 동시에 글을 써도 이 글들이 맨 앞에 오도록 하루 뒤로 옮긴다
+      // (글 사이 간격은 1초라서 몇 분 전에 돈 같은 시험의 글과도 섞이지 않는다)
+      await sql`update posts p set created_at = now() + interval '1 day' + (p.id - m.first) * interval '1 second'
+        from (select min(id) as first, blog_id from posts group by blog_id) m
+        where m.blog_id = p.blog_id
+          and p.blog_id = (select b.id from blogs b join users u on u.id = b.owner_id where u.username = ${a})`;
+      await sql`insert into posts (blog_id, title, content_html, content_text, is_public)
+        select b.id, '숨은 글', '<p>x</p>', 'x', false from blogs b join users u on u.id = b.owner_id where u.username = ${a}`;
+      await page.goto("/feed");
+      await expect(page).toHaveTitle("마을 소식 | Blogville");
+      await expect(page.getByRole("heading", { name: "📋 마을 소식" })).toBeVisible();
+      await expect(page.getByRole("link", { name: "💛 이웃 새 글" })).toBeVisible();
+      const cards = page.locator("article");
+      await expect(cards).toHaveCount(8);
       await expect(cards.first().getByRole("heading")).toHaveText("글 9");
+      await expect(page.getByRole("heading", { name: "숨은 글" })).toHaveCount(0);
+      await expect(page.getByText("🔒 비공개")).toHaveCount(0);
+      await expect(cards.first().getByRole("link", { name: new RegExp(`^${a}의 블로그`) })).toHaveAttribute("href", `/@${a}`);
+      await expect(page.getByRole("heading", { name: "🏷 인기 태그" })).toBeVisible();
+
+      for (const bad of ["abc", "0", "2.5", "1e300"]) {
+        await page.goto(`/feed?page=${bad}`);
+        await expect(cards.first().getByRole("heading")).toHaveText("글 9");
+      }
+      await page.goto("/feed");
+      await page.getByRole("navigation", { name: "페이지" }).getByRole("link", { name: "2", exact: true }).click();
+      await expect(page).toHaveURL(/\/feed\?page=2$/);
+      // 2페이지 맨 앞은 이 블로그의 9번째 글(가장 오래된 글 1)
+      await expect(cards.first().getByRole("heading")).toHaveText("글 1");
+      await expect(cards.first().getByRole("link", { name: new RegExp(`^${a}의 블로그`) })).toBeVisible();
+    } finally {
+      // 미래로 옮긴 글은 다른 시험(관리자 최근 글 등)의 순서를 흔들므로 지운다
+      await sql`delete from posts where blog_id = (select b.id from blogs b join users u on u.id = b.owner_id where u.username = ${a})`;
     }
-    await page.goto("/feed");
-    await page.getByRole("navigation", { name: "페이지" }).getByRole("link", { name: "2", exact: true }).click();
-    await expect(page).toHaveURL(/\/feed\?page=2$/);
-    // 2페이지 맨 앞은 이 블로그의 9번째 글(가장 오래된 글 1)
-    await expect(cards.first().getByRole("heading")).toHaveText("글 1");
-    await expect(cards.first().getByRole("link", { name: new RegExp(`^${a}의 블로그`) })).toBeVisible();
   });
 
   test("헤더의 📋 마을 소식으로 들어가고 375px에서 가로 스크롤이 없다", async ({ page, browser }) => {

@@ -4,7 +4,7 @@
 
 | 경로 | 내용 |
 |---|---|
-| `docs/01-requirements.md` | 요구사항 명세서 (v1.36) |
+| `docs/01-requirements.md` | 요구사항 명세서 (v1.37) |
 | `.specify/memory/constitution.md` | 프로젝트 원칙 |
 | `specs/001-blog-core/` | 첫 기능(가입·블로그·글·카테고리)의 spec·plan·tasks |
 | `specs/002-attachments/` | 사진·파일 첨부의 spec·plan·tasks |
@@ -16,6 +16,7 @@
 | `specs/008-neighbors/` | 이웃·이웃 새 글·마을 소식의 spec·plan·tasks |
 | `specs/009-drafts/` | 임시 저장의 spec·plan·tasks |
 | `specs/011-withdraw/` | 회원 탈퇴의 spec·plan·tasks |
+| `specs/012-admin/` | 관리자의 spec·plan·tasks |
 | `src/` | Next.js 16 앱 |
 
 ## 실행
@@ -28,6 +29,7 @@ docker compose up -d db        # 또는 로컬 PostgreSQL에 blogville DB를 만
 npm install
 npm run db:migrate
 npm run db:seed                # (선택) demo / demo1234, /@demo
+npm run admin:create           # (선택) .env.local의 ADMIN_USERNAME·ADMIN_PASSWORD로 관리자와 /@notice
 npm run dev                    # http://localhost:3000
 ```
 
