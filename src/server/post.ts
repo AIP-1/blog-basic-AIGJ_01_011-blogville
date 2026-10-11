@@ -1,5 +1,5 @@
 import "server-only";
-import { and, count, desc, eq, ilike, inArray, or } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { blogs, categories, posts, postTags, subcategories, tags } from "@/db/schema";
 import { extractFileKeys } from "@/lib/attachments";
@@ -102,9 +102,13 @@ export async function listBlogPosts(
     subcategoryId?: number | null;
     search?: string | null;
     tag?: string | null;
+    /** 글 관리(BLOG-08): 주인이 공개·비공개만 골라 볼 때 */
+    visibility?: "public" | "private" | null;
+    pageSize?: number;
     page: number;
   },
 ) {
+  const pageSize = opts.pageSize ?? PAGE_SIZE;
   const filter = opts.search
     ? or(ilike(posts.title, likePattern(opts.search)), ilike(posts.contentText, likePattern(opts.search)))
     : opts.tag
@@ -117,7 +121,8 @@ export async function listBlogPosts(
         : opts.categoryId
           ? eq(posts.categoryId, opts.categoryId)
           : undefined;
-  const where = and(eq(posts.blogId, blogId), opts.viewerIsOwner ? undefined : eq(posts.isPublic, true), filter);
+  const visibility = !opts.viewerIsOwner || opts.visibility === "public" ? eq(posts.isPublic, true) : opts.visibility === "private" ? eq(posts.isPublic, false) : undefined;
+  const where = and(eq(posts.blogId, blogId), visibility, filter);
   const [items, [{ total }]] = await Promise.all([
     db
       .select(postWithCategory)
@@ -126,9 +131,32 @@ export async function listBlogPosts(
       .leftJoin(subcategories, eq(subcategories.id, posts.subcategoryId))
       .where(where)
       .orderBy(desc(posts.createdAt), desc(posts.id))
-      .limit(PAGE_SIZE)
-      .offset((opts.page - 1) * PAGE_SIZE),
+      .limit(pageSize)
+      .offset((opts.page - 1) * pageSize),
     db.select({ total: count() }).from(posts).where(where),
   ]);
   return { items, total };
+}
+
+/** 글 관리 상단 숫자: 내 글 전체·공개·비공개 (BLOG-08) */
+export async function countMyPosts(blogId: number) {
+  const [row] = await db
+    .select({
+      all: count(),
+      public: sql<number>`count(*) filter (where ${posts.isPublic})::int`,
+      private: sql<number>`count(*) filter (where not ${posts.isPublic})::int`,
+    })
+    .from(posts)
+    .where(eq(posts.blogId, blogId));
+  return row;
+}
+
+/** 내 글이면 공개·비공개를 바꾼다. 글의 수정 시각은 그대로 둔다. 바꿨으면 true. */
+export async function setPostVisibility(blogId: number, postId: number, isPublic: boolean): Promise<boolean> {
+  const rows = await db
+    .update(posts)
+    .set({ isPublic, updatedAt: sql`${posts.updatedAt}` })
+    .where(and(eq(posts.id, postId), eq(posts.blogId, blogId)))
+    .returning({ id: posts.id });
+  return rows.length > 0;
 }
