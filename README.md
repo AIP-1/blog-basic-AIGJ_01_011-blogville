@@ -29,6 +29,7 @@ npm run typecheck
 npm run lint
 npm test                       # Vitest 단위 테스트
 npm run test:e2e               # Playwright E2E (개발 서버를 띄우거나 자동으로 띄운다)
+npm run test:perf              # 글 1,000개 블로그 홈 응답 시간 (서버를 먼저 띄운다, 기준 1초)
 ```
 
 미리 설치된 Chromium을 쓰려면 `PW_CHROMIUM_PATH=/경로/chrome npm run test:e2e`.

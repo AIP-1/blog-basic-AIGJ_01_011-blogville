@@ -12,7 +12,8 @@
     "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx scripts/seed.ts"
+    "db:seed": "tsx scripts/seed.ts",
+    "test:perf": "tsx tests/perf/blog-scale.ts"
   },
   "dependencies": {
     "@tiptap/extension-placeholder": "^3.31.4",
