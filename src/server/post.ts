@@ -2,8 +2,10 @@ import "server-only";
 import { and, count, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { blogs, categories, posts, subcategories } from "@/db/schema";
+import { extractFileKeys } from "@/lib/attachments";
 import { POST_ERRORS, type PostInput } from "@/lib/post-rules";
 import { htmlToText, sanitizePostHtml } from "@/lib/sanitize";
+import { lockLinkable, syncPostAttachments } from "./attachments";
 import { resolveCategory } from "./category";
 
 export const PAGE_SIZE = 8;
@@ -11,30 +13,40 @@ export const PAGE_SIZE = 8;
 export class PostSaveError extends Error {}
 
 /**
- * 글 저장 (POST-01~03). 새 글이면 만들고, postId가 있으면 내 글만 고친다.
+ * 글 저장 (POST-01~03, 07, 09). 새 글이면 만들고, postId가 있으면 내 글만 고친다.
+ * 본문의 첨부 중 이 글에 붙일 수 있는 것만 남겨 붙이고, 빠진 첨부는 떨어뜨린다.
  * 남의 글·없는 글을 고치려 하면 예외(오류 화면). 입력 오류는 PostSaveError(문구).
  */
-export async function savePost(blogId: number, input: PostInput): Promise<number> {
-  const contentHtml = sanitizePostHtml(input.contentHtml);
-  const contentText = htmlToText(contentHtml);
-  if (contentText.length === 0) throw new PostSaveError(POST_ERRORS.contentEmpty);
-
+export async function savePost(blogId: number, ownerId: string, input: PostInput): Promise<number> {
   return db.transaction(async (tx) => {
+    if (input.postId !== null) {
+      // 남의 글에 첨부를 붙이지 않게 먼저 내 글인지 본다
+      const [mine] = await tx
+        .select({ id: posts.id })
+        .from(posts)
+        .where(and(eq(posts.id, input.postId), eq(posts.blogId, blogId)))
+        .for("update");
+      if (!mine) throw new Error("내 글이 아닌 글을 고치려 함");
+    }
+    const known = await lockLinkable(tx, ownerId, input.postId, extractFileKeys(input.contentHtml));
+    const contentHtml = sanitizePostHtml(input.contentHtml, known);
+    const contentText = htmlToText(contentHtml);
+    if (contentText.length === 0) throw new PostSaveError(POST_ERRORS.contentEmpty);
+
     const category = await resolveCategory(tx, blogId, input.categoryId, input.subcategoryId);
     if (category === "invalid") throw new PostSaveError(POST_ERRORS.invalid);
     const values = { title: input.title, contentHtml, contentText, isPublic: input.isPublic, ...category };
 
+    let postId: number;
     if (input.postId === null) {
       const [row] = await tx.insert(posts).values({ blogId, ...values }).returning({ id: posts.id });
-      return row.id;
+      postId = row.id;
+    } else {
+      await tx.update(posts).set(values).where(eq(posts.id, input.postId));
+      postId = input.postId;
     }
-    const [row] = await tx
-      .update(posts)
-      .set(values)
-      .where(and(eq(posts.id, input.postId), eq(posts.blogId, blogId)))
-      .returning({ id: posts.id });
-    if (!row) throw new Error("내 글이 아닌 글을 고치려 함");
-    return row.id;
+    await syncPostAttachments(tx, postId, extractFileKeys(contentHtml));
+    return postId;
   });
 }
 

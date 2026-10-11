@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import { savePost, type PostFormState } from "@/app/write/actions";
 import { checkPostInput, CONTENT_BYTES_MAX, POST_ERRORS, TITLE_MAX, utf8Bytes } from "@/lib/post-rules";
 import { RichEditor } from "../editor/RichEditor";
@@ -28,6 +28,22 @@ export function PostForm({ categories, initial }: Props) {
   const [subcategoryId, setSubcategoryId] = useState(initial?.subcategoryId ? String(initial.subcategoryId) : "");
   const [visibility, setVisibility] = useState<"public" | "private">(initial?.isPublic === false ? "private" : "public");
   const [localError, setLocalError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  // 파일을 에디터 밖에 떨어뜨려도 브라우저가 그 파일을 열어 쓰던 글을 잃지 않게 한다 (POST-07)
+  useEffect(() => {
+    const guard = (e: DragEvent) => {
+      if (!e.dataTransfer?.types.includes("Files")) return;
+      if ((e.target as Element | null)?.closest?.(".tiptap")) return;
+      e.preventDefault();
+    };
+    window.addEventListener("dragover", guard);
+    window.addEventListener("drop", guard);
+    return () => {
+      window.removeEventListener("dragover", guard);
+      window.removeEventListener("drop", guard);
+    };
+  }, []);
 
   const subs = categories.find((c) => String(c.id) === categoryId)?.subs ?? [];
   const error = localError ?? state?.error;
@@ -35,6 +51,7 @@ export function PostForm({ categories, initial }: Props) {
   // 값은 모두 화면 상태에 두고 onSubmit에서 보낸다. 오류가 나도 입력이 남는다 (POST-01).
   const submit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (uploading) return;
     const raw = { postId: initial ? String(initial.postId) : "", title, contentHtml, categoryId, subcategoryId, visibility };
     const checked = checkPostInput(raw);
     if (!checked.ok) return setLocalError(checked.error);
@@ -89,7 +106,7 @@ export function PostForm({ categories, initial }: Props) {
         </select>
       </div>
 
-      <RichEditor initialHtml={initial?.contentHtml ?? ""} onChange={(html) => setContentHtml(html)} />
+      <RichEditor initialHtml={initial?.contentHtml ?? ""} onChange={(html) => setContentHtml(html)} onUploadingChange={setUploading} />
 
       <fieldset className="flex gap-2">
         <legend className="sr-only">공개 설정</legend>
@@ -112,8 +129,8 @@ export function PostForm({ categories, initial }: Props) {
             {error}
           </p>
         )}
-        <button type="submit" className="btn btn-primary" disabled={pending}>
-          {pending ? "저장하는 중..." : initial ? "수정 완료" : "발행하기"}
+        <button type="submit" className="btn btn-primary" disabled={pending || uploading}>
+          {uploading ? "첨부를 올리는 중..." : pending ? "저장하는 중..." : initial ? "수정 완료" : "발행하기"}
         </button>
       </div>
     </form>

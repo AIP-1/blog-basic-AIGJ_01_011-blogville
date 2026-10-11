@@ -17,7 +17,7 @@ export async function savePost(_prev: PostFormState, formData: FormData): Promis
   const blog = await getMyBlog(member.userId);
   let postId: number;
   try {
-    postId = await storePost(blog.id, checked.value);
+    postId = await storePost(blog.id, member.userId, checked.value);
   } catch (e) {
     if (e instanceof PostSaveError) return { error: e.message };
     throw e;

@@ -15,12 +15,12 @@ async function Header() {
   return (
     <header className="border-b border-line bg-surface">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-2">
-        <Link href={blog ? `/@${blog.slug}` : "/"} className="flex min-h-11 items-center text-xl font-extrabold text-accent">
+        <Link href={blog ? `/@${blog.slug}` : "/"} className="flex min-h-11 shrink-0 items-center whitespace-nowrap text-xl font-extrabold text-accent">
           Blogville
         </Link>
         {blog && (
           <nav className="flex items-center gap-1" aria-label="회원 메뉴">
-            <Link href={`/@${blog.slug}`} className="btn btn-ghost">
+            <Link href={`/@${blog.slug}`} className="btn btn-ghost header-my-blog">
               내 블로그
             </Link>
             <Link href="/write" className="btn btn-primary">

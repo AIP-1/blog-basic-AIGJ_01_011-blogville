@@ -87,6 +87,53 @@ body {
 .prose-post pre code { background: none; padding: 0; color: inherit; }
 .prose-post hr { border: 0; border-top: 1px solid var(--line); }
 
+/* 좁은 화면: 로고가 내 블로그로 가므로 [내 블로그]는 숨긴다 */
+@media (max-width: 400px) {
+  .header-my-blog { display: none; }
+}
+
+/* 첨부 (POST-07·09) */
+.prose-post img { display: block; max-width: 100%; height: auto; border-radius: 0.5rem; }
+.prose-post a[data-file] {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 0.75rem;
+  align-items: center;
+  max-width: 30rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  box-shadow: 0 2px 0 var(--line);
+  color: var(--ink);
+  text-decoration: none;
+}
+.prose-post a[data-file]:hover, .prose-post a[data-file].ProseMirror-selectednode { border-color: #e0b400; }
+.prose-post a[data-file]::before {
+  content: "📄";
+  grid-row: 1 / 3;
+  font-size: 1.75rem;
+}
+.prose-post a[data-file][data-ext="pdf"]::before { content: "📕"; }
+.prose-post a[data-file][data-ext="hwp"]::before, .prose-post a[data-file][data-ext="hwpx"]::before { content: "📘"; }
+.prose-post a[data-file][data-ext="doc"]::before, .prose-post a[data-file][data-ext="docx"]::before { content: "📝"; }
+.prose-post a[data-file][data-ext="xls"]::before, .prose-post a[data-file][data-ext="xlsx"]::before, .prose-post a[data-file][data-ext="csv"]::before { content: "📊"; }
+.prose-post a[data-file][data-ext="ppt"]::before, .prose-post a[data-file][data-ext="pptx"]::before, .prose-post a[data-file][data-ext="key"]::before { content: "📽️"; }
+.prose-post a[data-file][data-ext="zip"]::before { content: "🗜️"; }
+.prose-post a[data-file][data-ext="mp3"]::before { content: "🎵"; }
+.prose-post a[data-file][data-ext="mp4"]::before { content: "🎬"; }
+.prose-post a[data-file]::after {
+  content: attr(data-name) "\A" attr(data-size-label) " · 내려받기";
+  grid-row: 1 / 3;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.tiptap img.ProseMirror-selectednode { outline: 3px solid #e0b400; outline-offset: 2px; }
+.tiptap a[data-file] { cursor: default; }
+
 /* 에디터 */
 .tiptap { min-height: 320px; outline: none; }
 .tiptap p.is-editor-empty:first-child::before {

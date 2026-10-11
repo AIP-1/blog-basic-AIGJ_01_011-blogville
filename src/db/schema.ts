@@ -214,7 +214,36 @@ export const posts = pgTable(
   ],
 );
 
+// 사진·파일 첨부 (POST-07·09, specs/002-attachments/data-model.md).
+// detached_at은 트리거가 관리한다 (drizzle/0003_attachments_track_detached.sql).
+export const attachments = pgTable(
+  "attachments",
+  {
+    key: text("key").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind").$type<"image" | "file">().notNull(),
+    name: text("name").notNull(),
+    mime: text("mime").notNull(),
+    size: integer("size").notNull(),
+    postId: integer("post_id").references(() => posts.id, { onDelete: "set null" }),
+    detachedAt: timestamp("detached_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("attachments_user_created_idx").on(t.userId, t.createdAt),
+    index("attachments_post_id_idx").on(t.postId),
+    index("attachments_unlinked_idx").on(t.createdAt).where(sql`${t.postId} is null`),
+    check("attachments_key_check", sql`${t.key} ~ '^[0-9a-f]{32}$'`),
+    check("attachments_kind_check", sql`${t.kind} in ('image', 'file')`),
+    check("attachments_name_check", sql`char_length(${t.name}) between 1 and 255`),
+    check("attachments_size_check", sql`${t.size} > 0`),
+  ],
+);
+
 export type Blog = typeof blogs.$inferSelect;
 export type Post = typeof posts.$inferSelect;
 export type Category = typeof categories.$inferSelect;
 export type Subcategory = typeof subcategories.$inferSelect;
+export type Attachment = typeof attachments.$inferSelect;
