@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { updateNickname } from "@/app/settings/account/actions";
+import { deleteAccount, updateNickname, type WithdrawState } from "@/app/settings/account/actions";
 import { updateBlogInfo, updateBlogSlug, type SettingsState } from "@/app/settings/blog/actions";
 
 function Status({ state }: { state: SettingsState }) {
@@ -78,6 +78,32 @@ export function NicknameForm({ nickname }: { nickname: string }) {
         <Status state={state} />
         <button type="submit" className="btn btn-primary" disabled={pending}>
           저장
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** 회원 탈퇴 (AUTH-06). 확인 창 없이 비밀번호를 다시 적어 확인한다. 실패하면 비밀번호 칸을 비운다. */
+export function DeleteAccountForm() {
+  const [state, action, pending] = useActionState<WithdrawState, FormData>(deleteAccount, null);
+  return (
+    <form action={action} className="space-y-3" key={JSON.stringify(state)}>
+      <p className="text-sm text-ink-soft">
+        탈퇴하면 바로 지워지고 되돌릴 수 없어요. 회원 정보·프로필·블로그와 글, 남의 글에 단 댓글과 답글, 코인·경험치 기록, 보유 아이템, 연동한 소셜 계정 연결이 함께 지워져요.
+      </p>
+      <label className="block">
+        <span className="mb-1 block text-sm font-semibold">확인을 위해 비밀번호를 다시 적어 주세요.</span>
+        <input name="password" type="password" autoComplete="current-password" className="field" maxLength={64} aria-label="탈퇴 확인 비밀번호" />
+      </label>
+      <div className="flex items-center justify-end gap-3">
+        {state?.error && (
+          <p role="alert" className="form-error">
+            {state.error}
+          </p>
+        )}
+        <button type="submit" className="btn btn-danger-solid" disabled={pending}>
+          {pending ? "탈퇴하는 중..." : "회원 탈퇴"}
         </button>
       </div>
     </form>
