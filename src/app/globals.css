@@ -55,6 +55,8 @@ body {
 .btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .btn-danger { color: var(--danger); }
+/* 되돌릴 수 없는 일 (회원 탈퇴) */
+.btn-danger-solid { background: var(--danger); border-color: var(--danger); color: #ffffff; }
 /* 이웃 추가 (SOC-04): 하늘색 바탕 흰 글씨, 대비 4.5:1 이상 */
 .btn-sky { background: #0277bd; border-color: #0277bd; color: #ffffff; }
 /* 테두리 없는 버튼 (도구 막대·메뉴) */
