@@ -10,7 +10,7 @@ test.describe("POST-01 발행 안내", () => {
   test("새 글을 발행하면 맨 위 노란 안내, 주소의 ?new는 지워지고 새로고침하면 사라진다, 고친 뒤에는 없다", async ({ page }) => {
     const username = await signUpOk(page);
     const id = await writePost(page, "발행 안내 글", "본문");
-    await expect(notice(page)).toHaveText("🎉 글을 발행했어요!");
+    await expect(notice(page)).toHaveText(/^🎉 글을 발행했어요! /);
     await expect(notice(page)).toHaveCSS("background-color", "rgb(255, 248, 225)");
     // 글보다 위에 있다
     const top = (await notice(page).boundingBox())!.y;

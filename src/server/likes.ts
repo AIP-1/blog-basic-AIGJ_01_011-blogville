@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { postLikes, posts } from "@/db/schema";
 import { lockVisiblePost } from "./comments";
 import { notifyActivity } from "./notifications";
+import { grantReward, hasLedgerEntry } from "./points";
 
 /** 글 카드·상세의 `♥ N`: 글 주인 자신의 공감도 센다 (SOC-03) */
 export function likeCountSql(postId: SQL | typeof posts.id): SQL<number> {
@@ -25,7 +26,7 @@ export async function getLikeState(postId: number, viewerId: string | null) {
 /**
  * 공감·취소 (SOC-03). 서버가 지금 상태를 보고 정한다: 내 공감이 있으면 지우고, 없으면 넣는다.
  * 볼 수 없는 글이면 아무것도 하지 않고 false. 새로 공감했으면 글 주인에게 공감 알림(GAME-08, 같은 사람·같은 글은 한 번만).
- * 보상(GAME-05)은 게임이 생기면 이 트랜잭션에 붙인다.
+ * 남의 글이면 글 주인이 공감 보상을 받는다(하루 20번, 같은 사람·같은 글은 처음 한 번만, GAME-05).
  */
 export async function toggleLike(userId: string, postId: number): Promise<boolean> {
   return db.transaction(async (tx) => {
@@ -37,7 +38,10 @@ export async function toggleLike(userId: string, postId: number): Promise<boolea
       .returning({ postId: postLikes.postId });
     if (removed.length > 0) return true;
     const added = await tx.insert(postLikes).values({ postId, userId }).onConflictDoNothing().returning({ postId: postLikes.postId });
-    if (added.length > 0) await notifyActivity(tx, { kind: "like", recipientId: ownerId, actorId: userId, postId });
+    if (added.length === 0 || ownerId === userId) return true;
+    await notifyActivity(tx, { kind: "like", recipientId: ownerId, actorId: userId, postId });
+    const ref = `${postId}:${userId}`;
+    if (!(await hasLedgerEntry(tx, ownerId, "like_received", ref))) await grantReward(tx, ownerId, "like_received", ref);
     return true;
   });
 }

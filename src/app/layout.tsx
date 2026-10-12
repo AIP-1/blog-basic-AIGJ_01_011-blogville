@@ -5,7 +5,9 @@ import { SessionKeeper } from "@/components/auth/SessionKeeper";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { getMyBlog, getSession } from "@/server/dal";
+import { formatNumber } from "@/lib/game";
 import { countUnreadNotifications } from "@/server/notifications";
+import { getWallet } from "@/server/points";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -15,7 +17,9 @@ export const metadata: Metadata = {
 
 async function Header() {
   const member = await getSession();
-  const [blog, unread] = member ? await Promise.all([getMyBlog(member.userId), countUnreadNotifications(member.userId)]) : [null, 0];
+  const [blog, unread, wallet] = member
+    ? await Promise.all([getMyBlog(member.userId), countUnreadNotifications(member.userId), getWallet(member.userId)])
+    : [null, 0, null];
   return (
     <header className="border-b border-line bg-surface">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-2 px-4 py-2">
@@ -32,6 +36,18 @@ async function Header() {
               {member.role === "admin" && (
                 <Link href="/admin" className="btn btn-ghost px-2" aria-label="관리자">
                   👑<span className="hidden sm:inline">관리자</span>
+                </Link>
+              )}
+              {wallet && (
+                // 레벨·코인 (GAME-02·03), 누르면 내역 (GAME-07)
+                <Link
+                  href="/wallet"
+                  className="btn btn-ghost gap-1 px-2 text-sm"
+                  aria-label={`Lv.${wallet.progress.level}, 코인 ${formatNumber(wallet.coin)}: 경험치·코인 내역`}
+                  data-wallet
+                >
+                  <span className="rounded-full bg-accent/10 px-1.5 font-bold text-accent">Lv.{wallet.progress.level}</span>
+                  <span className="whitespace-nowrap">🪙 {formatNumber(wallet.coin)}</span>
                 </Link>
               )}
               <NotificationBell unread={{ count: unread }} />
