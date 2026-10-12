@@ -11,6 +11,7 @@ import { PublishNotice } from "@/components/post/PublishNotice";
 import { AdjacentPosts } from "@/components/post/AdjacentPosts";
 import { TagList } from "@/components/post/TagList";
 import { parseId } from "@/lib/ids";
+import { hasPostReward } from "@/server/points";
 import { showsPublishNotice } from "@/lib/post-rules";
 import { loginHref } from "@/lib/safe-next";
 import { formatDate } from "@/lib/text";
@@ -64,7 +65,7 @@ export default async function PostPage({ params, searchParams }: PageProps<"/blo
 
   return (
     <>
-      {notice && <PublishNotice />}
+      {notice && <PublishNotice rewarded={await hasPostReward(blog.ownerId, post.id)} />}
       <article className="mx-auto max-w-3xl rounded-2xl border border-line bg-surface p-5 md:p-8">
         <Link href={`/@${blog.slug}`} className="-ml-1 flex min-h-11 w-fit max-w-full items-center px-1 font-semibold text-ink-soft hover:text-ink" data-blog-link>
           <span className="truncate">📖 {blog.title}</span>

@@ -1,13 +1,15 @@
 import "server-only";
 import { and, asc, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { blogs, categories, posts, postTags, profiles, subcategories, tags } from "@/db/schema";
+import { blogs, categories, posts, postTags, profiles, subcategories, tags, users } from "@/db/schema";
 import { extractFileKeys } from "@/lib/attachments";
+import { postEarnsReward } from "@/lib/game";
 import { likePattern } from "@/lib/blog-search";
 import { POST_ERRORS, type PostInput } from "@/lib/post-rules";
 import { htmlToText, sanitizePostHtml } from "@/lib/sanitize";
 import { lockLinkable, syncPostAttachments } from "./attachments";
 import { commentCountSql } from "./comments";
+import { grantReward } from "./points";
 import { likeCountSql } from "./likes";
 import { resolveCategory } from "./category";
 import { syncPostTags } from "./tags";
@@ -32,7 +34,9 @@ export async function savePost(blogId: number, ownerId: string, input: PostInput
         .for("update");
       if (!mine) throw new Error("내 글이 아닌 글을 고치려 함");
     }
-    // 프로필 → 첨부 순서로 잠근다 (setProfilePhoto와 같은 순서). 그 사이 프로필 사진이 된 첨부를 본문에 남기지 않는다
+    // 회원 → 프로필 → 첨부 순서로 잠근다. 회원 행은 보상 원장 외래 키가 나중에 잠그므로 탈퇴(deleteMember: 회원 행 먼저)와 같은 순서로 먼저 잡는다.
+    // 프로필은 setProfilePhoto와 같은 순서라 그 사이 프로필 사진이 된 첨부를 본문에 남기지 않는다
+    await tx.select({ id: users.id }).from(users).where(eq(users.id, ownerId)).for("key share");
     await tx.select({ id: profiles.userId }).from(profiles).where(eq(profiles.userId, ownerId)).for("share");
     const known = await lockLinkable(tx, ownerId, input.postId, extractFileKeys(input.contentHtml));
     const contentHtml = sanitizePostHtml(input.contentHtml, known);
@@ -52,6 +56,8 @@ export async function savePost(blogId: number, ownerId: string, input: PostInput
       postId = input.postId;
     }
     await syncPostAttachments(tx, postId, extractFileKeys(contentHtml));
+    // 공개 새 글(본문 100자 이상)이면 글쓰기 보상, 하루 3번까지 (GAME-05). 고친 글은 보상이 없다
+    if (postEarnsReward(input.postId === null, input.isPublic, contentText.length)) await grantReward(tx, ownerId, "post", String(postId));
     await syncPostTags(tx, postId, input.tags);
     return postId;
   });

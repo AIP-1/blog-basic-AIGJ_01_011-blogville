@@ -421,3 +421,33 @@ export const notifications = pgTable(
     check("notifications_not_self_check", sql`${t.userId} <> ${t.actorId}`),
   ],
 );
+
+/**
+ * 경험치·코인 원장 (GAME-02·03·05, ERD 3.5). 레벨·잔액 컬럼은 없고 합계로만 계산한다.
+ * `ref_id`는 무엇으로 받았는지(글 ID 등) 남기는 글자이고 외래 키가 아니다. 글을 지워도 받은 보상은 그대로다.
+ */
+export const pointLedger = pgTable(
+  "point_ledger",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    reason: text("reason").notNull(),
+    expDelta: integer("exp_delta").notNull().default(0),
+    coinDelta: integer("coin_delta").notNull().default(0),
+    refId: text("ref_id"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("point_ledger_user_reason_created_idx").on(t.userId, t.reason, t.createdAt),
+    index("point_ledger_user_created_idx").on(t.userId, t.createdAt.desc(), t.id.desc()),
+    // 같은 사람·같은 글 공감 보상은 한 번만 (껐다 켜도, 동시에 눌러도)
+    uniqueIndex("point_ledger_like_received_uq").on(t.userId, t.refId).where(sql`${t.reason} = 'like_received'`),
+    // 가입 축하는 한 번만
+    uniqueIndex("point_ledger_signup_uq").on(t.userId).where(sql`${t.reason} = 'signup'`),
+    check("point_ledger_reason_check", sql`${t.reason} in ('signup', 'post', 'comment', 'like_received')`),
+    check("point_ledger_exp_check", sql`${t.expDelta} >= 0`),
+    check("point_ledger_nonzero_check", sql`${t.expDelta} <> 0 or ${t.coinDelta} <> 0`),
+  ],
+);

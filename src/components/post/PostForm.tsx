@@ -2,6 +2,7 @@
 
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { savePost, type PostFormState } from "@/app/write/actions";
+import { POST_REWARD_MIN_LENGTH, REWARD_RULES } from "@/lib/game";
 import { clearDraft, DRAFT_ASK, DRAFT_DELAY_MS, DRAFT_HINT, isEmptyDraft, readDraft, savedLabel, writeDraft } from "@/lib/draft";
 import { checkPostInput, CONTENT_BYTES_MAX, POST_ERRORS, TAGS_MAX_CHARS, TITLE_MAX, utf8Bytes } from "@/lib/post-rules";
 import { postTextLength } from "@/lib/text-length";
@@ -34,6 +35,13 @@ type Start = {
 };
 
 const EMPTY: Start = { title: "", contentHtml: "", categoryId: "", subcategoryId: "", visibility: "public", tags: "" };
+
+function rewardHint(isPublic: boolean, length: number): string {
+  if (!isPublic) return "비공개 글은 보상이 없어요";
+  if (length < POST_REWARD_MIN_LENGTH) return `${POST_REWARD_MIN_LENGTH}자 이상 쓰면 보상을 받아요`;
+  const { exp, coin, dailyLimit } = REWARD_RULES.post;
+  return `저장하면 ✨ 경험치 ${exp} · 🪙 ${coin} 보상 (하루 ${dailyLimit}번까지)`;
+}
 
 export function PostForm({ categories, initial, draftOwnerId }: Props) {
   const [start, setStart] = useState<Start | null>(draftOwnerId ? null : EMPTY);
@@ -266,8 +274,12 @@ function Form({ categories, initial, draftOwnerId, start }: Props & { start: Sta
       </fieldset>
 
       <div className="flex flex-wrap items-center justify-end gap-3">
-        <p className="mr-auto text-sm text-ink-soft" data-char-count>
-          {charCount.toLocaleString("ko-KR")}자{initial && " · 글을 고치고 있어요"}
+        <p className="mr-auto text-sm text-ink-soft">
+          <span data-char-count>
+            {charCount.toLocaleString("ko-KR")}자{initial && " · 글을 고치고 있어요"}
+          </span>
+          {/* 새 글의 보상 안내 (GAME-05). 서버도 같은 규칙(postEarnsReward)으로 정한다 */}
+          {!initial && <span data-reward-hint> · {rewardHint(visibility === "public", charCount)}</span>}
         </p>
         {error && (
           <p role="alert" className="form-error">

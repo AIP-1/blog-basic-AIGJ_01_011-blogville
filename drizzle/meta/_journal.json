@@ -85,6 +85,13 @@
       "when": 1791791581080,
       "tag": "0011_profile_photo",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791793455483,
+      "tag": "0012_points_ledger",
+      "breakpoints": true
     }
   ]
 }

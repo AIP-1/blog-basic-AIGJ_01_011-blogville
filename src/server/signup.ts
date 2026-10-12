@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { accounts, blogs, categories, loginAttempts, profiles, users } from "@/db/schema";
 import { AUTH_ERRORS } from "@/lib/auth-rules";
 import { findNameConflict, isUniqueViolation, lockName } from "./names";
+import { grantReward } from "./points";
 
 export class SignUpError extends Error {}
 
@@ -45,6 +46,8 @@ export async function createMember(input: { username: string; password: string; 
         .values({ ownerId: userId, slug: input.username, title: input.blogTitle.trim(), intro: "" })
         .returning({ id: blogs.id });
       await tx.insert(categories).values({ blogId: blog.id, name: "일상", position: 1 });
+      // 가입 축하 🪙 100 (GAME-03·05)
+      await grantReward(tx, userId, "signup");
     });
   } catch (error) {
     if (error instanceof SignUpError) throw error;
