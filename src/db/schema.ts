@@ -567,9 +567,17 @@ export const pointLedger = pgTable(
     uniqueIndex("point_ledger_attendance_uq").on(t.userId, t.refId).where(sql`${t.reason} = 'attendance'`),
     // 같은 아이템은 한 번만 산다 (SHOP-01, ref_id = 아이템 ID)
     uniqueIndex("point_ledger_purchase_uq").on(t.userId, t.refId).where(sql`${t.reason} = 'purchase'`),
-    check("point_ledger_reason_check", sql`${t.reason} in ('signup', 'attendance', 'post', 'comment', 'like_received', 'purchase')`),
-    // 구매만 코인이 줄고, 구매는 경험치가 없다 (SHOP-03)
-    check("point_ledger_purchase_check", sql`(${t.reason} = 'purchase') = (${t.coinDelta} < 0) and (${t.reason} <> 'purchase' or ${t.expDelta} = 0)`),
+    // 다 키운 동물 보상·산 알은 동물마다 한 번 (TOWN-09, ref_id = 동물 ID)
+    uniqueIndex("point_ledger_farm_uq").on(t.userId, t.reason, t.refId).where(sql`${t.reason} in ('farm_grown', 'egg_purchase')`),
+    check(
+      "point_ledger_reason_check",
+      sql`${t.reason} in ('signup', 'attendance', 'post', 'comment', 'like_received', 'purchase', 'farm_care', 'farm_grown', 'egg_purchase')`,
+    ),
+    // 구매(상점·알)만 코인이 줄고, 구매는 경험치가 없다 (SHOP-03, TOWN-09)
+    check(
+      "point_ledger_purchase_check",
+      sql`(${t.reason} in ('purchase', 'egg_purchase')) = (${t.coinDelta} < 0) and (${t.reason} not in ('purchase', 'egg_purchase') or ${t.expDelta} = 0)`,
+    ),
     check("point_ledger_exp_check", sql`${t.expDelta} >= 0`),
     check("point_ledger_nonzero_check", sql`${t.expDelta} <> 0 or ${t.coinDelta} <> 0`),
   ],
@@ -608,4 +616,49 @@ export const attendances = pgTable(
     index("attendances_session_idx").on(t.sessionId),
     check("attendances_cycle_day_check", sql`${t.cycleDay} between 1 and 7`),
   ],
+);
+
+/**
+ * 농장의 알과 동물 (TOWN-09, specs/044-farm). `species`가 NULL이면 아직 알이다.
+ * 알을 얻은 길(`source`): 첫 알·레벨 보상 알은 회원당 한 번(부분 고유 인덱스), 산 알은 몇 번이든.
+ * 다 자라면 `grown_at`이 찍히고 키우는 자리(5마리)에서 빠져 카드가 된다.
+ */
+export const animals = pgTable(
+  "animals",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    species: text("species"),
+    source: text("source").notNull(),
+    sourceLevel: integer("source_level"),
+    growth: integer("growth").notNull().default(0),
+    hatchedAt: timestamp("hatched_at", { withTimezone: true }),
+    grownAt: timestamp("grown_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("animals_user_idx").on(t.userId, t.grownAt),
+    uniqueIndex("animals_first_egg_uq").on(t.userId).where(sql`${t.source} = 'first'`),
+    uniqueIndex("animals_level_egg_uq").on(t.userId, t.sourceLevel).where(sql`${t.source} = 'level'`),
+    check("animals_species_check", sql`${t.species} in ('chick', 'rabbit', 'piglet', 'calf')`),
+    check("animals_source_check", sql`${t.source} in ('first', 'level', 'buy') and (${t.source} = 'level') = (${t.sourceLevel} is not null) and (${t.sourceLevel} is null or (${t.sourceLevel} > 0 and ${t.sourceLevel} % 5 = 0))`),
+    // 알은 자라지 않고 부화 시각이 없다. 다 자란 것은 부화한 동물만
+    check("animals_egg_check", sql`(${t.species} is null) = (${t.hatchedAt} is null) and (${t.species} is not null or (${t.growth} = 0 and ${t.grownAt} is null))`),
+    check("animals_growth_check", sql`${t.growth} >= 0`),
+  ],
+);
+
+/** 하루 한 번씩 하는 돌보기 (TOWN-09): 동물·돌보기·한국 날짜마다 한 줄 */
+export const animalCares = pgTable(
+  "animal_cares",
+  {
+    animalId: integer("animal_id")
+      .notNull()
+      .references(() => animals.id, { onDelete: "cascade" }),
+    action: text("action").notNull(),
+    date: date("date").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.animalId, t.action, t.date] }), check("animal_cares_action_check", sql`${t.action} in ('feed', 'water', 'pet')`)],
 );

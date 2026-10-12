@@ -1,6 +1,6 @@
 // 마을에 놓을 것과 입구 (TOWN-03·04, specs/038-town). 그림은 `src/lib/art/town.ts`, 좌표는 `layout.ts`.
 import type { PixelArt } from "@/lib/art/characters";
-import { benchArt, boardArt, emptyLotArt, fountainArt, houseArt, lampArt, mailboxArt, shopArt, TOWN_CELL, treeArt } from "@/lib/art/town";
+import { benchArt, boardArt, emptyLotArt, farmArt, fountainArt, houseArt, lampArt, mailboxArt, shopArt, TOWN_CELL, treeArt } from "@/lib/art/town";
 import {
   BOARD_POS,
   CENTER,
@@ -10,6 +10,7 @@ import {
   lotFront,
   PLAZA_RADIUS,
   ROADS,
+  FARM_POS,
   SHOP_POS,
   START_POS,
   WORLD,
@@ -133,6 +134,22 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean, m
     y: SHOP_POS.y + 30,
     label: "🏪 상점",
     href: member ? "/shop" : "login",
+  });
+
+  structures.push({
+    id: "farm",
+    art: farmArt(),
+    x: FARM_POS.x,
+    y: FARM_POS.y,
+    body: { x: FARM_POS.x - 110, y: FARM_POS.y - 50, width: 220, height: 50 },
+    label: "동물 농장",
+  });
+  entrances.push({
+    id: "farm",
+    x: FARM_POS.x,
+    y: FARM_POS.y + 30,
+    label: "🐮 동물 농장",
+    href: member ? "/farm" : "login",
   });
 
   structures.push({
@@ -283,7 +300,7 @@ export type TownSpot = { id: string; label: string; sub: string | null; x: numbe
 export const EMPTY_LOT_HINT = "친구 목록에서 ⭐를 누르면 집이 생겨요";
 
 /**
- * 텔레포트 목록: `마을` 3곳(분수·게시판·상점) + 집 11자리. 게임과 같은 좌표(입구 앞)를 쓴다.
+ * 텔레포트 목록: `마을` 4곳(분수·게시판·상점·농장) + 집 11자리. 게임과 같은 좌표(입구 앞)를 쓴다.
  * 빈 집터의 부제(⭐ 안내)는 회원에게만, 0번 자리는 없다.
  */
 export function townSpots(houses: readonly TownHouseInput[], member: boolean): { places: TownSpot[]; houses: TownSpot[] } {
@@ -291,6 +308,7 @@ export function townSpots(houses: readonly TownHouseInput[], member: boolean): {
     { id: "fountain", label: "⛲ 광장 분수", sub: null, ...START_POS, enabled: true, slug: null },
     { id: "board", label: "📋 마을 게시판", sub: null, x: BOARD_POS.x, y: BOARD_POS.y + 30, enabled: true, slug: null },
     { id: "shop", label: "🏪 상점", sub: null, x: SHOP_POS.x + 40, y: SHOP_POS.y + 30, enabled: true, slug: null },
+    { id: "farm", label: "🐮 동물 농장", sub: null, x: FARM_POS.x, y: FARM_POS.y + 30, enabled: true, slug: null },
   ];
   const lots = HOUSE_LOTS.map((_, i): TownSpot => {
     const house = houses.find((h) => h.lot === i);

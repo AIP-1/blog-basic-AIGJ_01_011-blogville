@@ -1,3 +1,4 @@
+import { ANIMAL_ART } from "./animals";
 import { CHARACTER_ART, type PixelArt } from "./characters";
 import { ITEM_ART, MANNEQUIN_ART } from "./items";
 
@@ -5,5 +6,5 @@ import { ITEM_ART, MANNEQUIN_ART } from "./items";
 export function findArt(key: string | null | undefined): PixelArt | undefined {
   if (!key) return undefined;
   if (key === "mannequin") return MANNEQUIN_ART;
-  return CHARACTER_ART[key] ?? ITEM_ART[key];
+  return CHARACTER_ART[key] ?? ITEM_ART[key] ?? ANIMAL_ART[key];
 }

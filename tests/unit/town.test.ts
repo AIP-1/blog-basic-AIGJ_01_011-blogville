@@ -122,9 +122,9 @@ describe("집 그림 (TOWN-11)", () => {
 });
 
 describe("☰ 텔레포트 목록 (TOWN-12)", () => {
-  it("마을 3곳 + 집 11자리, 집은 입구 앞 좌표·블로그 주소, 빈 집터는 못 고르고 회원에게만 ⭐ 안내", () => {
+  it("마을 4곳 + 집 11자리, 집은 입구 앞 좌표·블로그 주소, 빈 집터는 못 고르고 회원에게만 ⭐ 안내", () => {
     const member = townSpots([house(0, true), house(2)], true);
-    expect(member.places.map((s) => s.label)).toEqual(["⛲ 광장 분수", "📋 마을 게시판", "🏪 상점"]);
+    expect(member.places.map((s) => s.label)).toEqual(["⛲ 광장 분수", "📋 마을 게시판", "🏪 상점", "🐮 동물 농장"]);
     expect(member.houses).toHaveLength(11);
     expect(member.houses[0]).toMatchObject({ label: "🏠 내 집", sub: "블로그 0", enabled: true, slug: "blog0", ...lotFront(0) });
     expect(member.houses[2]).toMatchObject({ label: "🏠 주민2의 집", enabled: true, slug: "blog2" });

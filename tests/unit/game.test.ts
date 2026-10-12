@@ -37,6 +37,7 @@ describe("보상 규칙 (GAME-05)", () => {
       post: { exp: 30, coin: 30, dailyLimit: 3 },
       comment: { exp: 5, coin: 5, dailyLimit: 10 },
       like_received: { exp: 2, coin: 2, dailyLimit: 20 },
+      farm_care: { exp: 2, coin: 0, dailyLimit: 15 },
     });
   });
   it("글쓰기 보상은 공개 새 글, 100자 이상", () => {
