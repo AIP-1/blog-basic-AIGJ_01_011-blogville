@@ -6,9 +6,11 @@ import { CategoryBadge } from "@/components/post/CategoryBadge";
 import { DeletePostButton } from "@/components/post/DeletePostButton";
 import { CommentSection } from "@/components/post/CommentSection";
 import { LikeButton } from "@/components/post/LikeButton";
+import { PublishNotice } from "@/components/post/PublishNotice";
 import { AdjacentPosts } from "@/components/post/AdjacentPosts";
 import { TagList } from "@/components/post/TagList";
 import { parseId } from "@/lib/ids";
+import { showsPublishNotice } from "@/lib/post-rules";
 import { loginHref } from "@/lib/safe-next";
 import { formatDate } from "@/lib/text";
 import { getBlogBySlug } from "@/server/blog";
@@ -39,8 +41,9 @@ export async function generateMetadata({ params }: PageProps<"/blog/[slug]/[post
   return { title: data.post.isPublic ? `${data.post.title} | ${data.blog.title}` : "글 | Blogville" };
 }
 
-export default async function PostPage({ params }: PageProps<"/blog/[slug]/[postId]">) {
+export default async function PostPage({ params, searchParams }: PageProps<"/blog/[slug]/[postId]">) {
   const { slug, postId } = await params;
+  const { new: justPublished } = await searchParams;
   const data = await load(slug, postId);
   if (!data) notFound();
   const { blog, nickname, post, categoryName, subcategoryName, isOwner, member } = data;
@@ -55,39 +58,45 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]/[post
   const countsView = !isOwner && post.isPublic;
   const firstToday = countsView && !(await hasViewedToday(post.id, await readVisitorId()));
 
+  // 발행 안내: 주소에 ?new가 있고 주인이 만든 지 10분 안인 글 (POST-01)
+  const notice = justPublished !== undefined && showsPublishNotice(isOwner, post.createdAt);
+
   return (
-    <article className="mx-auto max-w-3xl rounded-2xl border border-line bg-surface p-5 md:p-8">
-      <Link href={`/@${blog.slug}`} className="-ml-1 flex min-h-11 w-fit max-w-full items-center px-1 font-semibold text-ink-soft hover:text-ink" data-blog-link>
-        <span className="truncate">📖 {blog.title}</span>
-      </Link>
-      <CategoryBadge categoryName={categoryName} subcategoryName={subcategoryName} href={categoryHref} />
-      <h1 className="mt-2 text-3xl font-extrabold">{post.title}</h1>
-      <p className="mt-2 text-sm text-ink-soft">
-        {nickname} · {formatDate(post.createdAt)}
-        {edited && " · 수정됨"}
-        {" · "}
-        <ViewCount postId={post.id} initial={post.viewCount + (firstToday ? 1 : 0)} record={countsView} />
-        {!post.isPublic && <span className="ml-2 font-semibold">🔒 비공개</span>}
-      </p>
-      {/* content_html은 저장할 때 허용 태그만 남긴 HTML이다 (NF-03) */}
-      <div className="prose-post mt-6" dangerouslySetInnerHTML={{ __html: post.contentHtml }} />
-      <TagList tags={await getPostTags(post.id)} />
-      <LikeButton postId={post.id} {...await getLikeState(post.id, member?.userId ?? null)} canLike={member !== null} loginHref={loginHref(postPath)} />
-      <AdjacentPosts slug={blog.slug} {...adjacent} />
-      <footer className={`flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 ${adjacent.older || adjacent.newer ? "" : "mt-8"}`}>
-        <Link href={`/@${blog.slug}`} className="btn">
-          목록으로
+    <>
+      {notice && <PublishNotice />}
+      <article className="mx-auto max-w-3xl rounded-2xl border border-line bg-surface p-5 md:p-8">
+        <Link href={`/@${blog.slug}`} className="-ml-1 flex min-h-11 w-fit max-w-full items-center px-1 font-semibold text-ink-soft hover:text-ink" data-blog-link>
+          <span className="truncate">📖 {blog.title}</span>
         </Link>
-        {isOwner && (
-          <div className="flex gap-2">
-            <Link href={`/write/${post.id}`} className="btn">
-              수정
-            </Link>
-            <DeletePostButton postId={post.id} />
-          </div>
-        )}
-      </footer>
-      <CommentSection postId={post.id} items={thread.items} count={thread.count} signedIn={member !== null} loginHref={loginHref(`${postPath}#comments`)} />
-    </article>
+        <CategoryBadge categoryName={categoryName} subcategoryName={subcategoryName} href={categoryHref} />
+        <h1 className="mt-2 text-3xl font-extrabold">{post.title}</h1>
+        <p className="mt-2 text-sm text-ink-soft">
+          {nickname} · {formatDate(post.createdAt)}
+          {edited && " · 수정됨"}
+          {" · "}
+          <ViewCount postId={post.id} initial={post.viewCount + (firstToday ? 1 : 0)} record={countsView} />
+          {!post.isPublic && <span className="ml-2 font-semibold">🔒 비공개</span>}
+        </p>
+        {/* content_html은 저장할 때 허용 태그만 남긴 HTML이다 (NF-03) */}
+        <div className="prose-post mt-6" dangerouslySetInnerHTML={{ __html: post.contentHtml }} />
+        <TagList tags={await getPostTags(post.id)} />
+        <LikeButton postId={post.id} {...await getLikeState(post.id, member?.userId ?? null)} canLike={member !== null} loginHref={loginHref(postPath)} />
+        <AdjacentPosts slug={blog.slug} {...adjacent} />
+        <footer className={`flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 ${adjacent.older || adjacent.newer ? "" : "mt-8"}`}>
+          <Link href={`/@${blog.slug}`} className="btn">
+            목록으로
+          </Link>
+          {isOwner && (
+            <div className="flex gap-2">
+              <Link href={`/write/${post.id}`} className="btn">
+                수정
+              </Link>
+              <DeletePostButton postId={post.id} />
+            </div>
+          )}
+        </footer>
+        <CommentSection postId={post.id} items={thread.items} count={thread.count} signedIn={member !== null} loginHref={loginHref(`${postPath}#comments`)} />
+      </article>
+    </>
   );
 }

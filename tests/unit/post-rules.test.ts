@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkPostInput, linkHref, POST_ERRORS, rawPostInput, type RawPostInput } from "@/lib/post-rules";
+import { checkPostInput, linkHref, POST_ERRORS, PUBLISH_NOTICE_MS, rawPostInput, showsPublishNotice, type RawPostInput } from "@/lib/post-rules";
 
 const ok: RawPostInput = { postId: "", title: "첫 글", contentHtml: "<p>안녕</p>", categoryId: "", subcategoryId: "", visibility: "public", tags: "" };
 const error = (patch: Partial<RawPostInput>) => {
@@ -48,5 +48,22 @@ describe("linkHref (링크 창)", () => {
   });
   it("저장하면 사라지거나 엉뚱한 곳으로 가는 주소는 거부", () => {
     for (const v of ["javascript:alert(1)", "tel:01012345678", "ftp://a.kr", "data:text/html,x", "hello", "naver com", "#top"]) expect(linkHref(v)).toBeNull();
+  });
+});
+
+describe("showsPublishNotice (발행 안내)", () => {
+  const now = Date.parse("2026-10-12T04:00:00Z");
+  const ago = (ms: number) => new Date(now - ms);
+  it("주인이고 만든 지 10분 안이면 보인다", () => {
+    expect(showsPublishNotice(true, ago(0), now)).toBe(true);
+    expect(showsPublishNotice(true, ago(PUBLISH_NOTICE_MS), now)).toBe(true);
+  });
+  it("10분이 지났거나 주인이 아니면 없다", () => {
+    expect(showsPublishNotice(true, ago(PUBLISH_NOTICE_MS + 1), now)).toBe(false);
+    expect(showsPublishNotice(false, ago(0), now)).toBe(false);
+  });
+  it("앞날짜로 넣은 글(시계 차이 1분 넘게)은 없다", () => {
+    expect(showsPublishNotice(true, ago(-30_000), now)).toBe(true);
+    expect(showsPublishNotice(true, ago(-61_000), now)).toBe(false);
   });
 });

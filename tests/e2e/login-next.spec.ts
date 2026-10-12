@@ -89,7 +89,7 @@ test.describe("로그인 뒤 보던 글로", () => {
     await expect(page.getByRole("button", { name: /공감 0/ })).toBeEnabled();
   });
 
-  test("다른 사이트 주소·점 경로·이상한 값·조작한 값이면 내 블로그로, 로그인한 채 열면 바로 그 화면으로", async ({ browser }) => {
+  test("다른 사이트 주소·점 경로·이상한 값·조작한 값이면 안내 없이 로그인 뒤 내 블로그로", async ({ browser }) => {
     const owner = await signUpOk(await browser.newPage());
     const id = await oldPost(owner, "바로 갈 글");
     const { page, username } = await signedOut(browser);
@@ -108,6 +108,13 @@ test.describe("로그인 뒤 보던 글로", () => {
     await page.locator('input[name="next"]').evaluate((el) => ((el as HTMLInputElement).value = "//evil.com"));
     await logIn(page, username);
     await expect(page).toHaveURL(`/@${username}`);
+  });
+
+  test("로그인한 채 열면 바로 그 화면으로(다른 사이트·점 경로면 내 블로그로), 돌아갈 주소 안에 다시 넣은 next도 걸러진다", async ({ browser }) => {
+    const owner = await signUpOk(await browser.newPage());
+    const id = await oldPost(owner, "바로 갈 글");
+    const page = await browser.newPage();
+    const username = await signUpOk(page);
 
     // 이미 로그인했으면 첫 화면을 거치지 않고 돌아갈 화면(다른 사이트면 내 블로그)으로
     await page.goto(`/?next=${encodeURIComponent(`/@${owner}/${id}#comments`)}`);
