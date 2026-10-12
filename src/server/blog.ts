@@ -1,7 +1,8 @@
 import "server-only";
-import { eq, sql } from "drizzle-orm";
+import { desc, eq, ilike, max, or, sql } from "drizzle-orm";
 import { db, type Tx } from "@/db";
-import { blogs, profiles } from "@/db/schema";
+import { blogs, posts, profiles } from "@/db/schema";
+import { likePattern } from "@/lib/blog-search";
 import { BLOG_ERRORS } from "@/lib/blog-rules";
 import { isReserved, normalizeName, SLUG_RE } from "@/lib/names";
 import { findNameConflict, isUniqueViolation, lockName } from "./names";
@@ -15,6 +16,28 @@ export async function getBlogBySlug(slug: string) {
     .where(eq(blogs.slug, slug))
     .limit(1);
   return row ?? null;
+}
+
+/**
+ * 마을 검색(BLOG-07): 블로그 이름이나 주인 닉네임에 그 말이 든 블로그.
+ * 최근 공개 글이 있는 블로그가 먼저(글이 없으면 뒤), 그다음 만든 순서.
+ */
+export async function searchBlogs(term: string, limit = 8) {
+  const pattern = likePattern(term);
+  const lastPost = db
+    .select({ blogId: posts.blogId, at: max(posts.createdAt).as("last_post_at") })
+    .from(posts)
+    .where(eq(posts.isPublic, true))
+    .groupBy(posts.blogId)
+    .as("last_post");
+  return db
+    .select({ slug: blogs.slug, title: blogs.title, nickname: profiles.nickname })
+    .from(blogs)
+    .innerJoin(profiles, eq(profiles.userId, blogs.ownerId))
+    .leftJoin(lastPost, eq(lastPost.blogId, blogs.id))
+    .where(or(ilike(blogs.title, pattern), ilike(profiles.nickname, pattern)))
+    .orderBy(sql`${lastPost.at} desc nulls last`, desc(blogs.createdAt), desc(blogs.id))
+    .limit(limit);
 }
 
 /** 같은 블로그의 카테고리 변경을 줄 세운다 (BLOG-05) */

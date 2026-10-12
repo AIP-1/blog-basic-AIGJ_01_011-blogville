@@ -4,7 +4,7 @@
 
 | 경로 | 내용 |
 |---|---|
-| `docs/01-requirements.md` | 요구사항 명세서 (v1.37) |
+| `docs/01-requirements.md` | 요구사항 명세서 (v1.38) |
 | `.specify/memory/constitution.md` | 프로젝트 원칙 |
 | `specs/001-blog-core/` | 첫 기능(가입·블로그·글·카테고리)의 spec·plan·tasks |
 | `specs/002-attachments/` | 사진·파일 첨부의 spec·plan·tasks |
@@ -17,6 +17,7 @@
 | `specs/009-drafts/` | 임시 저장의 spec·plan·tasks |
 | `specs/011-withdraw/` | 회원 탈퇴의 spec·plan·tasks |
 | `specs/012-admin/` | 관리자의 spec·plan·tasks |
+| `specs/013-town-search/` | 마을 검색의 spec·plan·tasks |
 | `src/` | Next.js 16 앱 |
 
 ## 실행

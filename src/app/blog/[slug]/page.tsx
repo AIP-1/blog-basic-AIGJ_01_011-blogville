@@ -6,11 +6,12 @@ import { CategoryNav } from "@/components/blog/CategoryNav";
 import { FollowButton } from "@/components/blog/FollowButton";
 import { Pagination } from "@/components/blog/Pagination";
 import { PostCard } from "@/components/blog/PostCard";
-import { parseSearchQuery, parseTagFilter, SEARCH_EMPTY } from "@/lib/blog-search";
+import { parseSearchQuery, parseTagFilter, SEARCH_EMPTY, TOWN_SEARCH_EMPTY, TOWN_SEARCH_NONE } from "@/lib/blog-search";
 import { parseId, parsePage } from "@/lib/ids";
-import { getBlogBySlug } from "@/server/blog";
+import { getBlogBySlug, searchBlogs } from "@/server/blog";
 import { getCategoryTree } from "@/server/category";
 import { getSession } from "@/server/dal";
+import { listFeed } from "@/server/feed";
 import { countFollowers, isFollowing } from "@/server/follows";
 import { countMyPosts, listBlogPosts, PAGE_SIZE } from "@/server/post";
 import { getBlogSidebar } from "@/server/sidebar";
@@ -40,16 +41,24 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
   const categoryId = sub ? sub.parent : tree.some((c) => c.id === catParam) ? catParam : null;
   const subId = sub?.id ?? null;
 
-  // 검색 → 태그 → 카테고리 순서로 하나만 쓴다 (BLOG-09)
-  const searchParam = parseSearchQuery(query.s);
+  // 마을 검색(BLOG-07)은 주인만. 주인이 아니면 ?q=를 무시하고 검색 쿼리를 돌리지 않는다.
+  const townParam = isOwner ? parseSearchQuery(query.q) : null;
+  const town = townParam === "empty" ? null : townParam;
+  const townMode = townParam !== null;
+
+  // 마을 검색 → 블로그 검색 → 태그 → 카테고리 순서로 하나만 쓴다 (BLOG-09)
+  const searchParam = townMode ? null : parseSearchQuery(query.s);
   const search = searchParam === "empty" ? null : searchParam;
   const tag = search || searchParam === "empty" ? null : parseTagFilter(query.tag);
-  const filtered = search !== null || tag !== null || searchParam === "empty";
+  const filtered = townMode || search !== null || tag !== null || searchParam === "empty";
 
-  const [{ items, total }, { total: allTotal }, sidebar, visits, myPostCount, followers, following] = await Promise.all([
-    searchParam === "empty"
+  const [{ items, total }, townFeed, townBlogs, { total: allTotal }, sidebar, visits, myPostCount, followers, following] = await Promise.all([
+    townMode || searchParam === "empty"
       ? { items: [], total: 0 }
       : listBlogPosts(blog.id, { viewerIsOwner: isOwner, categoryId, subcategoryId: subId, search, tag, page }),
+    town ? listFeed({ page, search: town }) : null,
+    // 블로그 묶음은 1페이지에만
+    town && page === 1 ? searchBlogs(town) : [],
     // `전체 글 (N)`은 누가 보든 공개 글 수다
     listBlogPosts(blog.id, { viewerIsOwner: false, page: 1 }),
     getBlogSidebar(blog.id, isOwner),
@@ -60,13 +69,18 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
     member && !isOwner ? isFollowing(member.userId, blog.ownerId) : false,
   ]);
   const filterQuery: Record<string, string> = {};
-  if (search) filterQuery.s = search;
+  if (town) filterQuery.q = town;
+  else if (search) filterQuery.s = search;
   else if (tag) filterQuery.tag = tag;
   else {
     if (categoryId !== null) filterQuery.category = String(categoryId);
     if (subId !== null) filterQuery.sub = String(subId);
   }
-  const listTitle = search
+  const listTitle = townMode
+    ? town
+      ? `🔍 '${town}' 검색 결과`
+      : "🔍 마을 검색"
+    : search
     ? `🔍 '${search}' 블로그 검색 ${total}개`
     : tag
       ? `#${tag} ${total}개`
@@ -121,7 +135,58 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
               </Link>
             )}
           </div>
-          {searchParam === "empty" ? (
+          {townMode ? (
+            townFeed === null ? (
+              <p role="alert" className="form-error">
+                {TOWN_SEARCH_EMPTY}
+              </p>
+            ) : townFeed.total === 0 && townBlogs.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-line p-8 text-center text-ink-soft">
+                <p>{TOWN_SEARCH_NONE}</p>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {townBlogs.length > 0 && (
+                  <section aria-labelledby="town-blogs">
+                    <h3 id="town-blogs" className="mb-2 font-bold">
+                      블로그
+                    </h3>
+                    <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
+                      {townBlogs.map((b) => (
+                        <li key={b.slug} data-town-blog={b.slug}>
+                          <Link href={`/@${b.slug}`} className="flex min-h-11 flex-col justify-center px-4 py-2 hover:bg-bg">
+                            <span className="min-w-0 truncate font-semibold">
+                              {b.nickname} · {b.title}
+                            </span>
+                            <span className="text-sm text-ink-soft">@{b.slug}</span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+                <section aria-labelledby="town-posts">
+                  <h3 id="town-posts" className="mb-2 font-bold">
+                    글 {townFeed.total}개
+                  </h3>
+                  <div className="space-y-3">
+                    {townFeed.items.map((row) => (
+                      <PostCard
+                        key={row.post.id}
+                        slug={row.blogSlug}
+                        post={row.post}
+                        categoryName={row.categoryName}
+                        subcategoryName={row.subcategoryName}
+                        commentCount={row.commentCount}
+                        likeCount={row.likeCount}
+                        author={{ nickname: row.nickname, blogTitle: row.blogTitle }}
+                      />
+                    ))}
+                  </div>
+                </section>
+              </div>
+            )
+          ) : searchParam === "empty" ? (
             <p role="alert" className="form-error">
               {SEARCH_EMPTY}
             </p>
@@ -141,7 +206,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
               ))}
             </div>
           )}
-          <Pagination basePath={`/@${blog.slug}`} query={filterQuery} page={page} totalPages={Math.ceil(total / PAGE_SIZE)} />
+          <Pagination basePath={`/@${blog.slug}`} query={filterQuery} page={page} totalPages={Math.ceil((townFeed?.total ?? total) / PAGE_SIZE)} />
         </section>
         <BlogSidebar
           blogId={blog.id}
@@ -150,6 +215,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
           visits={visits}
           recordVisit={!isOwner}
           search={search ?? ""}
+          townSearch={isOwner ? (town ?? "") : undefined}
           activeTag={tag}
           // 검색·태그로 볼 때는 카테고리에서 고른 항목이 없다
           categoryNav={
