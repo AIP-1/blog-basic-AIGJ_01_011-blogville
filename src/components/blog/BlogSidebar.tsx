@@ -12,12 +12,14 @@ type Props = {
   visits: VisitStats;
   recordVisit: boolean;
   search: string;
+  /** 마을 검색어(BLOG-07). 주인이 아니면 undefined라 상자가 없다 */
+  townSearch?: string;
   activeTag: string | null;
   categoryNav: React.ReactNode;
 };
 
 /** 블로그 홈 오른쪽 옆 칸 (BLOG-09). 휴대폰에서는 글 목록 아래. */
-export function BlogSidebar({ blogId, slug, sidebar, visits, recordVisit, search, activeTag, categoryNav }: Props) {
+export function BlogSidebar({ blogId, slug, sidebar, visits, recordVisit, search, townSearch, activeTag, categoryNav }: Props) {
   const empty = <p className="px-1 text-sm text-ink-soft">아직 없어요</p>;
   const linkClass = "flex min-h-11 items-center gap-2 rounded-lg px-2 hover:bg-bg";
   return (
@@ -33,6 +35,20 @@ export function BlogSidebar({ blogId, slug, sidebar, visits, recordVisit, search
           </button>
         </form>
       </section>
+
+      {townSearch !== undefined && (
+        <section className="widget" aria-labelledby="w-town-search">
+          <h2 id="w-town-search" className="widget-title">
+            🏘 마을 검색
+          </h2>
+          <form action={`/@${slug}`} role="search" className="flex gap-2">
+            <input name="q" type="search" aria-label="검색어" defaultValue={townSearch} maxLength={SEARCH_MAX} placeholder="마을의 글·블로그 검색" className="field min-w-0 flex-1" />
+            <button type="submit" className="btn">
+              검색
+            </button>
+          </form>
+        </section>
+      )}
 
       {categoryNav}
 

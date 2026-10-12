@@ -2,6 +2,9 @@
 
 export const SEARCH_MAX = 50;
 export const SEARCH_EMPTY = "찾을 말을 적어 주세요";
+/** 마을 검색(BLOG-07) 문구 */
+export const TOWN_SEARCH_EMPTY = "검색어를 적어 주세요";
+export const TOWN_SEARCH_NONE = "검색 결과가 없어요";
 
 /**
  * `?s=` 값. 앞뒤 공백을 지우고 1~50자면 그 말, 비었거나 공백만이면 "empty"(문구를 보여 준다),

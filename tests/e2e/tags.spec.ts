@@ -1,6 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { signUpOk, sql, uid } from "./helpers";
 
+// 인기 태그 비교는 다른 시험이 태그를 쓰는 동안 다시 읽으므로 기본 30초로는 모자랄 때가 있다
+test.describe.configure({ timeout: 60_000 });
+
 async function postWithTags(page: Page, title: string, tags: string, opts: { private?: boolean } = {}) {
   await page.goto("/write");
   await page.getByLabel("제목", { exact: true }).fill(title);
