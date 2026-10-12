@@ -14,7 +14,8 @@ export async function reserveLoginAttempt(username: string): Promise<boolean> {
     await tx
       .insert(loginAttempts)
       .values({ username, failures: 0 })
-      .onConflictDoNothing();
+      // 있던 행도 이 트랜잭션이 끝날 때까지 잠근다 (정리 작업이 그 사이에 지우지 못하게)
+      .onConflictDoUpdate({ target: loginAttempts.username, set: { username: sql`excluded.username` } });
     const [row] = await tx
       .select({
         failures: loginAttempts.failures,
