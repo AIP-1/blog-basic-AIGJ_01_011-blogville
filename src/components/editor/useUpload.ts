@@ -2,7 +2,8 @@
 
 import type { Editor } from "@tiptap/react";
 import { useCallback, useRef, useState } from "react";
-import { ATTACH_MESSAGES, attachmentProblem } from "@/lib/attachments";
+import { classifyPastedAttachments, reuploadPastedAttachment } from "@/app/write/actions";
+import { ATTACH_MESSAGES, attachmentProblem, keyFromUrl, PASTE_KEYS_MAX } from "@/lib/attachments";
 
 export type UploadProblem = { id: number; name: string; message: string };
 type Uploaded = { url: string; kind: "image" | "file"; name: string; size: number; sizeLabel: string; ext: string };
@@ -11,7 +12,7 @@ type Uploaded = { url: string; kind: "image" | "file"; name: string; size: numbe
  * 사진·파일을 한 개씩 차례로 올리고 받은 주소를 에디터에 넣는다 (POST-07 흐름 2~4).
  * 넣을 자리는 올리는 동안 글을 고쳐도 따라간다.
  */
-export function useUpload(editor: Editor | null, onBusyChange: (busy: boolean) => void) {
+export function useUpload(editor: Editor | null, onBusyChange: (busy: boolean) => void, postId: number | null) {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [problems, setProblems] = useState<UploadProblem[]>([]);
   const busy = useRef(false);
@@ -104,7 +105,72 @@ export function useUpload(editor: Editor | null, onBusyChange: (busy: boolean) =
     [editor, addProblem, onBusyChange],
   );
 
+  /**
+   * 이 사이트의 `/files/키`가 든 HTML 붙여 넣기 (POST-07 흐름 7). 서버에 물어서
+   * 내 것이고 안 붙었거나 이 글 것은 그대로, 내 다른 글 것은 새로 다시 올려, 남의 것·없는 키는 빼고 넣는다.
+   */
+  const pasteHtml = useCallback(
+    async (html: string) => {
+      if (!editor) return;
+      if (busy.current) {
+        addProblem("붙여 넣기", ATTACH_MESSAGES.busy);
+        return;
+      }
+      busy.current = true;
+      onBusyChange(true);
+      setProgress({ done: 0, total: 0 });
+      try {
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        // 글 화면에서 복사하면 주소가 `https://이 사이트/files/키`로 온다
+        const targets = [...doc.querySelectorAll<HTMLElement>("img[src], a[href]")].flatMap((el) => {
+          const attr = el.tagName === "IMG" ? "src" : "href";
+          const raw = el.getAttribute(attr) ?? "";
+          const url = raw.startsWith(`${location.origin}/files/`) ? raw.slice(location.origin.length) : raw;
+          const key = keyFromUrl(url);
+          return key ? [{ el, attr, key }] : [];
+        });
+        const keys = [...new Set(targets.map((t) => t.key))].slice(0, PASTE_KEYS_MAX);
+        let decided: Awaited<ReturnType<typeof classifyPastedAttachments>> = null;
+        try {
+          decided = await classifyPastedAttachments(keys, postId === null ? null : String(postId));
+        } catch {
+          decided = null;
+        }
+        if (!decided) {
+          addProblem("붙여 넣기", ATTACH_MESSAGES.failed);
+          return;
+        }
+        const newKey = new Map<string, string | null>();
+        const reupload = decided.filter((d) => d.action === "reupload");
+        for (const d of decided) if (d.action !== "reupload") newKey.set(d.key, d.action === "keep" ? d.key : null);
+        for (let i = 0; i < reupload.length; i++) {
+          setProgress({ done: i + 1, total: reupload.length });
+          const d = reupload[i];
+          let key: string | null = null;
+          try {
+            key = await reuploadPastedAttachment(d.key, postId === null ? null : String(postId));
+          } catch {
+            key = null;
+          }
+          if (!key) addProblem(d.name, ATTACH_MESSAGES.failed);
+          newKey.set(d.key, key);
+        }
+        for (const t of targets) {
+          const key = newKey.get(t.key);
+          if (key) t.el.setAttribute(t.attr, `/files/${key}`);
+          else t.el.remove();
+        }
+        editor.chain().focus().insertContent(doc.body.innerHTML).run();
+      } finally {
+        busy.current = false;
+        setProgress(null);
+        onBusyChange(false);
+      }
+    },
+    [editor, addProblem, onBusyChange, postId],
+  );
+
   const dismiss = useCallback((id: number) => setProblems((list) => list.filter((p) => p.id !== id)), []);
 
-  return { upload, progress, problems, dismiss };
+  return { upload, pasteHtml, progress, problems, dismiss };
 }

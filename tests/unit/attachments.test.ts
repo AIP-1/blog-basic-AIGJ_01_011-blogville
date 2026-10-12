@@ -8,6 +8,7 @@ import {
   extractFileKeys,
   formatBytes,
   keyFromUrl,
+  pasteAction,
   sniffImage,
   typeOf,
 } from "@/lib/attachments";
@@ -100,5 +101,23 @@ describe("attachmentAccess (FR-007)", () => {
     expect(attachmentAccess(a, "u1")).toBe(true);
     expect(attachmentAccess(a, "u2")).toBe(false);
     expect(attachmentAccess(a, null)).toBe(false);
+  });
+});
+
+describe("pasteAction (POST-07 흐름 7)", () => {
+  const mine = (postId: number | null) => ({ uploaderId: "me", postId });
+  it("없는 키·남의 것은 넣지 않는다", () => {
+    expect(pasteAction(undefined, "me", null)).toBe("drop");
+    expect(pasteAction({ uploaderId: "you", postId: null }, "me", null)).toBe("drop");
+    expect(pasteAction({ uploaderId: "you", postId: 3 }, "me", 3)).toBe("drop");
+  });
+  it("내 것이고 안 붙었거나 이 글 것이면 그대로", () => {
+    expect(pasteAction(mine(null), "me", null)).toBe("keep");
+    expect(pasteAction(mine(null), "me", 7)).toBe("keep");
+    expect(pasteAction(mine(7), "me", 7)).toBe("keep");
+  });
+  it("내 다른 글 것이면 다시 올린다 (새 글에서도)", () => {
+    expect(pasteAction(mine(3), "me", 7)).toBe("reupload");
+    expect(pasteAction(mine(3), "me", null)).toBe("reupload");
   });
 });

@@ -229,6 +229,7 @@ function Form({ categories, initial, draftOwnerId, start }: Props & { start: Sta
           setContentText(text);
         }}
         onUploadingChange={setUploading}
+        postId={initial?.postId ?? null}
       />
 
       <input

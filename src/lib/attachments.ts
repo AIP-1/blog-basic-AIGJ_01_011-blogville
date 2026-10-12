@@ -159,3 +159,23 @@ export function attachmentAccess(
   if (a.postIsPublic) return true;
   return viewerId !== null && viewerId === a.blogOwnerId;
 }
+
+/** 붙여 넣은 첨부 처리 (POST-07 흐름 7): 그대로 넣기 / 새로 다시 올려 넣기 / 넣지 않기 */
+export type PasteAction = "keep" | "reupload" | "drop";
+
+/** 붙여 넣기에서 한 번에 확인하는 키 수 */
+export const PASTE_KEYS_MAX = 50;
+
+/**
+ * 내 것이고 안 붙었거나 이 글 것이면 keep, 내 것인데 다른 글에 붙었으면 reupload,
+ * 남의 것·없는 키는 drop. `editingPostId`는 수정 중인 글(새 글이면 null).
+ */
+export function pasteAction(
+  a: { uploaderId: string; postId: number | null } | undefined,
+  viewerId: string,
+  editingPostId: number | null,
+): PasteAction {
+  if (!a || a.uploaderId !== viewerId) return "drop";
+  if (a.postId === null || a.postId === editingPostId) return "keep";
+  return "reupload";
+}
