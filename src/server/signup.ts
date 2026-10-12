@@ -1,8 +1,9 @@
 import "server-only";
 import { hashPassword } from "better-auth/crypto";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { accounts, blogs, categories, items, loginAttempts, profiles, userItems, users } from "@/db/schema";
+import { accounts, blogs, categories, houseFurniture, items, loginAttempts, profiles, userItems, users } from "@/db/schema";
+import { STARTER_FURNITURE } from "@/lib/house";
 import { STARTER_BACKGROUND } from "@/lib/shop";
 import { AUTH_ERRORS } from "@/lib/auth-rules";
 import { findNameConflict, isUniqueViolation, lockName } from "./names";
@@ -56,6 +57,17 @@ export async function createMember(input: { username: string; password: string; 
         .values({ ownerId: userId, slug: input.username, title: input.blogTitle.trim(), intro: "", backgroundItemId: meadow?.id ?? null })
         .returning({ id: blogs.id });
       await tx.insert(categories).values({ blogId: blog.id, name: "일상", position: 1 });
+      // 기본 가구 2개를 받아 우리 집 0·1번 칸에 놓는다 (SHOP-05)
+      const starters = await tx
+        .select({ id: items.id, code: items.code })
+        .from(items)
+        .where(inArray(items.code, STARTER_FURNITURE.map((f) => f.code)));
+      for (const f of STARTER_FURNITURE) {
+        const item = starters.find((s) => s.code === f.code);
+        if (!item) continue;
+        await tx.insert(userItems).values({ userId, itemId: item.id });
+        await tx.insert(houseFurniture).values({ userId, slot: f.slot, itemId: item.id });
+      }
       // 가입 축하 🪙 100 (GAME-03·05)
       await grantReward(tx, userId, "signup");
     });

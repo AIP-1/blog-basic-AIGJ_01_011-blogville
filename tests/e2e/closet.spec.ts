@@ -33,7 +33,9 @@ test.describe("SHOP-04·06 꾸미기", () => {
     await expect(page.getByText("아직 아바타 아이템이 없어요. 상점에서 모자·옷·소품을 사 보세요.")).toBeVisible();
     await expect(item(page, "초원")).toHaveAttribute("aria-pressed", "true");
     await expect(item(page, "초원")).toContainText("✓ 초원");
-    await expect(page.getByRole("heading", { name: "🪑 가구" })).toHaveCount(0);
+    // 기본 가구 2개(SHOP-05)는 보기만
+    await expect(page.getByRole("heading", { name: "🪑 가구" })).toBeVisible();
+    await expect(page.locator("[data-closet-furniture] span")).toHaveText(["초록 화분", "나무 의자"]);
     await page.close();
   });
 

@@ -75,6 +75,40 @@ export const ITEM_ART: Readonly<Record<string, PixelArt>> = {
     palette: { K: OUTLINE, N: "#9a5b2e", Y: "#f2cf6b" },
   },
   // ── 가구
+  "furn.plant": {
+    rows: layer(3, [
+      ".......GG.......",
+      "....GG.GG.GG....",
+      "...GLLGGGGLLG...",
+      "....GLLGGLLG....",
+      ".....GGGGGG.....",
+      "......GGGG......",
+      "....KKKKKKKK....",
+      "....KTTTTTTK....",
+      ".....KTTTTK.....",
+      ".....KTTTTK.....",
+      ".....KTTTTK.....",
+      "......KKKK......",
+    ]),
+    palette: { G: "#4caf6a", L: "#8fd18f", K: OUTLINE, T: "#d9824a" },
+  },
+  "furn.chair": {
+    rows: layer(3, [
+      ".....KKKK.......",
+      ".....KWWK.......",
+      ".....KWWK.......",
+      ".....KWWK.......",
+      ".....KWWK.......",
+      ".....KWWKKKKK...",
+      ".....KWWWWWWK...",
+      ".....KKKKKKKK...",
+      ".....KW....WK...",
+      ".....KW....WK...",
+      ".....KW....WK...",
+      ".....KK....KK...",
+    ]),
+    palette: { K: OUTLINE, W: "#c58b4f" },
+  },
   "furn.table": {
     rows: layer(3, [
       "......KKKK......",

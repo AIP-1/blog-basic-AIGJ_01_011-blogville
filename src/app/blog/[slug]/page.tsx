@@ -7,11 +7,15 @@ import { FollowButton } from "@/components/blog/FollowButton";
 import { Pagination } from "@/components/blog/Pagination";
 import { PostCard } from "@/components/blog/PostCard";
 import { Miniroom } from "@/components/game/Miniroom";
+import { HouseRoom } from "@/components/house/HouseRoom";
+import { houseInfo } from "@/lib/house";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { parseSearchQuery, parseTagFilter, SEARCH_EMPTY, TOWN_SEARCH_EMPTY, TOWN_SEARCH_NONE } from "@/lib/blog-search";
 import { parseId, parsePage } from "@/lib/ids";
 import { getBlogBySlug, searchBlogs } from "@/server/blog";
+import { getOwnedFurniture, getPlacedFurniture } from "@/server/house";
 import { getAvatar } from "@/server/items";
+import { getWallet } from "@/server/points";
 import { getCategoryTree } from "@/server/category";
 import { getSession } from "@/server/dal";
 import { listFeed } from "@/server/feed";
@@ -55,7 +59,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
   const tag = search || searchParam === "empty" ? null : parseTagFilter(query.tag);
   const filtered = townMode || search !== null || tag !== null || searchParam === "empty";
 
-  const [{ items, total }, townFeed, townBlogs, { total: allTotal }, sidebar, visits, myPostCount, followers, following, avatar] = await Promise.all([
+  const [{ items, total }, townFeed, townBlogs, { total: allTotal }, sidebar, visits, myPostCount, followers, following, avatar, ownerWallet, placed, owned] = await Promise.all([
     townMode || searchParam === "empty"
       ? { items: [], total: 0 }
       : listBlogPosts(blog.id, { viewerIsOwner: isOwner, categoryId, subcategoryId: subId, search, tag, page }),
@@ -71,6 +75,10 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
     // 이웃 버튼은 회원이 남의 블로그를 볼 때만 (SOC-04)
     member && !isOwner ? isFollowing(member.userId, blog.ownerId) : false,
     getAvatar(blog.ownerId),
+    // 우리 집 (SHOP-05): 칸 수는 주인 레벨로, 고르기 목록은 주인에게만
+    getWallet(blog.ownerId),
+    getPlacedFurniture(blog.ownerId),
+    isOwner ? getOwnedFurniture(blog.ownerId) : null,
   ]);
   const filterQuery: Record<string, string> = {};
   if (town) filterQuery.q = town;
@@ -148,6 +156,8 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
           </nav>
         )}
       </header>
+
+      <HouseRoom info={houseInfo(ownerWallet.progress.level)} placed={placed} owned={owned} />
 
       <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_260px] lg:grid-cols-[minmax(0,1fr)_300px]">
         <section aria-labelledby="list-title" className="min-w-0">

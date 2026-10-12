@@ -47,7 +47,7 @@ describe("구역·안내", () => {
   });
   it("받침에 맞는 조사와 종류별 안내", () => {
     expect(purchaseMessage("밀짚모자", "hat")).toBe("🎉 밀짚모자를 샀어요! 꾸미기에서 장착해 보세요.");
-    expect(purchaseMessage("책장", "furniture")).toBe("🎉 책장을 샀어요! 내 블로그의 우리 집에 놓을 수 있어요.");
+    expect(purchaseMessage("책장", "furniture")).toBe("🎉 책장을 샀어요! 내 블로그의 우리 집에 놓아 보세요.");
   });
 });
 

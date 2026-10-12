@@ -177,9 +177,9 @@ test.describe("BLOG-09 옆 칸", () => {
     await expect(box).toHaveValue("next.JS");
 
     await v.goto(`/@${o.username}?s=${encodeURIComponent("100%")}`);
-    await expect(v.getByRole("heading", { level: 2 }).first()).toHaveText("🔍 '100%' 블로그 검색 1개");
+    await expect(v.locator("#list-title")).toHaveText("🔍 '100%' 블로그 검색 1개");
     await v.goto(`/@${o.username}?s=${encodeURIComponent("0%")}`);
-    await expect(v.getByRole("heading", { level: 2 }).first()).toHaveText("🔍 '0%' 블로그 검색 1개");
+    await expect(v.locator("#list-title")).toHaveText("🔍 '0%' 블로그 검색 1개");
     await v.goto(`/@${o.username}?s=_`);
     await expect(v.getByText("이 블로그에서 찾은 글이 없어요")).toBeVisible();
 
@@ -187,7 +187,7 @@ test.describe("BLOG-09 옆 칸", () => {
     await expect(v.getByRole("alert").filter({ hasText: "찾을 말을 적어 주세요" })).toBeVisible();
 
     await v.goto(`/@${o.username}?s=${encodeURIComponent("본문")}`);
-    await expect(v.getByRole("heading", { level: 2 }).first()).toHaveText("🔍 '본문' 블로그 검색 11개");
+    await expect(v.locator("#list-title")).toHaveText("🔍 '본문' 블로그 검색 11개");
     await v.getByRole("navigation", { name: "페이지" }).getByRole("link", { name: "2" }).click();
     await expect(v).toHaveURL(/\?s=%EB%B3%B8%EB%AC%B8&page=2$/);
     await expect(v.locator("section[aria-labelledby=list-title] article")).toHaveCount(3);

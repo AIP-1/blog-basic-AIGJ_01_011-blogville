@@ -44,8 +44,8 @@ test.describe("GAME-01 기본 캐릭터 받기", () => {
     await page.getByLabel("비밀번호 확인").fill(PASSWORD);
     await page.getByRole("button", { name: "회원가입" }).click();
     await expect(page).toHaveURL(new RegExp(`/@${username}\\?welcome=1$`));
-    // 고른 캐릭터와 기본 배경 초원(SHOP-04)
-    expect((await owned(username)).map((r) => r.code).sort()).toEqual(["bg_meadow", "char_girl"]);
+    // 고른 캐릭터와 기본 배경 초원(SHOP-04)·기본 가구(SHOP-05)
+    expect((await owned(username)).map((r) => r.code).sort()).toEqual(["bg_meadow", "char_girl", "furn_chair", "furn_plant"]);
     const [p] = await sql`select i.code from profiles p join users u on u.id = p.user_id join items i on i.id = p.character_item_id where u.username = ${username}`;
     expect(p.code).toBe("char_girl");
     await expect(page.locator("header [data-wallet] svg")).toHaveAttribute("data-art", "char.girl");

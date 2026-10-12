@@ -127,6 +127,13 @@
       "when": 1791805067569,
       "tag": "0017_closet",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791807400186,
+      "tag": "0018_house",
+      "breakpoints": true
     }
   ]
 }

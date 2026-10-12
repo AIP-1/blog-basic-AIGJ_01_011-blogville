@@ -176,6 +176,31 @@ export const avatarEquips = pgTable(
   ],
 );
 
+/**
+ * 우리 집 가구 (SHOP-05): 칸(0~7)마다 가구 하나, 가구 하나는 한 칸에만. 가진 가구만 (복합 외래 키).
+ * 열린 칸 수는 집 단계로 정한다 (src/lib/house.ts). 회원이 지워지면 함께 지운다.
+ */
+export const houseFurniture = pgTable(
+  "house_furniture",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    slot: integer("slot").notNull(),
+    itemId: integer("item_id").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.slot] }),
+    unique("house_furniture_item_uq").on(t.userId, t.itemId),
+    check("house_furniture_slot_check", sql`${t.slot} between 0 and 7`),
+    foreignKey({
+      name: "house_furniture_owned_fk",
+      columns: [t.userId, t.itemId],
+      foreignColumns: [userItems.userId, userItems.itemId],
+    }).onDelete("cascade"),
+  ],
+);
+
 export const profiles = pgTable(
   "profiles",
   {
