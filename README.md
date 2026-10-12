@@ -47,6 +47,7 @@
 | `specs/040-phone-tabs/` | 휴대폰 회원 아래 탭과 휴대폰 ☰ 메뉴 화면의 spec·plan·tasks |
 | `specs/041-roof-color/` | 우리 집 지붕 색 고르기(10색, 단계마다 열림)와 마을 지붕의 spec·plan·tasks |
 | `specs/042-terrain/` | 마을 높낮이(언덕·절벽·계단·먼 하늘)의 spec·plan·tasks |
+| `specs/043-mailbox/` | 집 앞 우체통(내 알림·이웃 새 글)의 spec·plan·tasks |
 | `src/` | Next.js 16 앱 |
 
 ## 실행

@@ -6,7 +6,7 @@ import { findArt } from "@/lib/art";
 import { pixelRects, type PixelArt } from "@/lib/art/characters";
 import { TOWN_CELL } from "@/lib/art/town";
 import { PLAYER_SIZE, SPEED, WORLD, nearestEntrance, normalize, step, type Point } from "@/lib/town/layout";
-import { artSize, artVisibleHeight, entrancePrompt, townLayout, type TownEntrance, type TownHouseInput } from "@/lib/town/structures";
+import { artSize, artVisibleHeight, entrancePrompt, mailboxLot, townLayout, type TownEntrance, type TownHouseInput } from "@/lib/town/structures";
 import { onStairs, STAIR_SLOW, stairEnds, STAIRS } from "@/lib/town/terrain";
 import { bakeGround, GROUND_CELL } from "./ground";
 
@@ -82,6 +82,7 @@ function drawTag(ctx: CanvasRenderingContext2D, text: string, x: number, y: numb
  * 마을 게임 (TOWN-01~04, specs/038-town): 캔버스 하나에 바닥·건물·집·나무·캐릭터를 그린다.
  * 방향키·WASD·클릭으로 걷고, 입구 앞에서 Space·Enter(또는 건물 클릭)로 들어간다.
  * 시험용으로 캔버스에 발 위치 `data-feet`를 적고, `bv-teleport` 이벤트(`{x, y}`)로 옮길 수 있다.
+ * 우체통 입구는 페이지를 옮기지 않고 창 밖(window)에 `bv-mailbox` 이벤트(`{lot}`)를 보낸다 (TOWN-13, `TownHud`가 연다).
  */
 export function TownGame({
   houses,
@@ -90,6 +91,7 @@ export function TownGame({
   name,
   start,
   startKey,
+  mailFlag = false,
 }: {
   houses: TownHouseInput[];
   member: boolean;
@@ -98,6 +100,8 @@ export function TownGame({
   start: Point;
   /** 시작 자리를 고른 주소 값(`?at`). 같으면 다시 만들 때 서 있던 자리를 이어 쓴다 */
   startKey: string;
+  /** 안 읽은 알림이 있으면 내 우체통 깃발을 올린다 */
+  mailFlag?: boolean;
 }) {
   const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -105,7 +109,7 @@ export function TownGame({
   const lastPos = useRef<{ from: string; pos: Point } | null>(null);
   const [prompt, setPrompt] = useState<string | null>(null);
   const [touch, setTouch] = useState(false);
-  const data = JSON.stringify({ houses, member, layers, name, start, startKey });
+  const data = JSON.stringify({ houses, member, layers, name, start, startKey, mailFlag });
   // 창 폭이 휴대폰 조건을 넘나들면 게임을 끄고 다시 만든다
   const phone = useSyncExternalStore(
     subscribePhone,
@@ -116,7 +120,8 @@ export function TownGame({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || phone) return;
-    const { houses, member, layers, name, start, startKey } = JSON.parse(data) as {
+    const { houses, member, layers, name, start, startKey, mailFlag } = JSON.parse(data) as {
+      mailFlag: boolean;
       houses: TownHouseInput[];
       member: boolean;
       layers: string[];
@@ -126,7 +131,7 @@ export function TownGame({
     };
     setTouch(window.matchMedia("(pointer: coarse)").matches);
     const ctx = canvas.getContext("2d")!;
-    const { structures, entrances, walls } = townLayout(houses, member);
+    const { structures, entrances, walls } = townLayout(houses, member, mailFlag);
     const bodies = [...walls, ...structures.flatMap((s) => (s.body ? [s.body] : []))];
     const sprites = new Map<object, HTMLCanvasElement>();
     for (const s of structures) if (!sprites.has(s.art)) sprites.set(s.art, bake([s.art], TOWN_CELL));
@@ -146,7 +151,11 @@ export function TownGame({
     const held = new Set<string>();
     const camera = { x: 0, y: 0 };
 
-    const go = (e: TownEntrance) => router.push(e.href === "login" ? "/" : e.href);
+    const go = (e: TownEntrance) => {
+      const lot = mailboxLot(e.href);
+      if (lot !== null) window.dispatchEvent(new CustomEvent("bv-mailbox", { detail: { lot } }));
+      else router.push(e.href === "login" ? "/" : e.href);
+    };
 
     // 화면 배율(devicePixelRatio)만큼 캔버스를 키워 고해상도 화면에서도 또렷하게. 그리는 좌표는 CSS px
     let dpr = 1;
@@ -351,6 +360,7 @@ export function TownGame({
         data-feet={`${start.x},${start.y}`}
         // 시험 훅: 집 자리마다 지붕 색 (TOWN-07)
         data-roofs={houses.map((h) => `${h.lot}:${h.roof}`).join(" ")}
+        data-mail-flag={mailFlag ? "1" : "0"}
         // 시험 훅: 계단마다 `위x,위y,아래x,아래y` (TOWN-05)
         data-stairs={STAIRS.map((st) => {
           const { top, bottom } = stairEnds(st);

@@ -3,7 +3,7 @@ import { houseArt, HOUSE_ART_WIDTH } from "@/lib/art/town";
 import { CLIFF_FACE, CLIFF_LINES, heightAt, onStairs, stairEnds, STAIRS, TERRAIN_WALLS } from "@/lib/town/terrain";
 import { ROOF_HEX } from "@/lib/roof";
 import { feetRect, HOUSE_LOTS, INTERACT_DISTANCE, lotFront, nearestEntrance, normalize, overlaps, shortName, START_POS, step, WORLD, type Point } from "@/lib/town/layout";
-import { EMPTY_LOT_HINT, entrancePrompt, townLayout, townSpots, type TownHouseInput } from "@/lib/town/structures";
+import { EMPTY_LOT_HINT, entrancePrompt, mailboxLot, townLayout, townSpots, type TownHouseInput } from "@/lib/town/structures";
 
 const house = (lot: number, mine = false): TownHouseInput => ({ lot, slug: `blog${lot}`, nickname: `주민${lot}`, blogTitle: `블로그 ${lot}`, stage: 1, roof: ROOF_HEX.red, mine });
 
@@ -158,5 +158,22 @@ describe("높낮이 (TOWN-05)", () => {
     }
     expect(onStairs({ x: 1000, y: 800 })).toBe(false);
     expect([100, 600, 1500].map(heightAt)).toEqual([2, 1, 0]);
+  });
+});
+
+describe("집 앞 우체통 (TOWN-13)", () => {
+  it("집이 선 자리에만 우체통과 `소식 보기` 입구, 내 우체통은 깃발을 올릴 수 있다", () => {
+    const { structures, entrances } = townLayout([house(0, true), house(3)], true, true);
+    const boxes = entrances.filter((e) => mailboxLot(e.href) !== null);
+    expect(boxes.map((e) => mailboxLot(e.href))).toEqual([0, 3]);
+    expect(entrancePrompt(boxes[0])).toBe("📬 내 우체통 · Space 소식 보기");
+    expect(entrancePrompt(boxes[1])).toBe("📬 주민3의 우체통 · Space 소식 보기");
+    expect(structures.filter((s) => s.id.startsWith("mailbox:"))).toHaveLength(2);
+    const mine = structures.find((s) => s.id === "mailbox:0")!;
+    expect(Object.values(mine.art.palette)).toContain("#4a90d9");
+    expect(mine.art.rows.join("")).not.toEqual(townLayout([house(0, true)], true, false).structures.find((s) => s.id === "mailbox:0")!.art.rows.join(""));
+    expect(Object.values(structures.find((s) => s.id === "mailbox:3")!.art.palette)).toContain("#d9534f");
+    expect(mailboxLot("/@abc")).toBeNull();
+    expect(mailboxLot("mailbox:x")).toBeNull();
   });
 });
