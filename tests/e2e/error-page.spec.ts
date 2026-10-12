@@ -76,9 +76,9 @@ test.describe("NF-19 오류 화면", () => {
       await closeDevOverlay(page);
       await sql`insert into blogs (owner_id, slug, title) values (${blog.owner_id}, ${blog.slug}, ${blog.title})`;
       await page.getByRole("link", { name: "처음으로" }).click();
-      // 로그인한 회원의 첫 화면은 내 블로그
-      await expect(page).toHaveURL(new RegExp(`/@${username}$`));
-      await expect(page.getByRole("navigation", { name: "메뉴" })).toBeVisible();
+      // 로그인한 회원의 첫 화면은 마을 (039)
+      await expect(page).toHaveURL("/town");
+      await expect(page.locator("[data-town-menu]")).toBeVisible();
     } finally {
       await sql`insert into blogs (owner_id, slug, title) values (${blog.owner_id}, ${blog.slug}, ${blog.title}) on conflict do nothing`;
     }

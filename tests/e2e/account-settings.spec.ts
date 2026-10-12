@@ -75,7 +75,7 @@ test.describe("비밀번호 바꾸기", () => {
     const username = await signUpOk(page);
     const other = await browser.newPage();
     await signIn(other, username);
-    await expect(other).toHaveURL(new RegExp(`/@${username}$`));
+    await expect(other).toHaveURL("/town");
 
     await page.getByRole("link", { name: "내 정보", exact: true }).click();
     await expect(page).toHaveURL(/\/settings\/account$/);
@@ -94,7 +94,7 @@ test.describe("비밀번호 바꾸기", () => {
     await signIn(page, username);
     await expect(page.getByText("아이디 또는 비밀번호가 맞지 않아요")).toBeVisible();
     await signIn(page, username, "newpass123");
-    await expect(page).toHaveURL(new RegExp(`/@${username}$`));
+    await expect(page).toHaveURL("/town");
   });
 
   test("틀린 지금 비밀번호·짧은 새 비밀번호·확인 다름·같은 값은 문구만, 해시는 그대로", async ({ page }) => {

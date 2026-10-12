@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { houseArt, HOUSE_ART_WIDTH, ROOF_COLORS, roofColor } from "@/lib/art/town";
 import { feetRect, HOUSE_LOTS, INTERACT_DISTANCE, lotFront, nearestEntrance, normalize, overlaps, shortName, START_POS, step, WORLD, type Point } from "@/lib/town/layout";
-import { entrancePrompt, townLayout, type TownHouseInput } from "@/lib/town/structures";
+import { EMPTY_LOT_HINT, entrancePrompt, townLayout, townSpots, type TownHouseInput } from "@/lib/town/structures";
 
 const house = (lot: number, mine = false): TownHouseInput => ({ lot, slug: `blog${lot}`, nickname: `주민${lot}`, blogTitle: `블로그 ${lot}`, stage: 1, roof: ROOF_COLORS[0], mine });
 
@@ -106,5 +106,31 @@ describe("집 그림 (TOWN-11)", () => {
     const drawings = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((s) => houseArt(s, ROOF_COLORS[0]).rows.join("\n")));
     expect(drawings.size).toBe(10);
     expect(new Set(Array.from({ length: 20 }, (_, i) => roofColor(i))).size).toBe(10);
+  });
+});
+
+describe("☰ 텔레포트 목록 (TOWN-12)", () => {
+  it("마을 3곳 + 집 11자리, 집은 입구 앞 좌표·블로그 주소, 빈 집터는 못 고르고 회원에게만 ⭐ 안내", () => {
+    const member = townSpots([house(0, true), house(2)], true);
+    expect(member.places.map((s) => s.label)).toEqual(["⛲ 광장 분수", "📋 마을 게시판", "🏪 상점"]);
+    expect(member.houses).toHaveLength(11);
+    expect(member.houses[0]).toMatchObject({ label: "🏠 내 집", sub: "블로그 0", enabled: true, slug: "blog0", ...lotFront(0) });
+    expect(member.houses[2]).toMatchObject({ label: "🏠 주민2의 집", enabled: true, slug: "blog2" });
+    expect(member.houses[1]).toMatchObject({ label: "빈 집터", sub: EMPTY_LOT_HINT, enabled: false, slug: null });
+    const guest = townSpots([house(1)], false);
+    expect(guest.houses[0]).toMatchObject({ label: "내 집 자리", sub: null, enabled: false });
+    expect(guest.houses[2]).toMatchObject({ label: "빈 집터", sub: null });
+  });
+  it("텔레포트 자리는 몸체에 걸리지 않는다", () => {
+    const { structures } = townLayout(
+      HOUSE_LOTS.map((_, i) => house(i, i === 0)),
+      true,
+    );
+    const bodies = structures.flatMap((s) => (s.body ? [s.body] : []));
+    const spots = townSpots(
+      HOUSE_LOTS.map((_, i) => house(i, i === 0)),
+      true,
+    );
+    for (const s of [...spots.places, ...spots.houses]) expect(bodies.some((b) => overlaps(feetRect(s), b)), s.id).toBe(false);
   });
 });

@@ -5,7 +5,7 @@ import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { sessions, users } from "@/db/schema";
+import { sessions } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { AUTH_ERRORS, checkSignUp, PASSWORD_MAX } from "@/lib/auth-rules";
 import { parseId } from "@/lib/ids";
@@ -106,9 +106,8 @@ export async function signIn(_prev: AuthFormState, formData: FormData): Promise<
   // 보던 화면에서 [로그인]을 눌러 왔으면 그리로 돌아간다. 이 사이트 밖 주소는 버린다 (조작한 값 포함)
   const next = safeNext(formData.get("next"));
   if (next) redirect(next);
-  // 방금 만든 세션 쿠키는 이 요청의 headers()에 아직 없으므로 아이디로 회원을 찾는다
-  const user = await db.query.users.findFirst({ where: eq(users.username, username) });
-  return goToMyBlog(user!.id);
+  // 로그인하면 마을에서 시작한다 (TOWN-01·AUTH-09). 휴대폰은 마을이 내 블로그로 옮긴다
+  redirect("/town");
 }
 
 export async function signOut() {

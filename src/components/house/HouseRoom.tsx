@@ -13,7 +13,7 @@ const SLOT_COLS: Record<number, string> = { 4: "grid-cols-4", 6: "grid-cols-3 sm
  * 🏠 우리 집 (SHOP-05·BLOG-04): 벽지·창문·나무 바닥 위의 가구 칸. 누구나 같은 집을 보고,
  * 주인만 [🛋 가구 놓기]로 칸을 눌러 가진 가구를 놓거나 옮기거나 비운다. 칸 이름은 1번부터.
  */
-export function HouseRoom({ slug, info, placed, owned }: { slug: string; info: HouseInfo; placed: PlacedFurniture[]; owned: OwnedFurniture[] | null }) {
+export function HouseRoom({ slug, welcome = false, info, placed, owned }: { slug: string; welcome?: boolean; info: HouseInfo; placed: PlacedFurniture[]; owned: OwnedFurniture[] | null }) {
   const [editing, setEditing] = useState(false);
   const [picking, setPicking] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,9 +41,9 @@ export function HouseRoom({ slug, info, placed, owned }: { slug: string; info: H
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {/* 🚪 밖으로: 마을의 이 집 앞으로 (TOWN-01). 휴대폰에는 마을이 없어 숨긴다 */}
+          {/* 🚪 밖으로: 마을의 이 집 앞으로 (TOWN-01). 가입 직후면 첫 마을 환영으로, 노란 테두리로 깜빡인다. 휴대폰에는 마을이 없어 숨긴다 */}
           <span className="contents max-sm:hidden">
-            <Link href={`/town?at=${slug}`} className="btn">
+            <Link href={welcome ? "/town?welcome=1" : `/town?at=${slug}`} className={`btn ${welcome ? "door-welcome" : ""}`}>
               🚪 밖으로
             </Link>
           </span>

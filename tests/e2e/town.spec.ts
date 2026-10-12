@@ -110,10 +110,12 @@ test.describe("TOWN 마을", () => {
   test("글자 칸에 쓰는 동안에는 캐릭터가 움직이지 않는다", async ({ page }) => {
     await openTown(page);
     const start = await feet(page);
-    await page.getByRole("link", { name: "마을 소식" }).focus();
+    // 버튼에 초점을 두고 누른 Enter는 그 버튼으로 (게임이 가져가지 않는다)
+    await page.locator("[data-town-menu]").focus();
     await page.keyboard.press("Enter");
-    await expect(page).toHaveURL("/feed");
-    await openTown(page);
+    await expect(page.locator("[data-town-panel]")).toBeVisible();
+    await page.keyboard.press("Escape");
+    expect(await feet(page)).toEqual(start);
     await page.evaluate(() => {
       const input = document.createElement("input");
       input.id = "probe";

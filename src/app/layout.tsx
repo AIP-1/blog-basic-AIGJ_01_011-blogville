@@ -44,6 +44,7 @@ async function Header() {
       ])
     : [null, 0, null, null, null];
   return (
+    <>
     <header className="border-b border-line bg-surface">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-2 px-4 py-2">
         <Link href={blog ? `/@${blog.slug}` : "/"} className="flex min-h-11 shrink-0 items-center whitespace-nowrap text-xl font-extrabold text-accent">
@@ -99,16 +100,22 @@ async function Header() {
                 ✏️ 글쓰기
               </Link>
               <SignOutButton userId={member.userId} />
-              {member.rememberMe && <SessionKeeper />}
-              <AttendanceDayWatcher day={todayKST()} />
-              {/* 안 읽은 레벨업이 있으면 가운데 팝업 (GAME-06) */}
-              <LevelUpDialog pending={{ levelUp }} />
             </>
           )}
           {!member && <HeaderLoginLink />}
         </nav>
       </div>
     </header>
+    {/* 헤더 막대가 없는 마을에서도 동작하도록 헤더 밖에 둔다 (TOWN-01) */}
+    {member && (
+      <>
+        {member.rememberMe && <SessionKeeper />}
+        <AttendanceDayWatcher day={todayKST()} />
+        {/* 안 읽은 레벨업이 있으면 가운데 팝업 (GAME-06) */}
+        <LevelUpDialog pending={{ levelUp }} />
+      </>
+    )}
+    </>
   );
 }
 
