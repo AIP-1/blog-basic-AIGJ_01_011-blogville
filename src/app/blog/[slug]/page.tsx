@@ -157,7 +157,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
         )}
       </header>
 
-      <HouseRoom info={houseInfo(ownerWallet.progress.level)} placed={placed} owned={owned} />
+      <HouseRoom slug={blog.slug} info={houseInfo(ownerWallet.progress.level)} placed={placed} owned={owned} />
 
       <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_260px] lg:grid-cols-[minmax(0,1fr)_300px]">
         <section aria-labelledby="list-title" className="min-w-0">

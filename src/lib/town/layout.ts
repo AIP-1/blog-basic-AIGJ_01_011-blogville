@@ -1,0 +1,131 @@
+// 마을 배치·이동 규칙 (TOWN-01~04, specs/038-town). 게임 화면과 단위 시험이 같이 쓴다. 좌표 단위는 px, 기준점은 그림의 발밑(아랫변 가운데).
+
+export const WORLD = { width: 2000, height: 1600 } as const;
+export const CENTER = { x: 1000, y: 800 } as const;
+/** 돌광장 반지름 */
+export const PLAZA_RADIUS = 230;
+/** 초당 이동 거리 */
+export const SPEED = 230;
+/** 입구에서 이만큼 안이면 들어갈 수 있다 */
+export const INTERACT_DISTANCE = 90;
+/** 캐릭터 그림 크기 (도트 16칸 × 4, 정수배라 칸이 고르다) */
+export const PLAYER_SIZE = 64;
+/** 캐릭터 발밑 상자 */
+export const FEET = { width: 28, height: 16 } as const;
+/** 처음 서는 곳: 분수 아래 */
+export const START_POS = { x: CENTER.x + 50, y: CENTER.y + 160 } as const;
+
+export type Point = { x: number; y: number };
+export type Rect = { x: number; y: number; width: number; height: number };
+
+/** 서쪽·동쪽 길이 지나는 x, 남쪽 길이 지나는 y */
+const WEST_ROAD = 490;
+const EAST_ROAD = 1510;
+const SOUTH_ROAD = 1500;
+const ROAD = 52;
+
+/** 집 자리 11곳 (집 그림의 발밑). 0번은 내 집(광장 아래), 1~4 서쪽, 5~8 동쪽, 9·10 남쪽 */
+export const HOUSE_LOTS: readonly Point[] = [
+  { x: 1000, y: 1250 },
+  { x: 300, y: 380 },
+  { x: 300, y: 640 },
+  { x: 300, y: 900 },
+  { x: 300, y: 1160 },
+  { x: 1700, y: 380 },
+  { x: 1700, y: 640 },
+  { x: 1700, y: 900 },
+  { x: 1700, y: 1160 },
+  { x: 720, y: SOUTH_ROAD - 40 },
+  { x: 1280, y: SOUTH_ROAD - 40 },
+];
+
+export const BOARD_POS = { x: CENTER.x, y: CENTER.y - 300 } as const;
+export const SHOP_POS = { x: CENTER.x + 360, y: CENTER.y - 30 } as const;
+export const FOUNTAIN_POS = { x: CENTER.x, y: CENTER.y + 40 } as const;
+
+const band = (x1: number, y1: number, x2: number, y2: number): Rect => ({
+  x: Math.min(x1, x2) - ROAD / 2,
+  y: Math.min(y1, y2) - ROAD / 2,
+  width: Math.abs(x2 - x1) + ROAD,
+  height: Math.abs(y2 - y1) + ROAD,
+});
+
+/** 흙길 (가로·세로 띠). 바닥 그림과 나무 놓을 자리 거르기에만 쓰고, 걷는 데는 막지 않는다 */
+export const ROADS: readonly Rect[] = [
+  band(WEST_ROAD, CENTER.y, EAST_ROAD, CENTER.y), // 가운데 가로 길
+  band(CENTER.x, BOARD_POS.y + 30, CENTER.x, HOUSE_LOTS[0].y + 40), // 게시판 ~ 내 집
+  band(WEST_ROAD, HOUSE_LOTS[1].y + 40, WEST_ROAD, SOUTH_ROAD), // 서쪽 길
+  band(EAST_ROAD, HOUSE_LOTS[5].y + 40, EAST_ROAD, SOUTH_ROAD), // 동쪽 길
+  band(WEST_ROAD, SOUTH_ROAD, EAST_ROAD, SOUTH_ROAD), // 남쪽 길
+  // 집 앞에서 길까지
+  ...[1, 2, 3, 4].map((i) => band(HOUSE_LOTS[i].x, HOUSE_LOTS[i].y + 40, WEST_ROAD, HOUSE_LOTS[i].y + 40)),
+  ...[5, 6, 7, 8].map((i) => band(EAST_ROAD, HOUSE_LOTS[i].y + 40, HOUSE_LOTS[i].x, HOUSE_LOTS[i].y + 40)),
+  band(SHOP_POS.x, SHOP_POS.y + 30, SHOP_POS.x, CENTER.y),
+];
+
+/** 이름표가 길면 줄인다 (12자) */
+export function shortName(name: string, max = 12): string {
+  const chars = [...name];
+  return chars.length > max ? `${chars.slice(0, max).join("")}…` : name;
+}
+
+/** 두 상자가 겹치는가 (모서리만 닿으면 안 겹침) */
+export function overlaps(a: Rect, b: Rect): boolean {
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+}
+
+/** 발밑 좌표의 발 상자 */
+export function feetRect(p: Point): Rect {
+  return {
+    x: p.x - FEET.width / 2,
+    y: p.y - FEET.height,
+    width: FEET.width,
+    height: FEET.height,
+  };
+}
+
+/** 입력 방향을 길이 1로 (대각선도 같은 속도) */
+export function normalize(dx: number, dy: number): Point {
+  const len = Math.hypot(dx, dy);
+  return len === 0 ? { x: 0, y: 0 } : { x: dx / len, y: dy / len };
+}
+
+/**
+ * 한 걸음 옮긴다: 가로, 세로를 따로 옮겨 벽을 따라 미끄러지게 한다.
+ * 마을 밖과 몸체(`bodies`)에 걸리는 축은 그대로 둔다.
+ */
+export function step(from: Point, delta: Point, bodies: readonly Rect[]): Point {
+  const blocked = (p: Point) => {
+    const f = feetRect(p);
+    if (f.x < 0 || f.y < 0 || f.x + f.width > WORLD.width || f.y + f.height > WORLD.height) return true;
+    return bodies.some((b) => overlaps(f, b));
+  };
+  let p = from;
+  const nx = { x: p.x + delta.x, y: p.y };
+  if (delta.x !== 0 && !blocked(nx)) p = nx;
+  const ny = { x: p.x, y: p.y + delta.y };
+  if (delta.y !== 0 && !blocked(ny)) p = ny;
+  return p;
+}
+
+export type Entrance = { id: string; x: number; y: number };
+
+/** `INTERACT_DISTANCE` 안에서 가장 가까운 입구 */
+export function nearestEntrance<T extends Entrance>(p: Point, entrances: readonly T[]): T | null {
+  let best: T | null = null;
+  let bestDistance: number = INTERACT_DISTANCE;
+  for (const e of entrances) {
+    const d = Math.hypot(e.x - p.x, e.y - p.y);
+    if (d <= bestDistance) {
+      best = e;
+      bestDistance = d;
+    }
+  }
+  return best;
+}
+
+/** 집 자리 앞 (입구·도착 자리) */
+export function lotFront(lot: number): Point {
+  const p = HOUSE_LOTS[lot];
+  return { x: p.x, y: p.y + 40 };
+}

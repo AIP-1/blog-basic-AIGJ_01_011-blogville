@@ -1,0 +1,238 @@
+// 마을에 놓을 것과 입구 (TOWN-03·04, specs/038-town). 그림은 `src/lib/art/town.ts`, 좌표는 `layout.ts`.
+import type { PixelArt } from "@/lib/art/characters";
+import { boardArt, emptyLotArt, fountainArt, houseArt, lampArt, shopArt, TOWN_CELL, treeArt } from "@/lib/art/town";
+import {
+  BOARD_POS,
+  CENTER,
+  FOUNTAIN_POS,
+  HOUSE_LOTS,
+  lotFront,
+  PLAZA_RADIUS,
+  ROADS,
+  SHOP_POS,
+  WORLD,
+  overlaps,
+  shortName,
+  type Entrance,
+  type Rect,
+} from "./layout";
+
+export type TownHouseInput = {
+  lot: number;
+  slug: string;
+  nickname: string;
+  blogTitle: string;
+  stage: number;
+  roof: string;
+  mine: boolean;
+};
+
+/** 마을에 서는 것 하나: 그림(발밑 기준), 부딪히는 몸체, 이름표 */
+export type Structure = {
+  id: string;
+  art: PixelArt;
+  x: number;
+  y: number;
+  body: Rect | null;
+  label?: string;
+  sub?: string;
+};
+
+/** 들어갈 곳. `href`가 `login`이면 로그인이 필요한 곳(방문자) */
+export type TownEntrance = Entrance & { label: string; href: string };
+
+export type TownLayout = { structures: Structure[]; entrances: TownEntrance[] };
+
+/** 그림 크기 (px) */
+export function artSize(art: PixelArt): { width: number; height: number } {
+  return {
+    width: art.rows[0].length * TOWN_CELL,
+    height: art.rows.length * TOWN_CELL,
+  };
+}
+
+/** 그림 맨 위 빈 줄을 뺀 실제 높이 (px). 이름표를 그림 바로 위에 붙인다 */
+export function artVisibleHeight(art: PixelArt): number {
+  const first = art.rows.findIndex((row) => /[^.]/.test(row));
+  return (art.rows.length - Math.max(0, first)) * TOWN_CELL;
+}
+
+/** 고정 씨앗 난수 (나무 자리가 매번 같다) */
+function seeded(seed: number) {
+  let a = seed;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** 입구에 붙는 안내: `🏪 상점 · Space 들어가기`, 방문자가 회원 전용 곳에 가면 `· Space 로그인하고 이용하기` */
+export function entrancePrompt(e: TownEntrance): string {
+  return `${e.label} · Space ${e.href === "login" ? "로그인하고 이용하기" : "들어가기"}`;
+}
+
+/**
+ * 마을 배치를 만든다: 게시판(마을 소식·출석 체크 입구 둘)·상점·분수·가로등, 집 자리 11곳(집이 없으면 빈 집터), 나무.
+ * 방문자(`member = false`)에게 출석 체크·상점은 로그인 안내다.
+ */
+export function townLayout(houses: readonly TownHouseInput[], member: boolean): TownLayout {
+  const lotArt = emptyLotArt();
+  const lamp = lampArt();
+  const structures: Structure[] = [];
+  const entrances: TownEntrance[] = [];
+
+  structures.push({
+    id: "board",
+    art: boardArt(),
+    x: BOARD_POS.x,
+    y: BOARD_POS.y,
+    body: { x: BOARD_POS.x - 120, y: BOARD_POS.y - 40, width: 240, height: 40 },
+    label: "마을 게시판",
+  });
+  entrances.push({
+    id: "feed",
+    x: BOARD_POS.x - 60,
+    y: BOARD_POS.y + 30,
+    label: "📋 마을 소식",
+    href: "/feed",
+  });
+  entrances.push({
+    id: "attendance",
+    x: BOARD_POS.x + 60,
+    y: BOARD_POS.y + 30,
+    label: "📮 출석 체크",
+    href: member ? "/attendance" : "login",
+  });
+
+  structures.push({
+    id: "shop",
+    art: shopArt(),
+    x: SHOP_POS.x,
+    y: SHOP_POS.y,
+    body: { x: SHOP_POS.x - 95, y: SHOP_POS.y - 60, width: 190, height: 60 },
+    label: "상점",
+  });
+  entrances.push({
+    id: "shop",
+    x: SHOP_POS.x + 40,
+    y: SHOP_POS.y + 30,
+    label: "🏪 상점",
+    href: member ? "/shop" : "login",
+  });
+
+  structures.push({
+    id: "fountain",
+    art: fountainArt(),
+    x: FOUNTAIN_POS.x,
+    y: FOUNTAIN_POS.y,
+    body: {
+      x: FOUNTAIN_POS.x - 70,
+      y: FOUNTAIN_POS.y - 45,
+      width: 140,
+      height: 45,
+    },
+  });
+  for (const [dx, dy] of [
+    [-1, -1],
+    [1, -1],
+    [-1, 1],
+    [1, 1],
+  ]) {
+    const x = CENTER.x + dx * (PLAZA_RADIUS - 30) * 0.72;
+    const y = CENTER.y + dy * (PLAZA_RADIUS - 30) * 0.72;
+    structures.push({
+      id: `lamp:${dx},${dy}`,
+      art: lamp,
+      x,
+      y,
+      body: { x: x - 6, y: y - 8, width: 12, height: 8 },
+    });
+  }
+
+  HOUSE_LOTS.forEach((lot, i) => {
+    const house = houses.find((h) => h.lot === i);
+    if (house) {
+      const name = house.mine ? "내 집" : `${shortName(house.nickname)}의 집`;
+      structures.push({
+        id: `house:${i}`,
+        art: houseArt(house.stage, house.roof),
+        x: lot.x,
+        y: lot.y,
+        body: { x: lot.x - 55, y: lot.y - 55, width: 105, height: 55 },
+        label: name,
+        sub: house.blogTitle,
+      });
+      const front = lotFront(i);
+      entrances.push({
+        id: `house:${i}`,
+        x: front.x,
+        y: front.y,
+        label: `🏠 ${name}`,
+        href: `/@${house.slug}`,
+      });
+    } else {
+      structures.push({
+        id: `lot:${i}`,
+        art: lotArt,
+        x: lot.x,
+        y: lot.y + 10,
+        body: null,
+        label: i === 0 ? "내 집 자리" : "빈 집터",
+      });
+    }
+  });
+
+  // 나무: 마을 가장자리 숲 + 군데군데. 길·광장·건물 근처는 비운다
+  const random = seeded(20261012);
+  const keepOut: Rect[] = [
+    ...ROADS.map((r) => ({
+      x: r.x - 20,
+      y: r.y - 40,
+      width: r.width + 40,
+      height: r.height + 80,
+    })),
+    {
+      x: CENTER.x - PLAZA_RADIUS - 30,
+      y: CENTER.y - PLAZA_RADIUS - 30,
+      width: (PLAZA_RADIUS + 30) * 2,
+      height: (PLAZA_RADIUS + 30) * 2,
+    },
+    ...structures.map((s) => {
+      const { width, height } = artSize(s.art);
+      return {
+        x: s.x - width / 2 - 30,
+        y: s.y - height - 10,
+        width: width + 60,
+        height: height + 110,
+      };
+    }),
+  ];
+  const treeArts = [treeArt(0), treeArt(1)];
+  const trees: Structure[] = [];
+  for (let tries = 0; tries < 900 && trees.length < 140; tries++) {
+    const edge = tries % 3 !== 0;
+    let x = random() * WORLD.width;
+    let y = 60 + random() * (WORLD.height - 60);
+    if (edge) {
+      // 가장자리 띠 (120px)
+      const side = Math.floor(random() * 4);
+      if (side === 0) x = random() * 120;
+      else if (side === 1) x = WORLD.width - random() * 120;
+      else if (side === 2) y = 80 + random() * 120;
+      else y = WORLD.height - random() * 60;
+    }
+    const spot = { x: x - 30, y: y - 20, width: 60, height: 24 };
+    if (keepOut.some((k) => overlaps(spot, k)) || trees.some((t) => Math.hypot(t.x - x, t.y - y) < 46)) continue;
+    trees.push({
+      id: `tree:${trees.length}`,
+      art: treeArts[trees.length % 2],
+      x,
+      y,
+      body: { x: x - 10, y: y - 10, width: 20, height: 10 },
+    });
+  }
+  structures.push(...trees);
+  return { structures, entrances };
+}
