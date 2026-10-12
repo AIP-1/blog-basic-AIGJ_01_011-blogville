@@ -118,7 +118,8 @@ test.describe("비밀번호 바꾸기", () => {
     const visitor = await browser.newPage();
     await visitor.goto("/feed");
     await visitor.getByRole("navigation", { name: "메뉴" }).getByRole("link", { name: "로그인" }).click();
-    await expect(visitor).toHaveURL(/\/$/);
+    // 로그인하면 보던 화면으로 돌아온다 (tests/e2e/login-next.spec.ts)
+    await expect(visitor).toHaveURL(/\/\?next=%2Ffeed$/);
 
     const phone = await browser.newContext({ viewport: { width: 375, height: 800 } });
     const p = await phone.newPage();

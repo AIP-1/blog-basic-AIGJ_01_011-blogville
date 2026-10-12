@@ -9,6 +9,7 @@ import { sessions, users } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { AUTH_ERRORS, checkSignUp, PASSWORD_MAX } from "@/lib/auth-rules";
 import { normalizeName } from "@/lib/names";
+import { safeNext } from "@/lib/safe-next";
 import { getMyBlog, getSession } from "@/server/dal";
 import { clearLoginAttempts, reserveLoginAttempt } from "@/server/login-attempts";
 import { createMember, SignUpError } from "@/server/signup";
@@ -85,9 +86,12 @@ export async function signIn(_prev: AuthFormState, formData: FormData): Promise<
   if (!(await startSession(username, password, rememberMe))) return { error: AUTH_ERRORS.signInFailed, values };
   await clearLoginAttempts(username);
 
+  revalidatePath("/", "layout");
+  // 보던 화면에서 [로그인]을 눌러 왔으면 그리로 돌아간다. 이 사이트 밖 주소는 버린다 (조작한 값 포함)
+  const next = safeNext(formData.get("next"));
+  if (next) redirect(next);
   // 방금 만든 세션 쿠키는 이 요청의 headers()에 아직 없으므로 아이디로 회원을 찾는다
   const user = await db.query.users.findFirst({ where: eq(users.username, username) });
-  revalidatePath("/", "layout");
   return goToMyBlog(user!.id);
 }
 

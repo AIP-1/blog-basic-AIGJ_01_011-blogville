@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { HeaderLoginLink } from "@/components/auth/HeaderLoginLink";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { getMyBlog, getSession } from "@/server/dal";
@@ -45,11 +46,7 @@ async function Header() {
               <SignOutButton userId={member.userId} />
             </>
           )}
-          {!member && (
-            <Link href="/" className="btn btn-ghost">
-              로그인
-            </Link>
-          )}
+          {!member && <HeaderLoginLink />}
         </nav>
       </div>
     </header>
