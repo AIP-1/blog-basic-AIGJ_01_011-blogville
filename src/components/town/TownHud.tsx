@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { openNotification } from "@/app/notifications/actions";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { FavoriteButton } from "@/components/feed/FavoriteButton";
@@ -29,6 +29,8 @@ function teleport(spot: { x: number; y: number }) {
  * ☰ 마을 메뉴 (TOWN-12, specs/039-town-menu): 마을 왼쪽 위 버튼과 창 하나. 마을에는 헤더 막대가 없어
  * 내 프로필·알림·텔레포트·친구 목록과 내 정보·관리자·로그아웃을 여기에 둔다. 방문자는 텔레포트와 로그인만.
  * 창이 열려 있으면(`dialog[open]`) 게임은 키보드를 쓰지 않는다. Esc나 [✕]로 닫고 [‹]로 메뉴에 돌아온다.
+ * `phone`이면 휴대폰 아래 탭의 ☰ 메뉴 화면(`/town?menu=1`, specs/040-phone-tabs): 게임이 없어 늘 펼친 채 페이지에 놓이고,
+ * 텔레포트와 ✨ 없이 내 프로필·알림·친구 목록·바로 가기만 보인다.
  */
 export function TownHud({
   hud,
@@ -36,16 +38,21 @@ export function TownHud({
   userId,
   unread,
   spots,
+  phone = false,
 }: {
   hud: HudMember | null;
   admin: boolean;
   userId: string | null;
   unread: string | null;
   spots: { places: TownSpot[]; houses: TownSpot[] };
+  phone?: boolean;
 }) {
-  const [panel, setPanel] = useState<Panel | null>(null);
+  const [panel, setPanel] = useState<Panel | null>(phone ? "menu" : null);
   const opener = useRef<HTMLButtonElement>(null);
-  const dialog = useRef<HTMLDialogElement>(null);
+  const dialog = useRef<HTMLElement>(null);
+  const titleId = useId();
+  // 창을 바꿀 때만 제목으로 초점을 옮긴다. 휴대폰 메뉴 화면은 처음 열 때 초점을 빼앗지 않는다
+  const shown = useRef<Panel | null>(panel);
 
   const close = () => {
     setPanel(null);
@@ -53,8 +60,11 @@ export function TownHud({
   };
 
   useEffect(() => {
+    const changed = shown.current !== panel;
+    shown.current = panel;
     if (!panel) return;
-    dialog.current?.querySelector<HTMLElement>("[data-panel-focus]")?.focus();
+    if (changed) dialog.current?.querySelector<HTMLElement>("[data-panel-focus]")?.focus();
+    if (phone) return;
     const onKey = (event: KeyboardEvent) => {
       // 레벨업 팝업 같은 모달이 열려 있으면 그 창이 Esc를 받는다
       if (event.key !== "Escape" || document.querySelector("dialog[open]:modal")) return;
@@ -64,7 +74,7 @@ export function TownHud({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [panel]);
+  }, [panel, phone]);
 
   const go = (spot: TownSpot) => {
     if (!spot.enabled) return;
@@ -80,40 +90,49 @@ export function TownHud({
   );
 
   /** 친구의 집이 마을에 서 있으면 그 텔레포트 자리 */
-  const houseOf = (slug: string) => spots.houses.find((s) => s.enabled && s.slug === slug);
+  const houseOf = (slug: string) => (phone ? undefined : spots.houses.find((s) => s.enabled && s.slug === slug));
 
+  const Box = phone ? "section" : "dialog";
   return (
     <>
-      {/* 화면 위 가운데 로고 (TOWN-01) */}
-      <Link
-        href={userId ? "/town" : "/"}
-        className="absolute left-1/2 top-2 flex min-h-11 -translate-x-1/2 items-center px-2 text-xl font-extrabold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.45)]"
-      >
-        Blogville
-      </Link>
-      <button
-        ref={opener}
-        type="button"
-        className="absolute left-3 top-3 inline-flex min-h-11 min-w-11 items-center gap-1 rounded-xl bg-white/90 px-3 font-bold text-[#3b2a20] shadow"
-        aria-haspopup="dialog"
-        aria-expanded={panel !== null}
-        onClick={() => (panel ? close() : setPanel("menu"))}
-        data-town-menu
-      >
-        ☰ 메뉴
-        {unread && (
-          <span className="rounded-full bg-[#e74c3c] px-1.5 text-xs text-white" aria-label={`안 읽은 알림 ${unread}`}>
-            {unread}
-          </span>
-        )}
-      </button>
+      {!phone && (
+        <>
+          {/* 화면 위 가운데 로고 (TOWN-01) */}
+          <Link
+            href={userId ? "/town" : "/"}
+            className="absolute left-1/2 top-2 flex min-h-11 -translate-x-1/2 items-center px-2 text-xl font-extrabold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.45)]"
+          >
+            Blogville
+          </Link>
+          <button
+            ref={opener}
+            type="button"
+            className="absolute left-3 top-3 inline-flex min-h-11 min-w-11 items-center gap-1 rounded-xl bg-white/90 px-3 font-bold text-[#3b2a20] shadow"
+            aria-haspopup="dialog"
+            aria-expanded={panel !== null}
+            onClick={() => (panel ? close() : setPanel("menu"))}
+            data-town-menu
+          >
+            ☰ 메뉴
+            {unread && (
+              <span className="rounded-full bg-[#e74c3c] px-1.5 text-xs text-white" aria-label={`안 읽은 알림 ${unread}`}>
+                {unread}
+              </span>
+            )}
+          </button>
+        </>
+      )}
 
       {panel && (
-        <dialog
-          ref={dialog}
-          open
-          aria-labelledby="town-panel-title"
-          className="absolute left-3 top-16 m-0 max-h-[calc(100%-5rem)] w-[min(22rem,calc(100vw-1.5rem))] overflow-y-auto rounded-2xl border border-line bg-surface p-4 text-ink shadow-xl"
+        <Box
+          ref={dialog as never}
+          open={phone ? undefined : true}
+          aria-labelledby={titleId}
+          className={
+            phone
+              ? "mx-auto w-full max-w-md rounded-2xl border border-line bg-surface p-4 text-ink"
+              : "absolute left-3 top-16 m-0 max-h-[calc(100%-5rem)] w-[min(22rem,calc(100vw-1.5rem))] overflow-y-auto rounded-2xl border border-line bg-surface p-4 text-ink shadow-xl"
+          }
           data-town-panel={panel}
         >
           <div className="mb-3 flex items-center gap-1">
@@ -122,12 +141,14 @@ export function TownHud({
                 ‹
               </button>
             )}
-            <h2 id="town-panel-title" className="flex-1 text-lg font-bold" tabIndex={-1} data-panel-focus>
+            <h2 id={titleId} className="flex-1 text-lg font-bold" tabIndex={-1} data-panel-focus>
               {TITLES[panel]}
             </h2>
-            <button type="button" className="btn btn-ghost min-w-11 px-2" aria-label="닫기" onClick={close}>
-              ✕
-            </button>
+            {!phone && (
+              <button type="button" className="btn btn-ghost min-w-11 px-2" aria-label="닫기" onClick={close}>
+                ✕
+              </button>
+            )}
           </div>
 
           {panel === "menu" && hud && (
@@ -135,7 +156,7 @@ export function TownHud({
               <div className="grid grid-cols-2 gap-2">
                 {tile("profile", "👤 내 프로필", `Lv.${hud.level} · 🪙 ${formatNumber(hud.coin)}`)}
                 {tile("notifications", "🔔 알림", unread ? `안 읽은 알림 ${unread}개` : "새 알림 없음")}
-                {tile("teleport", "✨ 텔레포트", "상점·이웃집 앞으로")}
+                {!phone && tile("teleport", "✨ 텔레포트", "상점·이웃집 앞으로")}
                 {tile("friends", "👫 친구 목록", `이웃 ${hud.neighborTotal}명`)}
               </div>
               {/* 마을에는 헤더가 없어 바로 가기 링크를 둔다 (걷지 않고, 화면 낭독기로도) */}
@@ -314,7 +335,7 @@ export function TownHud({
               )}
             </div>
           )}
-        </dialog>
+        </Box>
       )}
     </>
   );

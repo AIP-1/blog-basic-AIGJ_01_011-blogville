@@ -6,12 +6,12 @@ import { useEffect, useRef, useState } from "react";
 import { unreadBadge } from "@/lib/notifications";
 
 /**
- * 헤더 🔔 (GAME-08). 처음 숫자는 서버가 그린다. 헤더(레이아웃)는 화면을 옮겨도 다시 그려지지 않으므로
- * 주소가 바뀔 때마다 안 읽은 수를 새로 받는다.
+ * 안 읽은 알림 수 (GAME-08, 헤더 🔔·휴대폰 아래 탭). 처음 숫자는 서버가 그린다. 헤더(레이아웃)는 화면을 옮겨도
+ * 다시 그려지지 않으므로 주소가 바뀔 때마다 안 읽은 수를 새로 받는다.
  * `unread`는 서버가 헤더를 다시 그릴 때마다(Server Action 뒤 등) 새 객체로 온다. 숫자가 전과 같아도
  * 그때의 서버 값으로 맞추고, 받는 중이던 옛 숫자는 버린다.
  */
-export function NotificationBell({ unread }: { unread: { count: number } }) {
+export function useUnreadCount(unread: { count: number }): number {
   const pathname = usePathname();
   const [count, setCount] = useState(unread.count);
   const [seen, setSeen] = useState(unread);
@@ -36,7 +36,12 @@ export function NotificationBell({ unread }: { unread: { count: number } }) {
       alive = false;
     };
   }, [pathname, unread]);
+  return count;
+}
 
+/** 헤더 🔔 (GAME-08) */
+export function NotificationBell({ unread }: { unread: { count: number } }) {
+  const count = useUnreadCount(unread);
   const badge = unreadBadge(count);
   return (
     <Link href="/notifications" className="btn btn-ghost relative px-2" aria-label={badge ? `알림, 안 읽은 알림 ${badge}개` : "알림"}>

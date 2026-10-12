@@ -5,6 +5,7 @@ import { SessionKeeper } from "@/components/auth/SessionKeeper";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { AttendanceDayWatcher } from "@/components/game/AttendanceDayWatcher";
 import { LevelUpDialog } from "@/components/game/LevelUpDialog";
+import { PhoneTabs } from "@/components/layout/PhoneTabs";
 import { PixelLayers } from "@/components/game/PixelLayers";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { getMyBlog, getSession } from "@/server/dal";
@@ -59,9 +60,12 @@ async function Header() {
               🏘<span className="hidden md:inline">마을</span>
             </Link>
           </span>
-          <Link href="/feed" className="btn btn-ghost px-2" aria-label="마을 소식">
-            📋<span className="hidden sm:inline">마을 소식</span>
-          </Link>
+          {/* 휴대폰 회원은 아래 탭에 있는 것(마을 소식·상점·출석·알림·내 블로그)을 헤더에서 뺀다 (TOWN-11) */}
+          <span className={member && blog ? "contents max-sm:hidden" : "contents"}>
+            <Link href="/feed" className="btn btn-ghost px-2" aria-label="마을 소식">
+              📋<span className="hidden sm:inline">마을 소식</span>
+            </Link>
+          </span>
           {member && blog && (
             <>
               {member.role === "admin" && (
@@ -83,19 +87,23 @@ async function Header() {
                   <span className="whitespace-nowrap">🪙 {formatNumber(wallet.coin)}</span>
                 </Link>
               )}
-              <Link href="/shop" className="btn btn-ghost px-2" aria-label="마을 상점">
-                🏪<span className="hidden xl:inline">상점</span>
-              </Link>
-              <Link href="/attendance" className="btn btn-ghost px-2" aria-label="출석 체크">
-                📮<span className="hidden xl:inline">출석</span>
-              </Link>
-              <NotificationBell unread={{ count: unread }} />
+              <span className="contents max-sm:hidden">
+                <Link href="/shop" className="btn btn-ghost px-2" aria-label="마을 상점">
+                  🏪<span className="hidden xl:inline">상점</span>
+                </Link>
+                <Link href="/attendance" className="btn btn-ghost px-2" aria-label="출석 체크">
+                  📮<span className="hidden xl:inline">출석</span>
+                </Link>
+                <NotificationBell unread={{ count: unread }} />
+              </span>
               <Link href="/settings/account" className="btn btn-ghost px-2" aria-label="내 정보">
                 👤<span className="hidden sm:inline">내 정보</span>
               </Link>
-              <Link href={`/@${blog.slug}`} className="btn btn-ghost header-my-blog">
-                내 블로그
-              </Link>
+              <span className="contents max-sm:hidden">
+                <Link href={`/@${blog.slug}`} className="btn btn-ghost">
+                  내 블로그
+                </Link>
+              </span>
               <Link href="/write" className="btn btn-primary">
                 ✏️ 글쓰기
               </Link>
@@ -115,6 +123,7 @@ async function Header() {
         <LevelUpDialog pending={{ levelUp }} />
       </>
     )}
+    {member && blog && <PhoneTabs slug={blog.slug} unread={{ count: unread }} />}
     </>
   );
 }

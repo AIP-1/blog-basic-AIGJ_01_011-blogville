@@ -95,9 +95,11 @@ body {
 .prose-post pre code { background: none; padding: 0; color: inherit; }
 .prose-post hr { border: 0; border-top: 1px solid var(--line); }
 
-/* 좁은 화면: 로고가 내 블로그로 가므로 [내 블로그]는 숨긴다 */
-@media (max-width: 400px) {
-  .header-my-blog { display: none; }
+/* 휴대폰 회원의 아래 탭 (TOWN-11, specs/040-phone-tabs): 마지막 줄이 탭에 가리지 않게 띄운다 */
+@media (max-width: 639px) {
+  body:has([data-phone-tabs]) {
+    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
+  }
 }
 
 /* 태그 (POST-04) */
