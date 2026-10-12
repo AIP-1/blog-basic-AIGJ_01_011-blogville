@@ -1,6 +1,6 @@
 // 마을에 놓을 것과 입구 (TOWN-03·04, specs/038-town). 그림은 `src/lib/art/town.ts`, 좌표는 `layout.ts`.
 import type { PixelArt } from "@/lib/art/characters";
-import { benchArt, boardArt, emptyLotArt, fountainArt, houseArt, lampArt, shopArt, TOWN_CELL, treeArt } from "@/lib/art/town";
+import { benchArt, boardArt, emptyLotArt, fountainArt, houseArt, lampArt, mailboxArt, shopArt, TOWN_CELL, treeArt } from "@/lib/art/town";
 import {
   BOARD_POS,
   CENTER,
@@ -41,8 +41,17 @@ export type Structure = {
   sub?: string;
 };
 
-/** 들어갈 곳. `href`가 `login`이면 로그인이 필요한 곳(방문자) */
+/** 들어갈 곳. `href`가 `login`이면 로그인이 필요한 곳(방문자), `mailbox:{자리}`면 우체통 창 (TOWN-13) */
 export type TownEntrance = Entrance & { label: string; href: string };
+
+/** 우체통 입구의 집 자리 번호 (우체통이 아니면 null) */
+export function mailboxLot(href: string): number | null {
+  const m = /^mailbox:(\d+)$/.exec(href);
+  return m ? Number(m[1]) : null;
+}
+
+/** 우체통은 집 오른쪽 앞 (집 발밑에서) */
+export const MAILBOX_OFFSET = { x: 118, y: 6 } as const;
 
 /** `walls`: 걸을 수 없는 땅 (절벽 앞면·하늘, TOWN-05) */
 export type TownLayout = { structures: Structure[]; entrances: TownEntrance[]; walls: readonly Rect[] };
@@ -74,14 +83,14 @@ function seeded(seed: number) {
 
 /** 입구에 붙는 안내: `🏪 상점 · Space 들어가기`, 방문자가 회원 전용 곳에 가면 `· Space 로그인하고 이용하기` */
 export function entrancePrompt(e: TownEntrance): string {
-  return `${e.label} · Space ${e.href === "login" ? "로그인하고 이용하기" : "들어가기"}`;
+  return `${e.label} · Space ${e.href === "login" ? "로그인하고 이용하기" : mailboxLot(e.href) !== null ? "소식 보기" : "들어가기"}`;
 }
 
 /**
  * 마을 배치를 만든다: 게시판(마을 소식·출석 체크 입구 둘)·상점·분수·가로등, 집 자리 11곳(집이 없으면 빈 집터), 나무.
- * 방문자(`member = false`)에게 출석 체크·상점은 로그인 안내다.
+ * 방문자(`member = false`)에게 출석 체크·상점은 로그인 안내다. 집마다 오른쪽 앞에 우체통(TOWN-13), 내 우체통은 안 읽은 알림이 있으면(`mailFlag`) 깃발을 올린다.
  */
-export function townLayout(houses: readonly TownHouseInput[], member: boolean): TownLayout {
+export function townLayout(houses: readonly TownHouseInput[], member: boolean, mailFlag = false): TownLayout {
   const lotArt = emptyLotArt();
   const lamp = lampArt();
   const structures: Structure[] = [];
@@ -185,6 +194,21 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean): 
         y: front.y,
         label: `🏠 ${name}`,
         href: `/@${house.slug}`,
+      });
+      const box = { x: lot.x + MAILBOX_OFFSET.x, y: lot.y + MAILBOX_OFFSET.y };
+      structures.push({
+        id: `mailbox:${i}`,
+        art: mailboxArt(house.mine, house.mine && mailFlag),
+        x: box.x,
+        y: box.y,
+        body: { x: box.x - 8, y: box.y - 8, width: 16, height: 8 },
+      });
+      entrances.push({
+        id: `mailbox:${i}`,
+        x: box.x,
+        y: box.y + 34,
+        label: house.mine ? "📬 내 우체통" : `📬 ${shortName(house.nickname)}의 우체통`,
+        href: `mailbox:${i}`,
       });
     } else {
       structures.push({

@@ -7,10 +7,11 @@ import { SignOutButton } from "@/components/auth/SignOutButton";
 import { FavoriteButton } from "@/components/feed/FavoriteButton";
 import { PixelLayers } from "@/components/game/PixelLayers";
 import { formatNumber } from "@/lib/game";
+import { lotFront } from "@/lib/town/layout";
 import type { TownSpot } from "@/lib/town/structures";
-import type { HudMember } from "@/server/town";
+import type { HudMember, TownHouse } from "@/server/town";
 
-type Panel = "menu" | "profile" | "notifications" | "teleport" | "friends";
+type Panel = "menu" | "profile" | "notifications" | "teleport" | "friends" | "mailbox";
 
 const TITLES: Record<Panel, string> = {
   menu: "메뉴",
@@ -18,6 +19,7 @@ const TITLES: Record<Panel, string> = {
   notifications: "🔔 알림",
   teleport: "✨ 텔레포트",
   friends: "👫 친구 목록",
+  mailbox: "📮 우체통",
 };
 
 /** 게임 캔버스에 순간 이동을 알린다 (TOWN-02) */
@@ -38,6 +40,7 @@ export function TownHud({
   userId,
   unread,
   spots,
+  houses = [],
   phone = false,
 }: {
   hud: HudMember | null;
@@ -45,18 +48,29 @@ export function TownHud({
   userId: string | null;
   unread: string | null;
   spots: { places: TownSpot[]; houses: TownSpot[] };
+  /** 우체통 창에 보일 집들 (TOWN-13) */
+  houses?: TownHouse[];
   phone?: boolean;
 }) {
   const [panel, setPanel] = useState<Panel | null>(phone ? "menu" : null);
+  // 지금 연 우체통의 집 (자리 번호)
+  const [mailLot, setMailLot] = useState<number | null>(null);
+  const mailHouse = mailLot === null ? undefined : houses.find((h) => h.lot === mailLot);
   const opener = useRef<HTMLButtonElement>(null);
   const dialog = useRef<HTMLElement>(null);
   const titleId = useId();
   // 창을 바꿀 때만 제목으로 초점을 옮긴다. 휴대폰 메뉴 화면은 처음 열 때 초점을 빼앗지 않는다
   const shown = useRef<Panel | null>(panel);
 
+  // 게임(우체통)에서 연 창은 닫으면 초점을 게임에 돌려준다. ☰에 두면 다음 Space가 메뉴를 다시 연다
+  const fromGame = useRef(false);
+  const refocus = () => {
+    if (!fromGame.current) opener.current?.focus();
+    else if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  };
   const close = () => {
     setPanel(null);
-    opener.current?.focus();
+    refocus();
   };
 
   useEffect(() => {
@@ -70,11 +84,23 @@ export function TownHud({
       if (event.key !== "Escape" || document.querySelector("dialog[open]:modal")) return;
       event.preventDefault();
       setPanel(null);
-      opener.current?.focus();
+      refocus();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [panel, phone]);
+
+  // 게임에서 우체통 앞 Space·클릭 (TOWN-13)
+  useEffect(() => {
+    if (phone) return;
+    const onMailbox = (event: Event) => {
+      setMailLot((event as CustomEvent<{ lot: number }>).detail.lot);
+      fromGame.current = true;
+      setPanel("mailbox");
+    };
+    window.addEventListener("bv-mailbox", onMailbox);
+    return () => window.removeEventListener("bv-mailbox", onMailbox);
+  }, [phone]);
 
   const go = (spot: TownSpot) => {
     if (!spot.enabled) return;
@@ -87,6 +113,39 @@ export function TownHud({
       <span className="font-bold">{title}</span>
       <span className="text-sm text-ink-soft">{sub}</span>
     </button>
+  );
+
+  /** 최근 알림 5개 (☰ 🔔 알림과 내 우체통이 같이 쓴다) */
+  const notificationList = (hud: HudMember) => (
+    <div className="space-y-2">
+      {hud.notifications.length === 0 ? (
+        <p className="text-ink-soft">아직 알림이 없어요.</p>
+      ) : (
+        <ol className="divide-y divide-line overflow-hidden rounded-xl border border-line" aria-label="최근 알림">
+          {hud.notifications.map((n) => (
+            <li key={n.id}>
+              <form action={openNotification}>
+                <input type="hidden" name="id" value={n.id} />
+                <button
+                  type="submit"
+                  className={`flex min-h-11 w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-ink/5 ${n.read ? "" : "bg-[#fff3d6] font-bold"}`}
+                  data-notification={n.read ? "read" : "unread"}
+                >
+                  <span>
+                    {!n.read && <span className="sr-only">안 읽음, </span>}
+                    {n.text}
+                  </span>
+                  <span className="text-xs font-normal text-ink-soft">{n.time}</span>
+                </button>
+              </form>
+            </li>
+          ))}
+        </ol>
+      )}
+      <Link href="/notifications" className="btn btn-ghost">
+        알림함 전체 보기 ›
+      </Link>
+    </div>
   );
 
   /** 친구의 집이 마을에 서 있으면 그 텔레포트 자리 */
@@ -110,7 +169,11 @@ export function TownHud({
             className="absolute left-3 top-3 inline-flex min-h-11 min-w-11 items-center gap-1 rounded-xl bg-white/90 px-3 font-bold text-[#3b2a20] shadow"
             aria-haspopup="dialog"
             aria-expanded={panel !== null}
-            onClick={() => (panel ? close() : setPanel("menu"))}
+            onClick={() => {
+          fromGame.current = false;
+          if (panel) close();
+          else setPanel("menu");
+        }}
             data-town-menu
           >
             ☰ 메뉴
@@ -142,7 +205,7 @@ export function TownHud({
               </button>
             )}
             <h2 id={titleId} className="flex-1 text-lg font-bold" tabIndex={-1} data-panel-focus>
-              {TITLES[panel]}
+              {panel === "mailbox" && mailHouse ? (mailHouse.mine ? "📮 내 우체통" : `📮 ${mailHouse.nickname}님의 우체통`) : TITLES[panel]}
             </h2>
             {!phone && (
               <button type="button" className="btn btn-ghost min-w-11 px-2" aria-label="닫기" onClick={close}>
@@ -235,35 +298,41 @@ export function TownHud({
             </div>
           )}
 
-          {panel === "notifications" && hud && (
-            <div className="space-y-2">
-              {hud.notifications.length === 0 ? (
-                <p className="text-ink-soft">아직 알림이 없어요.</p>
+          {panel === "notifications" && hud && notificationList(hud)}
+
+          {panel === "mailbox" && mailHouse?.mine && hud && notificationList(hud)}
+          {panel === "mailbox" && mailHouse && !mailHouse.mine && (
+            <div className="space-y-3" data-mailbox={mailHouse.slug}>
+              <p className="break-words text-sm font-semibold">{mailHouse.blogTitle}의 새 글</p>
+              {mailHouse.recentPosts.length === 0 ? (
+                <p className="text-ink-soft">아직 공개 글이 없어요.</p>
               ) : (
-                <ol className="divide-y divide-line overflow-hidden rounded-xl border border-line" aria-label="최근 알림">
-                  {hud.notifications.map((n) => (
-                    <li key={n.id}>
-                      <form action={openNotification}>
-                        <input type="hidden" name="id" value={n.id} />
-                        <button
-                          type="submit"
-                          className={`flex min-h-11 w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-ink/5 ${n.read ? "" : "bg-[#fff3d6] font-bold"}`}
-                          data-notification={n.read ? "read" : "unread"}
-                        >
-                          <span>
-                            {!n.read && <span className="sr-only">안 읽음, </span>}
-                            {n.text}
-                          </span>
-                          <span className="text-xs font-normal text-ink-soft">{n.time}</span>
-                        </button>
-                      </form>
+                <ul className="grid gap-1" aria-label="새 글">
+                  {mailHouse.recentPosts.map((post) => (
+                    <li key={post.id}>
+                      <Link href={`/@${mailHouse.slug}/${post.id}`} className="flex min-h-11 items-center gap-2 rounded-lg border border-line bg-bg px-3 py-2 text-sm hover:bg-ink/5">
+                        <span aria-hidden="true">✉️</span>
+                        <span className="min-w-0 break-words">{post.title}</span>
+                      </Link>
                     </li>
                   ))}
-                </ol>
+                </ul>
               )}
-              <Link href="/notifications" className="btn btn-ghost">
-                알림함 전체 보기 ›
-              </Link>
+              <div className="flex flex-wrap gap-2">
+                <Link href={`/@${mailHouse.slug}`} className="btn">
+                  🏠 집에 들어가기
+                </Link>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    setPanel(null);
+                    teleport(lotFront(mailHouse.lot));
+                  }}
+                >
+                  ✨ 집 앞으로
+                </button>
+              </div>
             </div>
           )}
 

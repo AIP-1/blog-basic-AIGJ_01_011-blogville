@@ -309,6 +309,27 @@ export function fountainArt(): PixelArt {
   return art(g, { S: "#c9c2b5", s: "#a39b8c", B: "#6ec6ff", w: "#d6f0ff" });
 }
 
+/** 집 앞 우체통 (TOWN-13): 내 집은 파랑, 다른 집은 빨강. `flag`면 안 읽은 알림 깃발을 올린다 */
+export function mailboxArt(mine: boolean, flag = false): PixelArt {
+  const g = grid(9, 12);
+  // 둥근 지붕 통
+  fill(g, 1, 1, 6, 1, "K");
+  fill(g, 0, 2, 8, 4, "B");
+  fill(g, 1, 1, 6, 1, "B");
+  frame(g, 0, 2, 8, 4, "K");
+  fill(g, 1, 0, 6, 1, "K");
+  fill(g, 2, 3, 4, 1, "K");
+  // 기둥과 밑동
+  fill(g, 3, 6, 2, 5, "P");
+  fill(g, 2, 11, 4, 1, "P");
+  // 깃발: 내려가 있으면 옆에 붙고, 올라가면 위로
+  if (flag) {
+    fill(g, 8, 0, 1, 4, "K");
+    fill(g, 7, 0, 1, 2, "F");
+  } else fill(g, 8, 3, 1, 2, "F");
+  return art(g, { K: "#2b2b2b", B: mine ? "#4a90d9" : "#d9534f", P: "#6b4a2f", F: "#ffd23f" });
+}
+
 /** 전망대 나무 의자 (TOWN-05) */
 export function benchArt(): PixelArt {
   const g = grid(18, 8);
