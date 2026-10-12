@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { sessions, users } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { AUTH_ERRORS, checkSignUp, PASSWORD_MAX } from "@/lib/auth-rules";
+import { parseId } from "@/lib/ids";
 import { normalizeName } from "@/lib/names";
 import { safeNext } from "@/lib/safe-next";
 import { getMyBlog, getSession } from "@/server/dal";
@@ -69,13 +70,16 @@ export async function signUp(_prev: AuthFormState, formData: FormData): Promise<
     passwordConfirm: field(formData, "passwordConfirm"),
     blogTitle: field(formData, "blogTitle"),
   };
-  const values = { username: input.username, blogTitle: input.blogTitle };
+  const values = { username: input.username, blogTitle: input.blogTitle, characterId: field(formData, "characterId") };
   const error = checkSignUp(input);
   if (error) return { error, values };
+  // 캐릭터 ID 모양만 여기서 보고, 기본 캐릭터인지는 가입 트랜잭션이 DB로 다시 본다 (GAME-01)
+  const characterId = parseId(values.characterId);
+  if (characterId === null) return { error: AUTH_ERRORS.character, values };
 
   const username = normalizeName(input.username);
   try {
-    await createMember({ username, password: input.password, blogTitle: input.blogTitle });
+    await createMember({ username, password: input.password, blogTitle: input.blogTitle, characterId });
   } catch (e) {
     if (e instanceof SignUpError) return { error: e.message, values };
     throw e;

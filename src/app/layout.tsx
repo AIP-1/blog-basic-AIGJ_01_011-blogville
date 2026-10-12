@@ -3,10 +3,12 @@ import Link from "next/link";
 import { HeaderLoginLink } from "@/components/auth/HeaderLoginLink";
 import { SessionKeeper } from "@/components/auth/SessionKeeper";
 import { SignOutButton } from "@/components/auth/SignOutButton";
+import { PixelCharacter } from "@/components/game/PixelCharacter";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { getMyBlog, getSession } from "@/server/dal";
 import { formatNumber } from "@/lib/game";
 import { countUnreadNotifications } from "@/server/notifications";
+import { getCharacter } from "@/server/items";
 import { getWallet } from "@/server/points";
 import "./globals.css";
 
@@ -17,9 +19,9 @@ export const metadata: Metadata = {
 
 async function Header() {
   const member = await getSession();
-  const [blog, unread, wallet] = member
-    ? await Promise.all([getMyBlog(member.userId), countUnreadNotifications(member.userId), getWallet(member.userId)])
-    : [null, 0, null];
+  const [blog, unread, wallet, character] = member
+    ? await Promise.all([getMyBlog(member.userId), countUnreadNotifications(member.userId), getWallet(member.userId), getCharacter(member.userId)])
+    : [null, 0, null, null];
   return (
     <header className="border-b border-line bg-surface">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-2 px-4 py-2">
@@ -46,6 +48,8 @@ async function Header() {
                   aria-label={`Lv.${wallet.progress.level}, 코인 ${formatNumber(wallet.coin)}: 경험치·코인 내역`}
                   data-wallet
                 >
+                  {/* 내 캐릭터 (GAME-01) */}
+                  <PixelCharacter art={character?.art} size={28} />
                   <span className="rounded-full bg-accent/10 px-1.5 font-bold text-accent">Lv.{wallet.progress.level}</span>
                   <span className="whitespace-nowrap">🪙 {formatNumber(wallet.coin)}</span>
                 </Link>

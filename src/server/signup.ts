@@ -2,9 +2,10 @@ import "server-only";
 import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { accounts, blogs, categories, loginAttempts, profiles, users } from "@/db/schema";
+import { accounts, blogs, categories, loginAttempts, profiles, userItems, users } from "@/db/schema";
 import { AUTH_ERRORS } from "@/lib/auth-rules";
 import { findNameConflict, isUniqueViolation, lockName } from "./names";
+import { findStarterCharacter } from "./items";
 import { grantReward } from "./points";
 
 export class SignUpError extends Error {}
@@ -12,10 +13,10 @@ export class SignUpError extends Error {}
 const newId = () => crypto.randomUUID().replace(/-/g, "");
 
 /**
- * 가입 트랜잭션 (AUTH-07, BLOG-01): 회원·로그인 수단·프로필·블로그·기본 카테고리 "일상"을 한 번에 만든다.
+ * 가입 트랜잭션 (AUTH-07, BLOG-01, GAME-01): 회원·로그인 수단·고른 캐릭터·프로필·블로그·기본 카테고리 "일상"을 한 번에 만든다.
  * 하나라도 실패하면 전부 취소된다. 입력은 checkSignUp을 통과한 값이어야 한다.
  */
-export async function createMember(input: { username: string; password: string; blogTitle: string }) {
+export async function createMember(input: { username: string; password: string; blogTitle: string; characterId: number }) {
   // 해시는 느리므로 트랜잭션(잠금) 밖에서 만든다
   const passwordHash = await hashPassword(input.password);
   const userId = newId();
@@ -23,6 +24,9 @@ export async function createMember(input: { username: string; password: string; 
     await db.transaction(async (tx) => {
       await lockName(tx, input.username);
       if (await findNameConflict(tx, input.username)) throw new SignUpError(AUTH_ERRORS.taken);
+      // 고른 캐릭터가 기본 캐릭터인지 DB에서 다시 본다 (GAME-01)
+      const characterId = await findStarterCharacter(tx, input.characterId);
+      if (characterId === null) throw new SignUpError(AUTH_ERRORS.character);
 
       await tx.insert(users).values({
         id: userId,
@@ -40,7 +44,9 @@ export async function createMember(input: { username: string; password: string; 
         password: passwordHash,
       });
       await tx.delete(loginAttempts).where(eq(loginAttempts.username, input.username));
-      await tx.insert(profiles).values({ userId, nickname: input.username });
+      // 고른 캐릭터 1종을 받아 장착한다 (GAME-01)
+      await tx.insert(userItems).values({ userId, itemId: characterId });
+      await tx.insert(profiles).values({ userId, nickname: input.username, characterItemId: characterId });
       const [blog] = await tx
         .insert(blogs)
         .values({ ownerId: userId, slug: input.username, title: input.blogTitle.trim(), intro: "" })

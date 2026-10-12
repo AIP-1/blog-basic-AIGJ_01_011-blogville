@@ -28,7 +28,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
   const query = await searchParams;
   const found = await getBlogBySlug(slug);
   if (!found) notFound();
-  const { blog, nickname, photoKey } = found;
+  const { blog, nickname, photoKey, characterArt } = found;
 
   const member = await getSession();
   const isOwner = member?.userId === blog.ownerId;
@@ -98,8 +98,8 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
 
       <header className="rounded-2xl border border-line bg-surface p-5">
         <div className="flex items-center gap-3">
-          {/* 주인 프로필 사진 (BLOG-04, 없으면 닉네임 첫 글자 원) */}
-          <ProfileAvatar photoKey={photoKey} nickname={nickname} />
+          {/* 주인 프로필 사진 (BLOG-04, 없으면 캐릭터 얼굴) */}
+          <ProfileAvatar photoKey={photoKey} nickname={nickname} character={characterArt} />
           <h1 className="min-w-0 text-2xl font-extrabold">
             <Link href={`/@${blog.slug}`} className="-ml-1 inline-flex min-h-11 min-w-11 max-w-full items-center px-1 hover:underline">
               {blog.title}

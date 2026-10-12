@@ -36,6 +36,7 @@
 | `specs/029-admin-password-reset/` | 관리자 회원 찾기·비밀번호 초기화의 spec·plan·tasks |
 | `specs/030-profile-photo/` | 👤 내 정보 프로필 사진 올리기·지우기, 블로그 홈 머리글 사진의 spec·plan·tasks |
 | `specs/031-points-levels/` | 경험치·레벨·코인 원장, 글·댓글·공감 보상, 헤더 Lv·🪙, 📒 내역 화면의 spec·plan·tasks |
+| `specs/032-pixel-characters/` | 가입 때 도트 캐릭터 고르기, 헤더·블로그 홈 캐릭터의 spec·plan·tasks |
 | `src/` | Next.js 16 앱 |
 
 ## 실행

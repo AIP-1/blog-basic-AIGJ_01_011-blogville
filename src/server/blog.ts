@@ -1,7 +1,7 @@
 import "server-only";
 import { desc, eq, ilike, max, or, sql } from "drizzle-orm";
 import { db, type Tx } from "@/db";
-import { blogs, posts, profiles } from "@/db/schema";
+import { blogs, items, posts, profiles } from "@/db/schema";
 import { likePattern } from "@/lib/blog-search";
 import { BLOG_ERRORS } from "@/lib/blog-rules";
 import { mayUseSlug, normalizeName, SLUG_RE } from "@/lib/names";
@@ -10,9 +10,10 @@ import { findNameConflict, isUniqueViolation, lockName } from "./names";
 /** 주소로 블로그와 주인 닉네임. 주소는 들어온 그대로 비교한다 (대문자 주소는 없음 → 404, BLOG-02). */
 export async function getBlogBySlug(slug: string) {
   const [row] = await db
-    .select({ blog: blogs, nickname: profiles.nickname, photoKey: profiles.photoKey })
+    .select({ blog: blogs, nickname: profiles.nickname, photoKey: profiles.photoKey, characterArt: items.art })
     .from(blogs)
     .innerJoin(profiles, eq(profiles.userId, blogs.ownerId))
+    .leftJoin(items, eq(items.id, profiles.characterItemId))
     .where(eq(blogs.slug, slug))
     .limit(1);
   return row ?? null;

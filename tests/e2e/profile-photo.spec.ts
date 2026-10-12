@@ -15,10 +15,10 @@ const photoBox = (page: Page) => page.getByRole("region", { name: "프로필 사
 const cleanup = () => execFileSync("npm", ["run", "-s", "posts:cleanup"], { encoding: "utf8" });
 
 test.describe("BLOG-03·04 프로필 사진", () => {
-  test("올리면 블로그 홈 이름 옆 48px 사진, 방문자도 볼 수 있고, 바꾸면 전 사진은 떨어지고, 지우면 첫 글자 원과 404", async ({ page, browser }) => {
+  test("올리면 블로그 홈 이름 옆 48px 사진, 방문자도 볼 수 있고, 바꾸면 전 사진은 떨어지고, 지우면 캐릭터 얼굴과 404", async ({ page, browser }) => {
     const username = await signUpOk(page);
-    // 처음에는 닉네임 첫 글자 원
-    await expect(page.locator("header [data-avatar-fallback]").first()).toHaveText(username[0]);
+    // 처음에는 캐릭터 얼굴 (GAME-01)
+    await expect(page.locator("header [data-avatar-character] svg").first()).toHaveAttribute("data-character", "char.boy");
 
     await page.goto("/settings/account");
     await expect(page.getByRole("heading", { name: "프로필 사진" })).toBeVisible();
@@ -39,7 +39,7 @@ test.describe("BLOG-03·04 프로필 사진", () => {
     const box = (await avatar.boundingBox())!;
     expect(Math.round(box.width)).toBe(48);
     expect(Math.round(box.height)).toBe(48);
-    await expect(page.locator("header [data-avatar-fallback]")).toHaveCount(0);
+    await expect(page.locator("header [data-avatar-character]")).toHaveCount(0);
 
     // 로그인하지 않은 방문자도 프로필 사진은 본다 (붙지 않은 다른 첨부는 못 본다)
     const visitor = await browser.newPage();
@@ -68,7 +68,7 @@ test.describe("BLOG-03·04 프로필 사진", () => {
     cleanup();
     expect(await sql`select 1 from attachments where key = ${first}`).toHaveLength(0);
 
-    // 지우기: 확인 창에서 취소하면 그대로, 확인하면 첫 글자 원으로
+    // 지우기: 확인 창에서 취소하면 그대로, 확인하면 캐릭터 얼굴로
     page.once("dialog", (d) => d.dismiss());
     await page.getByRole("button", { name: "사진 지우기" }).click();
     await page.waitForTimeout(300);
@@ -80,7 +80,7 @@ test.describe("BLOG-03·04 프로필 사진", () => {
     await expect(page.getByRole("button", { name: "사진 지우기" })).toHaveCount(0);
     expect((await visitor.request.get(`/files/${second}`)).status()).toBe(404);
     await page.goto(`/@${username}`);
-    await expect(page.locator("header [data-avatar-fallback]").first()).toBeVisible();
+    await expect(page.locator("header [data-avatar-character]").first()).toBeVisible();
     await expect(page.getByRole("img", { name: `${username} 프로필 사진` })).toHaveCount(0);
   });
 

@@ -3,6 +3,7 @@ import {
   boolean,
   check,
   date,
+  foreignKey,
   index,
   integer,
   pgTable,
@@ -108,6 +109,40 @@ export const loginAttempts = pgTable(
 
 // ── 도메인 ─────────────────────────────────────────────────────────────
 
+/**
+ * 아이템 (GAME-01, SHOP-01, ERD 3.10). 지금은 기본 캐릭터 2종(남자·여자 주민)만 있다. 그림은 `art` 키로 `src/lib/art`의 도트를 고른다.
+ * 행은 마이그레이션이 `code`로 넣는다.
+ */
+export const items = pgTable(
+  "items",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    code: text("code").notNull().unique(),
+    type: text("type").notNull(),
+    name: text("name").notNull(),
+    art: text("art").notNull(),
+    price: integer("price").notNull().default(0),
+    isStarter: boolean("is_starter").notNull().default(false),
+    isOnSale: boolean("is_on_sale").notNull().default(false),
+  },
+  (t) => [check("items_type_check", sql`${t.type} in ('character')`), check("items_price_check", sql`${t.price} >= 0`)],
+);
+
+/** 가진 아이템 (인벤토리). 회원이 지워지면 함께 지운다 */
+export const userItems = pgTable(
+  "user_items",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    itemId: integer("item_id")
+      .notNull()
+      .references(() => items.id),
+    acquiredAt: timestamp("acquired_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.itemId] }), index("user_items_item_idx").on(t.itemId)],
+);
+
 export const profiles = pgTable(
   "profiles",
   {
@@ -119,6 +154,8 @@ export const profiles = pgTable(
     photoKey: text("photo_key")
       .unique()
       .references((): AnyPgColumn => attachments.key, { onDelete: "set null" }),
+    // 장착한 캐릭터 (GAME-01): 가진 캐릭터만 (복합 외래 키)
+    characterItemId: integer("character_item_id"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -127,6 +164,11 @@ export const profiles = pgTable(
       "profiles_nickname_check",
       sql`char_length(${t.nickname}) between 2 and 20 and ${t.nickname} = btrim(${t.nickname})`,
     ),
+    foreignKey({
+      name: "profiles_character_owned_fk",
+      columns: [t.userId, t.characterItemId],
+      foreignColumns: [userItems.userId, userItems.itemId],
+    }),
   ],
 );
 

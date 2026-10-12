@@ -44,7 +44,9 @@ async function main() {
           values (${id}, ${username}, ${username}, ${`${username}@users.blogville.invalid`}, ${username}, 'admin')`;
         await tx`insert into accounts (id, user_id, account_id, provider_id, password) values (${newId()}, ${id}, ${id}, 'credential', ${hash})`;
         const [taken] = await tx`select 1 from profiles where nickname = ${NOTICE.nickname}`;
-        await tx`insert into profiles (user_id, nickname) values (${id}, ${taken ? username : NOTICE.nickname})`;
+        // 관리자도 남자 주민을 받아 장착한다 (GAME-01)
+        await tx`insert into user_items (user_id, item_id) select ${id}, id from items where code = 'char_boy'`;
+        await tx`insert into profiles (user_id, nickname, character_item_id) values (${id}, ${taken ? username : NOTICE.nickname}, (select id from items where code = 'char_boy'))`;
         user = { id };
         console.log(`${username}: 관리자 계정을 만들었어요.`);
       }
