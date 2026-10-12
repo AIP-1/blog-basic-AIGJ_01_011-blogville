@@ -29,7 +29,7 @@ async function publish(page: Page, body: string, opts: { private?: boolean } = {
 test.describe("GAME-02·03·05 보상", () => {
   test("가입 🪙 100, 글쓰기 안내와 보상(공개·새 글·100자), 고친 글·비공개·상한·어제 기록", async ({ page }) => {
     const username = await signUpOk(page);
-    await expect(wallet(page)).toHaveText("Lv.1🪙 100");
+    await expect(wallet(page)).toHaveText("Lv.1🪙 110"); // 가입 100 + 1일차 출석 10
     expect(await ledger(username, "signup")).toEqual([{ exp_delta: 0, coin_delta: 100, ref_id: null }]);
 
     // 글쓰기 아래 안내
@@ -45,7 +45,7 @@ test.describe("GAME-02·03·05 보상", () => {
     // 공개 새 글 100자 이상 → 보상, 발행 안내에도
     const first = await publish(page, LONG);
     await expect(page.getByRole("status").filter({ hasText: "글을 발행했어요" })).toHaveText("🎉 글을 발행했어요! ✨ 경험치 30 · 🪙 30 코인을 받았어요");
-    await expect(wallet(page)).toHaveText("Lv.2🪙 130");
+    await expect(wallet(page)).toHaveText("Lv.2🪙 140"); // 경험치 출석 10 + 글 30
     expect(await ledger(username, "post")).toEqual([{ exp_delta: 30, coin_delta: 30, ref_id: String(first) }]);
 
     // 고친 글은 보상 없음, 안내도 없음
@@ -69,7 +69,7 @@ test.describe("GAME-02·03·05 보상", () => {
     await publish(page, LONG);
     await expect(page.getByRole("status").filter({ hasText: "글을 발행했어요" })).toContainText("보상 3번을 다 받아서");
     expect(await ledger(username, "post")).toHaveLength(3);
-    await expect(wallet(page)).toHaveText("Lv.3🪙 190"); // 경험치 90 → Lv.3
+    await expect(wallet(page)).toHaveText("Lv.3🪙 200"); // 경험치 100 → Lv.3
 
     // 어제 받은 보상은 오늘 상한에 들어가지 않는다 (한국 0시 기준)
     await sql`update point_ledger set created_at = now() - interval '1 day' - interval '1 hour'
@@ -92,7 +92,7 @@ test.describe("GAME-02·03·05 보상", () => {
 
     await guest.page.goto(`/@${owner.username}/${postId}`);
     await comment(guest.page, "첫 댓글");
-    await expect(wallet(guest.page)).toHaveText("Lv.1🪙 105");
+    await expect(wallet(guest.page)).toHaveText("Lv.1🪙 115");
     // 내 글에 단 댓글은 보상 없음
     await owner.page.goto(`/@${owner.username}/${postId}`);
     await comment(owner.page, "주인 댓글");
@@ -138,30 +138,30 @@ test.describe("GAME-07 경험치·코인 내역", () => {
     await wallet(page).click();
     await expect(page).toHaveURL(/\/wallet$/);
     await expect(page.getByRole("heading", { name: "📒 경험치·코인 내역" })).toBeVisible();
-    await expect(page.getByText("기록 1개")).toBeVisible();
+    await expect(page.getByText("기록 2개")).toBeVisible();
     const row = page.locator("[data-ledger=signup]");
     await expect(row).toContainText("🎉 가입 축하");
     await expect(row).toContainText("🪙 +100");
     await expect(row).not.toContainText("✨");
     await expect(row.locator("time")).toHaveText(/^\d{4}\. \d{2}\. \d{2}\. \d{2}:\d{2}$/);
 
-    // 경험치 250 → Lv.5, 50 / 100
+    // 경험치 250 → Lv.5, 50 / 100 (출석 10 + 댓글 100 + 글 140)
     await sql`insert into point_ledger (user_id, reason, exp_delta, coin_delta, ref_id, created_at)
       select id, 'comment', 5, 5, 'comment:' || g, now() - make_interval(mins => g) from users, generate_series(1, 20) g where username = ${username}`;
     await sql`insert into point_ledger (user_id, reason, exp_delta, coin_delta, ref_id)
-      select id, 'post', 150, 30, '0' from users where username = ${username}`;
+      select id, 'post', 140, 30, '0' from users where username = ${username}`;
     await page.reload();
     await expect(page.locator("[data-summary=level]")).toHaveText("Lv.5");
     await expect(page.locator("[data-summary=exp]")).toHaveText("✨ 250");
-    await expect(page.locator("[data-summary=coin]")).toHaveText("🪙 230");
+    await expect(page.locator("[data-summary=coin]")).toHaveText("🪙 240");
     await expect(page.locator("[data-progress]")).toHaveText("50 / 100 EXP");
-    await expect(wallet(page)).toHaveText("Lv.5🪙 230");
-    await expect(page.getByText("기록 22개")).toBeVisible();
+    await expect(wallet(page)).toHaveText("Lv.5🪙 240");
+    await expect(page.getByText("기록 23개")).toBeVisible();
     await expect(page.getByRole("list", { name: "기록" }).getByRole("listitem")).toHaveCount(20);
     await expect(page.getByRole("list", { name: "기록" }).getByRole("listitem").first()).toContainText("✏️ 글 작성");
     await page.goto("/wallet?page=2");
-    await expect(page.getByRole("list", { name: "기록" }).getByRole("listitem")).toHaveCount(2);
-    await expect(page.locator("[data-ledger=comment]")).toHaveCount(2);
+    await expect(page.getByRole("list", { name: "기록" }).getByRole("listitem")).toHaveCount(3);
+    await expect(page.locator("[data-ledger=comment]")).toHaveCount(3);
 
     // 375px에서 가로 스크롤 없음
     await page.setViewportSize({ width: 375, height: 800 });

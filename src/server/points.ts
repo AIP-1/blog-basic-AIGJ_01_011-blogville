@@ -18,7 +18,7 @@ export async function lockUser(tx: Tx, userId: string): Promise<void> {
  * 보상 지급 (GAME-05): 회원을 잠그고 오늘 같은 사유로 받은 횟수가 하루 상한보다 적을 때만 원장에 한 줄 넣는다.
  * 넣었으면 true. 활동 자체는 이 결과와 관계없이 성공한다. 같은 트랜잭션 안에서 부른다.
  */
-export async function grantReward(tx: Tx, userId: string, reason: RewardReason, refId: string | null = null): Promise<boolean> {
+export async function grantReward(tx: Tx, userId: string, reason: Exclude<RewardReason, "attendance">, refId: string | null = null): Promise<boolean> {
   const rule = REWARD_RULES[reason];
   await lockUser(tx, userId);
   const [{ n }] = await tx

@@ -488,8 +488,45 @@ export const pointLedger = pgTable(
     uniqueIndex("point_ledger_like_received_uq").on(t.userId, t.refId).where(sql`${t.reason} = 'like_received'`),
     // 가입 축하는 한 번만
     uniqueIndex("point_ledger_signup_uq").on(t.userId).where(sql`${t.reason} = 'signup'`),
-    check("point_ledger_reason_check", sql`${t.reason} in ('signup', 'post', 'comment', 'like_received')`),
+    // 출석 보상은 하루 한 번 (ref_id = 날짜)
+    uniqueIndex("point_ledger_attendance_uq").on(t.userId, t.refId).where(sql`${t.reason} = 'attendance'`),
+    check("point_ledger_reason_check", sql`${t.reason} in ('signup', 'attendance', 'post', 'comment', 'like_received')`),
     check("point_ledger_exp_check", sql`${t.expDelta} >= 0`),
     check("point_ledger_nonzero_check", sql`${t.expDelta} <> 0 or ${t.coinDelta} <> 0`),
+  ],
+);
+
+/** 출석 일차별 보상 (GAME-04, ERD 3.12). 숫자는 이 표만 고친다 (데이터 마이그레이션) */
+export const attendanceRewards = pgTable(
+  "attendance_rewards",
+  {
+    day: integer("day").primaryKey(),
+    exp: integer("exp").notNull(),
+    coins: integer("coins").notNull(),
+  },
+  (t) => [
+    check("attendance_rewards_day_check", sql`${t.day} between 1 and 7`),
+    check("attendance_rewards_amount_check", sql`${t.exp} >= 0 and ${t.coins} >= 0 and (${t.exp} > 0 or ${t.coins} > 0)`),
+  ],
+);
+
+/** 출석 (GAME-04): 회원·한국 날짜마다 한 줄. 로그인 세션이 지워져도 출석은 남는다 */
+export const attendances = pgTable(
+  "attendances",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    date: date("date").notNull(),
+    cycleDay: integer("cycle_day")
+      .notNull()
+      .references(() => attendanceRewards.day),
+    sessionId: text("session_id").references(() => sessions.id, { onDelete: "set null" }),
+    checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.date] }),
+    index("attendances_session_idx").on(t.sessionId),
+    check("attendances_cycle_day_check", sql`${t.cycleDay} between 1 and 7`),
   ],
 );

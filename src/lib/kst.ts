@@ -26,3 +26,13 @@ export function fillDays(days: string[], rows: { date: string; count: number }[]
   const byDate = new Map(rows.map((r) => [r.date, r.count]));
   return days.map((date) => ({ date, count: byDate.get(date) ?? 0 }));
 }
+
+/** 그 날짜가 든 달의 달력 (일요일 시작). 앞의 빈칸은 null (GAME-04 출석 달력) */
+export function monthCalendar(day: string): { year: number; month: number; start: string; end: string; cells: (string | null)[] } {
+  const [year, month] = day.split("-").map(Number);
+  const first = new Date(Date.UTC(year, month - 1, 1));
+  const days = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const dates = Array.from({ length: days }, (_, i) => `${year}-${pad(month)}-${pad(i + 1)}`);
+  return { year, month, start: dates[0], end: dates[days - 1], cells: [...Array<null>(first.getUTCDay()).fill(null), ...dates] };
+}
