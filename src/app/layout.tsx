@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SignOutButton } from "@/components/auth/SignOutButton";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { getMyBlog, getSession } from "@/server/dal";
+import { countUnreadNotifications } from "@/server/notifications";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -11,7 +13,7 @@ export const metadata: Metadata = {
 
 async function Header() {
   const member = await getSession();
-  const blog = member ? await getMyBlog(member.userId) : null;
+  const [blog, unread] = member ? await Promise.all([getMyBlog(member.userId), countUnreadNotifications(member.userId)]) : [null, 0];
   return (
     <header className="border-b border-line bg-surface">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-2 px-4 py-2">
@@ -30,6 +32,7 @@ async function Header() {
                   👑<span className="hidden sm:inline">관리자</span>
                 </Link>
               )}
+              <NotificationBell initial={unread} />
               <Link href="/settings/account" className="btn btn-ghost px-2" aria-label="내 정보">
                 👤<span className="hidden sm:inline">내 정보</span>
               </Link>

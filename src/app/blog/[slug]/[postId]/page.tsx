@@ -71,7 +71,7 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]/[post
       <TagList tags={await getPostTags(post.id)} />
       <LikeButton postId={post.id} {...await getLikeState(post.id, member?.userId ?? null)} canLike={member !== null} />
       <AdjacentPosts slug={blog.slug} {...adjacent} />
-      <footer className="mt-8 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4">
+      <footer className={`flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 ${adjacent.older || adjacent.newer ? "" : "mt-8"}`}>
         <Link href={`/@${blog.slug}`} className="btn">
           목록으로
         </Link>
