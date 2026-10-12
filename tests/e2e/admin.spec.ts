@@ -89,7 +89,7 @@ test.describe("AUTH-08 관리자", () => {
       d.dismiss();
     });
     await page.getByRole("button", { name: "남의 공개 글 삭제" }).click();
-    expect(message).toBe("'남의 공개 글' 글을 삭제할까요?");
+    await expect.poll(() => message).toBe("'남의 공개 글' 글을 삭제할까요?");
     expect(await sql`select 1 from posts where id = ${pub}`).toHaveLength(1);
 
     page.once("dialog", (d) => d.accept());
@@ -140,8 +140,16 @@ test.describe("AUTH-08 관리자", () => {
     await expect(member.getByRole("heading", { level: 1, name: "오래된 남의 글" })).toBeVisible();
     await expect(member.getByRole("button", { name: /삭제/ })).toHaveCount(0);
 
+    // 관리자 자기 글에는 주인의 [수정]·[삭제]만 있다
+    const me = await makeAdmin(page);
+    const mine = await oldPost(me, "관리자 자기 글");
+    await page.goto(`/@${me}/${mine}`);
+    await expect(page.getByRole("link", { name: "수정" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "삭제", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /삭제/ })).toHaveCount(1);
+    await sql`delete from posts where id = ${mine}`;
+
     // 관리자: /admin 최근 글에는 없지만 글 화면에 [삭제]가 있다. 비공개 글은 관리자에게도 404
-    await makeAdmin(page);
     await page.goto("/admin");
     await expect(page.getByRole("heading", { name: "👑 관리자" })).toBeVisible();
     await expect(page.locator(`[data-post="${old}"]`)).toHaveCount(0);
@@ -157,7 +165,8 @@ test.describe("AUTH-08 관리자", () => {
       d.dismiss();
     });
     await adminDelete(page).click();
-    expect(message).toBe("'오래된 남의 글' 글을 삭제할까요?");
+    // 그리기 전에 누른 클릭은 React가 나중에 다시 실행하므로 확인 창을 기다린다
+    await expect.poll(() => message).toBe("'오래된 남의 글' 글을 삭제할까요?");
     expect(await sql`select 1 from posts where id = ${old}`).toHaveLength(1);
 
     // 관리자가 누른 요청을 가로채(보내지 않고) 일반 회원 쿠키로 다시 보내도 글은 남는다
