@@ -13,11 +13,14 @@ type Props = {
   onChange: (html: string, text: string) => void;
   /** 첨부를 올리는 동안 true (발행 버튼을 막는다) */
   onUploadingChange?: (uploading: boolean) => void;
+  /** 수정 중인 글 ID (새 글이면 null). 붙여 넣은 이 글의 첨부는 다시 올리지 않는다 */
+  postId?: number | null;
 };
 
-export function RichEditor({ initialHtml, onChange, onUploadingChange }: Props) {
+export function RichEditor({ initialHtml, onChange, onUploadingChange, postId = null }: Props) {
   // 붙여 넣기·끌어다 놓기 처리가 만들어질 때는 아직 upload가 없어서 ref로 잇는다
   const uploadRef = useRef<(files: File[], at?: number) => void>(() => {});
+  const pasteRef = useRef<(html: string) => void>(() => {});
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -34,6 +37,12 @@ export function RichEditor({ initialHtml, onChange, onUploadingChange }: Props) 
       attributes: { "aria-label": "본문", class: "tiptap prose-post px-4 py-3" },
       handlePaste: (_view, event) => {
         const data = event.clipboardData;
+        const html = data?.getData("text/html") ?? "";
+        // 이 사이트의 사진·파일 카드가 든 HTML은 서버에 물어서 넣는다 (POST-07 흐름 7)
+        if (/\/files\/[0-9a-f]{32}/.test(html)) {
+          pasteRef.current(html);
+          return true;
+        }
         const files = data ? [...data.files] : [];
         // 엑셀·키노트처럼 글자와 그림을 함께 복사했으면 글자를 붙여 넣는다
         if (files.length === 0 || data?.getData("text/plain")) return false;
@@ -53,17 +62,18 @@ export function RichEditor({ initialHtml, onChange, onUploadingChange }: Props) 
     onUpdate: ({ editor }) => onChange(editor.getHTML(), editor.getText()),
   });
 
-  const { upload, progress, problems, dismiss } = useUpload(editor, (busy) => onUploadingChange?.(busy));
+  const { upload, pasteHtml, progress, problems, dismiss } = useUpload(editor, (busy) => onUploadingChange?.(busy), postId);
   useEffect(() => {
     uploadRef.current = upload;
-  }, [upload]);
+    pasteRef.current = pasteHtml;
+  }, [upload, pasteHtml]);
 
   return (
     <div className="rounded-xl border border-line bg-surface" data-editor-root>
       {editor && <Toolbar editor={editor} uploading={progress !== null} onPick={upload} />}
       {(progress || problems.length > 0) && (
         <div className="space-y-1 border-b border-line px-3 py-2 text-sm">
-          {progress && <p role="status">올리는 중... ({progress.done}/{progress.total})</p>}
+          {progress && <p role="status">{progress.total === 0 ? "붙여 넣는 중..." : `올리는 중... (${progress.done}/${progress.total})`}</p>}
           {problems.map((p) => (
             <p key={p.id} role="alert" className="form-error flex items-start justify-between gap-2">
               <span>

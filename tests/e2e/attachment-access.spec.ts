@@ -82,11 +82,21 @@ test.describe("US3 누가 여나", () => {
     await a.page.getByLabel("제목", { exact: true }).fill("섞은 글");
     await a.page.getByLabel("본문").click();
     await a.page.keyboard.type("본문");
-    const html = [otherUrl, bUpload.json.url, `/files/${"0".repeat(32)}`, mine.json.url].map((u) => `<img src="${u}">`).join("");
-    await dispatchFiles(a.page, "paste", [], `<p>붙여 넣기</p>${html}`);
-    await expect(a.page.locator(".tiptap img")).toHaveCount(4);
+    await dispatchFiles(a.page, "paste", [], `<p>붙여 넣기</p><img src="${mine.json.url}">`);
+    await expect(a.page.locator(".tiptap img")).toHaveCount(1);
+    // 붙여 넣기는 남의 것·다른 글 것을 넣지 않으므로(POST-07 흐름 7), 저장 요청을 직접 고쳐 섞어 보낸다
+    const extra = [otherUrl, bUpload.json.url, `/files/${"0".repeat(32)}`].map((u) => `<img src="${u}" alt="">`).join("");
+    let tampered = false;
+    await a.page.route("**/write", async (route) => {
+      const body = route.request().postData() ?? "";
+      const img = new RegExp(`<img src="${mine.json.url}"[^>]*>`);
+      if (route.request().method() !== "POST" || !img.test(body)) return route.continue();
+      tampered = true;
+      await route.continue({ postData: body.replace(img, (m) => m + extra) });
+    });
     await a.page.getByRole("button", { name: "발행하기" }).click();
     await expect(a.page).toHaveURL(/\/\d+$/);
+    expect(tampered).toBe(true);
     const id = Number(a.page.url().split("/").pop());
 
     const [post] = await sql`select content_html from posts where id = ${id}`;

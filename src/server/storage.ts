@@ -1,6 +1,6 @@
 import "server-only";
 import { createReadStream } from "node:fs";
-import { mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { constants, copyFile as copy, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { KEY_PATTERN } from "@/lib/attachments";
@@ -16,6 +16,11 @@ function pathOf(key: string) {
 export async function saveFile(key: string, data: Uint8Array) {
   await mkdir(ROOT, { recursive: true });
   await writeFile(pathOf(key), data, { flag: "wx" });
+}
+
+/** 저장된 파일을 새 키로 복사한다. 새 키가 이미 있으면 실패한다. */
+export async function copyFile(from: string, to: string) {
+  await copy(pathOf(from), pathOf(to), constants.COPYFILE_EXCL);
 }
 
 /** 파일 스트림. 없으면 null. */

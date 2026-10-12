@@ -3,8 +3,8 @@ import { randomBytes } from "node:crypto";
 import { and, eq, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
 import { db, type Tx } from "@/db";
 import { attachments, blogs, posts, type Attachment } from "@/db/schema";
-import type { AttachmentKind } from "@/lib/attachments";
-import { deleteFile, listFiles, saveFile } from "./storage";
+import { pasteAction, type AttachmentKind, type PasteAction } from "@/lib/attachments";
+import { copyFile, deleteFile, listFiles, saveFile } from "./storage";
 
 /** 올린 파일을 저장하고 붙지 않은 첨부 행을 만든다 (POST-07 흐름 3) */
 export async function createAttachment(
@@ -23,6 +23,43 @@ export async function createAttachment(
     await deleteFile(key);
     throw e;
   }
+}
+
+/**
+ * 붙여 넣은 키마다 할 일 (POST-07 흐름 7). 이름은 내 첨부만 알려 준다 (실패 문구용).
+ */
+export async function classifyPasted(userId: string, keys: string[], editingPostId: number | null) {
+  const rows = keys.length
+    ? await db
+        .select({ key: attachments.key, uploaderId: attachments.userId, postId: attachments.postId, name: attachments.name })
+        .from(attachments)
+        .where(inArray(attachments.key, keys))
+    : [];
+  const byKey = new Map(rows.map((r) => [r.key, r]));
+  return keys.map((key) => {
+    const row = byKey.get(key);
+    const action: PasteAction = pasteAction(row, userId, editingPostId);
+    return { key, action, name: action === "drop" ? "" : row!.name };
+  });
+}
+
+/**
+ * 내 다른 글에 붙은 첨부를 새 키로 복사해 붙지 않은 첨부로 만든다 (원래 첨부는 그대로).
+ * 서버에서 다시 판정해 keep이면 같은 키, drop이면 null.
+ */
+export async function reuploadAttachment(userId: string, key: string, editingPostId: number | null): Promise<string | null> {
+  const [row] = await db.select().from(attachments).where(eq(attachments.key, key)).limit(1);
+  const action = pasteAction(row && { uploaderId: row.userId, postId: row.postId }, userId, editingPostId);
+  if (action !== "reupload") return action === "keep" ? key : null;
+  const newKey = randomBytes(16).toString("hex");
+  await copyFile(key, newKey);
+  try {
+    await db.insert(attachments).values({ key: newKey, userId, kind: row.kind, name: row.name, mime: row.mime, size: row.size });
+  } catch (e) {
+    await deleteFile(newKey);
+    throw e;
+  }
+  return newKey;
 }
 
 /** 보기용: 첨부와 붙은 글의 공개 설정·블로그 주인 */
