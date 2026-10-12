@@ -92,7 +92,7 @@ test.describe("POST-01 에디터 도구", () => {
     await expect(body(page)).toHaveText("되돌릴 글자");
   });
 
-  test("🔗 링크 창: 문구와 기본값 https://, https://만 두면 링크가 생기지 않고, 링크 위에서 비우면 풀린다", async ({ page }) => {
+  test("🔗 링크 창: 문구와 기본값 https://, https://만 두면 링크가 생기지 않고, 링크 위에서 비우면 풀린다, 주소 앞에 https://를 붙이고 tel: 등은 거부", async ({ page }) => {
     await openWrite(page);
     await body(page).click();
     await page.keyboard.type("블로그빌");
@@ -126,6 +126,21 @@ test.describe("POST-01 에디터 도구", () => {
     expect(seen[2].value).toBe("https://example.com/blog");
     await expect(body(page).locator("a")).toHaveCount(0);
     await expect(body(page)).toHaveText("블로그빌");
+
+    // 저장하면 사라질 주소(tel: 등)는 알리고 넣지 않는다. scheme 없이 넣으면 https://를 붙인다
+    answer = "tel:01012345678";
+    await page.keyboard.press("End");
+    await page.keyboard.press("Shift+Home");
+    await tool(page, "링크").click();
+    await expect.poll(() => seen.length).toBe(5);
+    expect(seen[4].message).toBe("링크로 넣을 수 없는 주소예요. https://로 시작하는 주소를 넣어 주세요.");
+    await expect(body(page).locator("a")).toHaveCount(0);
+    answer = "naver.com";
+    await body(page).click();
+    await page.keyboard.press("End");
+    await page.keyboard.press("Shift+Home");
+    await tool(page, "링크").click();
+    await expect(body(page).locator("a")).toHaveAttribute("href", "https://naver.com");
   });
 
   test("본문 칸에 초점이 가면 감싼 상자에 초점선이 보이고, 375px에서 도구 모음이 감겨 가로 스크롤이 없다", async ({ browser }) => {

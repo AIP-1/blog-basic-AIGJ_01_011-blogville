@@ -5,6 +5,7 @@ import { EditorContent, useEditor, useEditorState, type Editor } from "@tiptap/r
 import StarterKit from "@tiptap/starter-kit";
 import { Fragment, useEffect, useRef } from "react";
 import { FILE_ACCEPT, IMAGE_ACCEPT } from "@/lib/attachments";
+import { LINK_ERROR, linkHref } from "@/lib/post-rules";
 import { FileCard, SiteImage } from "./FileCard";
 import { useUpload } from "./useUpload";
 
@@ -114,13 +115,14 @@ function Toolbar({ editor, uploading, onPick }: { editor: Editor; uploading: boo
     }),
   });
 
-  // 비우거나 `https://`만 남기면 링크를 푼다 (깨진 링크를 만들지 않는다)
+  // 비우거나 `https://`만 남기면 링크를 푼다. 저장하면 깨지는 주소는 넣지 않는다 (linkHref)
   const setLink = () => {
     const previous = editor.getAttributes("link").href as string | undefined;
     const url = window.prompt("링크 주소 (비우면 링크 해제)", previous ?? "https://");
     if (url === null) return;
-    const href = url.trim();
-    if (href === "" || href === "https://") editor.chain().focus().extendMarkRange("link").unsetLink().run();
+    const href = linkHref(url);
+    if (href === null) window.alert(LINK_ERROR);
+    else if (href === "") editor.chain().focus().extendMarkRange("link").unsetLink().run();
     else editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
   };
 

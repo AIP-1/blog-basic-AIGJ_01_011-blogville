@@ -110,3 +110,24 @@ export function parseTags(raw: string): string[] {
 export function utf8Bytes(value: string): number {
   return new TextEncoder().encode(value).length;
 }
+
+export const LINK_ERROR = "링크로 넣을 수 없는 주소예요. https://로 시작하는 주소를 넣어 주세요.";
+
+/** 링크로 남는 주소의 scheme (POST-01: 저장할 때 http·https·mailto와 `/…`만 남는다) */
+const LINK_SCHEMES = new Set(["http", "https", "mailto"]);
+
+/**
+ * 링크 창에 넣은 값 (POST-01). `""`는 링크 풀기, null은 저장하면 사라지거나 엉뚱한 곳으로 가는 주소.
+ * `naver.com`처럼 scheme 없이 넣으면 `https://`를 붙인다 (그대로 두면 글 주소 기준 상대 주소가 되어 404).
+ */
+export function linkHref(input: string): string | null {
+  const href = input.trim();
+  if (href === "" || /^https?:\/\/$/i.test(href)) return "";
+  if (/\s/.test(href)) return null;
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(href)?.[1];
+  // naver.com:8080처럼 점이 있으면 scheme이 아니라 주소다
+  if (scheme && !scheme.includes(".")) return LINK_SCHEMES.has(scheme.toLowerCase()) ? href : null;
+  if (href.startsWith("//")) return `https:${href}`;
+  if (href.startsWith("/")) return href;
+  return /^[^/?#]+\.[^/?#]+/.test(href) ? `https://${href}` : null;
+}
