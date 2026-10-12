@@ -156,10 +156,38 @@ test.describe("GAME-08 알림", () => {
     await actor.page.goto("/notifications");
     await expect(rows(actor.page)).toHaveCount(1);
     await rows(actor.page).locator('input[name="id"]').evaluate((el, v) => ((el as HTMLInputElement).value = v), String(theirs));
-    await rows(actor.page).getByRole("button").click();
+    // 같은 주소로 돌아오므로 Server Action 응답을 기다린 뒤 DB를 본다
+    await Promise.all([
+      actor.page.waitForResponse((r) => r.request().method() === "POST" && !!r.request().headers()["next-action"]),
+      rows(actor.page).getByRole("button").click(),
+    ]);
     await expect(actor.page).toHaveURL(/\/notifications$/);
     expect((await sql`select read_at from notifications where id = ${theirs}`)[0].read_at).toBeNull();
     await expect(rows(actor.page).getByRole("button")).toHaveAttribute("data-notification", "unread");
+  });
+
+  test("처음 숫자가 0이었어도 화면을 옮기면 새 알림 숫자가 보이고, 모두 읽음·마지막보다 큰 쪽·읽는 화면의 안 읽음 표시", async ({ browser }) => {
+    const owner = await member(browser);
+    const actor = await member(browser);
+    const postId = await writePost(owner.page, "늦게 온 알림 글", "본문");
+    await owner.page.goto(`/@${owner.username}`);
+    await expect(badge(owner.page)).toHaveCount(0);
+    await sql`insert into notifications (user_id, kind, actor_id, post_id) values (${owner.userId}, 'comment', ${actor.userId}, ${postId})`;
+    // 헤더(레이아웃)는 다시 그려지지 않고, 주소가 바뀔 때 숫자를 새로 받는다
+    await owner.page.getByRole("navigation", { name: "메뉴" }).getByRole("link", { name: "마을 소식" }).click();
+    await expect(owner.page).toHaveURL(/\/feed$/);
+    await expect(badge(owner.page)).toHaveText("1");
+    await bell(owner.page).click();
+    await expect(rows(owner.page)).toHaveCount(1);
+    await expect(rows(owner.page).getByRole("button")).toHaveAccessibleName(`안 읽음, 💬 ${actor.username}님이 「늦게 온 알림 글」에 댓글을 달았어요 방금`);
+    await owner.page.getByRole("button", { name: "모두 읽음" }).click();
+    await expect(owner.page.getByRole("button", { name: "모두 읽음" })).toHaveCount(0);
+    await expect(badge(owner.page)).toHaveCount(0);
+    await expect(rows(owner.page).getByRole("button")).toHaveAccessibleName(`💬 ${actor.username}님이 「늦게 온 알림 글」에 댓글을 달았어요 방금`);
+
+    await owner.page.goto("/notifications?page=2");
+    await expect(owner.page.getByText("아직 알림이 없어요")).toBeVisible();
+    await expect(owner.page.getByRole("list", { name: "알림" })).toHaveCount(0);
   });
 
   test("글이 지워지거나 행동한 회원이 탈퇴하면 알림도 없어지고, 나중에 비공개가 된 글의 답글 알림은 숨는다", async ({ browser }) => {

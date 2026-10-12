@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { db, type Tx } from "@/db";
-import { blogs, comments, posts, profiles, replies } from "@/db/schema";
+import { blogs, comments, posts, profiles, replies, users } from "@/db/schema";
 import { COMMENT_ERRORS } from "@/lib/comment-rules";
 import type { Member } from "./dal";
 import { notifyActivity } from "./notifications";
@@ -84,10 +84,23 @@ export async function getCommentThread(postId: number, blogOwnerId: string, view
 }
 
 /**
+ * 회원 행을 FOR KEY SHARE로 잠근다. 없으면(탈퇴) false.
+ * 알림을 받을 회원의 행은 글·원댓글보다 먼저 잠근다. 탈퇴(deleteMember)가 회원 행 → 글·댓글 순서로 잠그므로
+ * 거꾸로 잠그면 알림 외래 키 확인과 엇갈려 교착 상태가 된다 (GAME-08).
+ */
+async function lockMemberRow(tx: Tx, userId: string): Promise<boolean> {
+  const rows = await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("key share");
+  return rows.length > 0;
+}
+
+/**
  * 공개 글이거나 내 글이면 글 행을 잠그고 글 주인 ID, 아니면 null (댓글·공감).
- * 댓글을 쓰는 동안 글이 지워지지 않게 한다. 주인 ID는 알림을 받을 사람이다 (GAME-08).
+ * 댓글을 쓰는 동안 글이 지워지지 않게 한다. 주인 ID는 알림을 받을 사람이라 주인 회원 행을 먼저 잠근다 (GAME-08).
  */
 export async function lockVisiblePost(tx: Tx, userId: string, postId: number): Promise<string | null> {
+  const [owner] = await tx.select({ ownerId: blogs.ownerId }).from(posts).innerJoin(blogs, eq(blogs.id, posts.blogId)).where(eq(posts.id, postId));
+  if (!owner) return null;
+  if (owner.ownerId !== userId && !(await lockMemberRow(tx, owner.ownerId))) return null;
   const [row] = await tx
     .select({ ownerId: blogs.ownerId })
     .from(posts)
@@ -113,6 +126,9 @@ export async function createComment(userId: string, postId: number, content: str
 export async function createReply(userId: string, postId: number, commentId: number, content: string): Promise<Result> {
   return db.transaction(async (tx) => {
     if ((await lockVisiblePost(tx, userId, postId)) === null) return { ok: false, error: COMMENT_ERRORS.postNotFound };
+    // 답글 알림을 받을 원댓글 작성자의 회원 행을 원댓글보다 먼저 잠근다. 그새 탈퇴했으면 아래에서 작성자가 비어 알림이 없다
+    const [author] = await tx.select({ authorId: comments.authorId }).from(comments).where(eq(comments.id, commentId));
+    if (author?.authorId && author.authorId !== userId) await lockMemberRow(tx, author.authorId);
     // 원댓글을 잠가 답글 저장과 원댓글 삭제가 겹치지 않게 한다
     const [parent] = await tx
       .select({ postId: comments.postId, authorId: comments.authorId, deletedAt: comments.deletedAt })

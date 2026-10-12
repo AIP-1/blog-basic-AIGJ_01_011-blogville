@@ -32,7 +32,7 @@ async function Header() {
                   👑<span className="hidden sm:inline">관리자</span>
                 </Link>
               )}
-              <NotificationBell initial={unread} />
+              <NotificationBell unread={{ count: unread }} />
               <Link href="/settings/account" className="btn btn-ghost px-2" aria-label="내 정보">
                 👤<span className="hidden sm:inline">내 정보</span>
               </Link>

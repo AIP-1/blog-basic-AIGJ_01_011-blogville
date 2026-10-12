@@ -28,7 +28,8 @@ export default async function NotificationsPage({ searchParams }: PageProps<"/no
         )}
       </div>
 
-      {total === 0 ? (
+      {/* 마지막보다 큰 쪽도 빈 문구 (POST-05) */}
+      {items.length === 0 ? (
         <p className="rounded-2xl border border-line bg-surface p-6 text-center text-ink-soft">{NOTIFICATION_EMPTY}</p>
       ) : (
         <ol className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface" aria-label="알림">
@@ -41,7 +42,10 @@ export default async function NotificationsPage({ searchParams }: PageProps<"/no
                   className={`flex min-h-11 w-full flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-4 py-3 text-left hover:bg-ink/5 ${n.read ? "" : "bg-[#fff3d6] font-bold"}`}
                   data-notification={n.read ? "read" : "unread"}
                 >
-                  <span className="min-w-0 break-words">{notificationText(n.kind, n.nickname, n.postTitle)}</span>
+                  <span className="min-w-0 break-words">
+                    {!n.read && <span className="sr-only">안 읽음, </span>}
+                    {notificationText(n.kind, n.nickname, n.postTitle)}
+                  </span>
                   <time className="shrink-0 text-sm font-normal text-ink-soft" dateTime={n.createdAt.toISOString()}>
                     {notificationTime(n.createdAt, now)}
                   </time>
