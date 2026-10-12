@@ -8,7 +8,7 @@ import { db } from "@/db";
 import { blogs, posts } from "@/db/schema";
 import { createComment, createReply, removeComment, removeReply } from "@/server/comments";
 import { getSession, requireMember } from "@/server/dal";
-import { toggleFollow as storeFollow } from "@/server/follows";
+import { toggleFollow as storeFollow, unfollow } from "@/server/follows";
 import { toggleLike as storeLike } from "@/server/likes";
 import { getBlogVisitStats, recordView, recordVisit, type VisitStats } from "@/server/stats";
 import { ensureVisitorId } from "@/server/visitor";
@@ -110,5 +110,17 @@ export async function toggleFollow(formData: FormData): Promise<void> {
   if (typeof followeeId !== "string" || followeeId.length < 1 || followeeId.length > 64) return;
   if (followeeId === member.userId) return;
   await storeFollow(member.userId, followeeId);
+  revalidatePath("/", "layout");
+}
+
+/**
+ * 내 이웃 목록의 [✓ 이웃] (SOC-04): 취소만 한다. 확인 창은 화면에서 띄운다.
+ * 1~64자 문자열이 아니면 아무것도 하지 않는다. 이웃이 아닌 값이면 지울 행이 없다.
+ */
+export async function removeNeighbor(formData: FormData): Promise<void> {
+  const member = await requireMember();
+  const followeeId = formData.get("followeeId");
+  if (typeof followeeId !== "string" || followeeId.length < 1 || followeeId.length > 64) return;
+  await unfollow(member.userId, followeeId);
   revalidatePath("/", "layout");
 }

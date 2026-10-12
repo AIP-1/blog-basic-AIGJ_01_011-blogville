@@ -1,19 +1,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { FeedView } from "@/components/feed/FeedView";
+import { NeighborList } from "@/components/feed/NeighborList";
 import { parsePage } from "@/lib/ids";
 import { requireMember } from "@/server/dal";
 import { listFeed } from "@/server/feed";
+import { listMyNeighbors } from "@/server/follows";
 import { getPopularTags } from "@/server/tags";
 
 export const metadata: Metadata = { title: "이웃 새 글 | Blogville" };
 
-// 이웃 새 글 (SOC-04): 내가 이웃 추가한 블로그의 공개 글. 방문자는 첫 화면으로.
+// 이웃 새 글 (SOC-04): 내가 이웃 추가한 블로그의 공개 글. 위에 접힌 내 이웃 목록. 방문자는 첫 화면으로.
 export default async function FollowingFeedPage({ searchParams }: PageProps<"/feed/following">) {
   const member = await requireMember();
   const page = parsePage((await searchParams).page);
   // 인기 태그는 이웃 글만이 아니라 마을 전체 공개 글의 태그다
-  const [feed, tags] = await Promise.all([listFeed({ page, followerId: member.userId }), getPopularTags()]);
+  const [feed, tags, neighbors] = await Promise.all([listFeed({ page, followerId: member.userId }), getPopularTags(), listMyNeighbors(member.userId)]);
   return (
     <FeedView
       title="💛 이웃 새 글"
@@ -22,6 +24,7 @@ export default async function FollowingFeedPage({ searchParams }: PageProps<"/fe
       feed={feed}
       page={page}
       tags={tags}
+      top={<NeighborList {...neighbors} />}
       empty={
         <>
           <p>아직 이웃이 없거나 이웃의 새 글이 없어요.</p>

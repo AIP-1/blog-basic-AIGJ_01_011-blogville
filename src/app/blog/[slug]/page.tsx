@@ -97,7 +97,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
 
       <header className="rounded-2xl border border-line bg-surface p-5">
         <h1 className="text-2xl font-extrabold">
-          <Link href={`/@${blog.slug}`} className="-ml-1 inline-flex min-h-11 min-w-11 max-w-full items-center px-1 break-words hover:underline">
+          <Link href={`/@${blog.slug}`} className="-ml-1 inline-flex min-h-11 min-w-11 max-w-full items-center px-1 hover:underline">
             {blog.title}
           </Link>
         </h1>
