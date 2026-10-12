@@ -3,7 +3,7 @@
 import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor, useEditorState, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef } from "react";
 import { FILE_ACCEPT, IMAGE_ACCEPT } from "@/lib/attachments";
 import { FileCard, SiteImage } from "./FileCard";
 import { useUpload } from "./useUpload";
@@ -91,6 +91,9 @@ export function RichEditor({ initialHtml, onChange, onUploadingChange, postId = 
   );
 }
 
+type Tool = { label: string; title: string; run: () => void; active?: boolean; disabled?: boolean; className?: string };
+
+/** 명세 POST-01 에디터 도구 순서: 제목 | 글자 꾸미기 | 덩어리 | 되돌리기 | 첨부 */
 function Toolbar({ editor, uploading, onPick }: { editor: Editor; uploading: boolean; onPick: (files: File[]) => void }) {
   const state = useEditorState({
     editor,
@@ -99,52 +102,78 @@ function Toolbar({ editor, uploading, onPick }: { editor: Editor; uploading: boo
       h3: e.isActive("heading", { level: 3 }),
       bold: e.isActive("bold"),
       italic: e.isActive("italic"),
+      underline: e.isActive("underline"),
+      strike: e.isActive("strike"),
       bullet: e.isActive("bulletList"),
       ordered: e.isActive("orderedList"),
       quote: e.isActive("blockquote"),
       code: e.isActive("codeBlock"),
       link: e.isActive("link"),
+      canUndo: e.can().undo(),
+      canRedo: e.can().redo(),
     }),
   });
 
+  // 비우거나 `https://`만 남기면 링크를 푼다 (깨진 링크를 만들지 않는다)
   const setLink = () => {
     const previous = editor.getAttributes("link").href as string | undefined;
-    const url = window.prompt("링크 주소", previous ?? "https://");
+    const url = window.prompt("링크 주소 (비우면 링크 해제)", previous ?? "https://");
     if (url === null) return;
-    if (url.trim() === "") editor.chain().focus().unsetLink().run();
-    else editor.chain().focus().extendMarkRange("link").setLink({ href: url.trim() }).run();
+    const href = url.trim();
+    if (href === "" || href === "https://") editor.chain().focus().extendMarkRange("link").unsetLink().run();
+    else editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
   };
 
-  const buttons: { label: string; title: string; active: boolean; run: () => void }[] = [
-    { label: "H2", title: "큰 제목", active: state.h2, run: () => editor.chain().focus().toggleHeading({ level: 2 }).run() },
-    { label: "H3", title: "작은 제목", active: state.h3, run: () => editor.chain().focus().toggleHeading({ level: 3 }).run() },
-    { label: "B", title: "굵게", active: state.bold, run: () => editor.chain().focus().toggleBold().run() },
-    { label: "I", title: "기울임", active: state.italic, run: () => editor.chain().focus().toggleItalic().run() },
-    { label: "•", title: "목록", active: state.bullet, run: () => editor.chain().focus().toggleBulletList().run() },
-    { label: "1.", title: "번호 목록", active: state.ordered, run: () => editor.chain().focus().toggleOrderedList().run() },
-    { label: "❝", title: "인용", active: state.quote, run: () => editor.chain().focus().toggleBlockquote().run() },
-    { label: "</>", title: "코드 블록", active: state.code, run: () => editor.chain().focus().toggleCodeBlock().run() },
-    { label: "🔗", title: "링크", active: state.link, run: setLink },
-    { label: "―", title: "구분선", active: false, run: () => editor.chain().focus().setHorizontalRule().run() },
+  const chain = () => editor.chain().focus();
+  const groups: Tool[][] = [
+    [
+      { label: "H2", title: "큰 제목", active: state.h2, run: () => chain().toggleHeading({ level: 2 }).run() },
+      { label: "H3", title: "작은 제목", active: state.h3, run: () => chain().toggleHeading({ level: 3 }).run() },
+    ],
+    [
+      { label: "B", title: "굵게", active: state.bold, run: () => chain().toggleBold().run(), className: "font-bold" },
+      { label: "I", title: "기울임", active: state.italic, run: () => chain().toggleItalic().run(), className: "italic" },
+      { label: "U", title: "밑줄", active: state.underline, run: () => chain().toggleUnderline().run(), className: "underline" },
+      { label: "S", title: "취소선", active: state.strike, run: () => chain().toggleStrike().run(), className: "line-through" },
+    ],
+    [
+      { label: "•", title: "글머리 목록", active: state.bullet, run: () => chain().toggleBulletList().run() },
+      { label: "1.", title: "번호 목록", active: state.ordered, run: () => chain().toggleOrderedList().run() },
+      { label: "❝", title: "인용", active: state.quote, run: () => chain().toggleBlockquote().run() },
+      { label: "</>", title: "코드 블록", active: state.code, run: () => chain().toggleCodeBlock().run() },
+      { label: "―", title: "구분선", run: () => chain().setHorizontalRule().run() },
+      { label: "🔗", title: "링크", active: state.link, run: setLink },
+    ],
+    [
+      { label: "↶", title: "되돌리기", disabled: !state.canUndo, run: () => chain().undo().run() },
+      { label: "↷", title: "다시 실행", disabled: !state.canRedo, run: () => chain().redo().run() },
+    ],
   ];
 
   return (
-    <div role="toolbar" aria-label="글 꾸미기" className="flex flex-wrap gap-1 border-b border-line p-1">
+    <div role="toolbar" aria-label="글 꾸미기" className="flex flex-wrap items-center gap-1 border-b border-line p-1">
+      {groups.map((tools, i) => (
+        <Fragment key={tools[0].title}>
+          {i > 0 && <span role="separator" aria-orientation="vertical" className="mx-0.5 h-6 w-px bg-line" />}
+          {tools.map((b) => (
+            <button
+              key={b.title}
+              type="button"
+              title={b.title}
+              aria-label={b.title}
+              aria-pressed={b.active}
+              disabled={b.disabled}
+              onClick={b.run}
+              className={`btn px-2 font-mono ${b.active ? "btn-current" : "btn-ghost"} ${b.className ?? ""}`}
+            >
+              {b.label}
+            </button>
+          ))}
+        </Fragment>
+      ))}
+      <span role="separator" aria-orientation="vertical" className="mx-0.5 h-6 w-px bg-line" />
       <UploadButton label="🖼 사진" title="사진 올리기 (PNG·JPG·GIF·WEBP, 10MB까지)" accept={IMAGE_ACCEPT} disabled={uploading} onPick={onPick} />
       <UploadButton label="📎 파일" title="파일 올리기 (PDF·한글·오피스·ZIP 등, 30MB까지)" accept={FILE_ACCEPT} disabled={uploading} onPick={onPick} />
-      {buttons.map((b) => (
-        <button
-          key={b.title}
-          type="button"
-          title={b.title}
-          aria-label={b.title}
-          aria-pressed={b.active}
-          onClick={b.run}
-          className={`btn px-2 font-mono ${b.active ? "btn-selected" : "btn-ghost"}`}
-        >
-          {b.label}
-        </button>
-      ))}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { changeVisibility, removePost } from "@/app/settings/posts/actions";
+import { confirmFirst } from "@/lib/confirm-action";
 
 /** 글 관리 한 줄의 [수정] [공개로/비공개로] [삭제] (BLOG-08) */
 export function PostRowActions({ postId, title, isPublic }: { postId: number; title: string; isPublic: boolean }) {
@@ -17,12 +18,7 @@ export function PostRowActions({ postId, title, isPublic }: { postId: number; ti
           {isPublic ? "🔒 비공개로" : "🌐 공개로"}
         </button>
       </form>
-      <form
-        action={removePost}
-        onSubmit={(e) => {
-          if (!confirm("이 글을 지울까요? 지운 글은 되돌릴 수 없어요.")) e.preventDefault();
-        }}
-      >
+      <form action={confirmFirst("이 글을 삭제할까요? 댓글과 공감도 함께 지워져요.", removePost)}>
         <input type="hidden" name="postId" value={postId} />
         <button type="submit" className="btn btn-ghost px-3 text-danger" aria-label={`${title} 삭제`}>
           삭제
