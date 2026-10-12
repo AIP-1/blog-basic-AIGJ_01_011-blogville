@@ -24,6 +24,7 @@
 | `specs/017-notifications/` | 알림함(🔔)의 spec·plan·tasks |
 | `specs/018-neighbor-list/` | 내 이웃 목록·이웃 취소의 spec·plan·tasks |
 | `specs/019-editor-toolbar/` | 에디터 도구 모음 정리의 spec·plan·tasks |
+| `specs/020-error-retry/` | 오류 화면 [다시 시도]·루트 오류 화면의 spec·plan·tasks |
 | `src/` | Next.js 16 앱 |
 
 ## 실행
