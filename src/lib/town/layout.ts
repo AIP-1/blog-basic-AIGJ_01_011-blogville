@@ -45,6 +45,8 @@ export const BOARD_POS = { x: CENTER.x, y: CENTER.y - 300 } as const;
 export const SHOP_POS = { x: CENTER.x + 360, y: CENTER.y - 30 } as const;
 /** 동물 농장 (TOWN-09): 내 집으로 가는 길 오른쪽 */
 export const FARM_POS = { x: CENTER.x + 260, y: CENTER.y + 280 } as const;
+/** 연못 낚시터 (TOWN-14): 광장 왼쪽, 상점 맞은편 */
+export const POND_POS = { x: CENTER.x - 350, y: CENTER.y - 40 } as const;
 export const FOUNTAIN_POS = { x: CENTER.x, y: CENTER.y + 40 } as const;
 
 const band = (x1: number, y1: number, x2: number, y2: number): Rect => ({

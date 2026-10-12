@@ -328,6 +328,48 @@ export function farmArt(): PixelArt {
   });
 }
 
+/** 연못 낚시터 (TOWN-14): 둥근 연못, 연잎, 앞쪽 나무 잔교와 낚싯대 */
+export function pondArt(): PixelArt {
+  const g = grid(40, 22);
+  // 연못 (타원): 가장자리 돌 → 물
+  for (let y = 0; y < 18; y++) {
+    const t = (y - 8.5) / 9;
+    const half = Math.round(19.5 * Math.sqrt(Math.max(0, 1 - t * t)));
+    fill(g, 20 - half, y + 2, half * 2, 1, "S");
+    if (half > 1) fill(g, 21 - half, y + 2, half * 2 - 2, 1, y < 4 ? "L" : "W");
+  }
+  // 물결
+  fill(g, 8, 9, 4, 1, "L");
+  fill(g, 26, 12, 5, 1, "L");
+  fill(g, 14, 15, 3, 1, "L");
+  // 연잎과 꽃
+  fill(g, 6, 13, 3, 2, "G");
+  fill(g, 30, 7, 3, 2, "G");
+  g[7][31] = "P";
+  fill(g, 22, 6, 2, 2, "G");
+  // 잔교 (앞쪽 가운데)
+  fill(g, 17, 14, 6, 8, "D");
+  for (let y = 15; y < 22; y += 2) fill(g, 17, y, 6, 1, "d");
+  fill(g, 17, 14, 1, 8, "d");
+  fill(g, 22, 14, 1, 8, "d");
+  // 낚싯대와 찌
+  for (let i = 0; i < 6; i++) g[13 - i][23 + i] = "R";
+  fill(g, 29, 8, 1, 2, "n");
+  g[11][29] = "F";
+  return art(g, {
+    S: "#9a9a8a",
+    W: "#4aa3df",
+    L: "#8fd0f5",
+    G: "#5fae4f",
+    P: "#ff8fb1",
+    D: "#b07c4a",
+    d: "#7a5230",
+    R: "#5a3b22",
+    n: "#e8e8e8",
+    F: "#e74c3c",
+  });
+}
+
 /** 분수: 둥근 돌 수반과 물줄기 */
 export function fountainArt(): PixelArt {
   const g = grid(30, 22);

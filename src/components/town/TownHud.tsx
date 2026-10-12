@@ -239,6 +239,9 @@ export function TownHud({
                 <Link href="/farm" className="btn btn-ghost">
                   🐮 동물 농장
                 </Link>
+                <Link href="/fishing" className="btn btn-ghost">
+                  🎣 낚시터
+                </Link>
               </nav>
               <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-line pt-3">
                 <Link href="/settings/account" className="btn btn-ghost">
