@@ -1,5 +1,5 @@
 import "server-only";
-import { and, count, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, max, or, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { likePattern } from "@/lib/blog-search";
 import { blogs, categories, follows, posts, profiles, subcategories } from "@/db/schema";
@@ -46,4 +46,26 @@ export async function listFeed({ page, followerId, search }: { page: number; fol
     db.select({ total: count() }).from(posts).innerJoin(blogs, eq(blogs.id, posts.blogId)).where(where),
   ]);
   return { items, total };
+}
+
+export const BROWSE_BLOGS = 12;
+
+/**
+ * 마을 소식 1페이지의 `블로그 둘러보기` (SOC-05 열린 질문의 제안): 공개 글이 있는 블로그를 최근 공개 글 순으로.
+ * 글 수도 공개 글만 센다.
+ */
+export async function listActiveBlogs(limit = BROWSE_BLOGS) {
+  const active = db
+    .select({ blogId: posts.blogId, lastAt: max(posts.createdAt).as("last_at"), postCount: count().as("post_count") })
+    .from(posts)
+    .where(eq(posts.isPublic, true))
+    .groupBy(posts.blogId)
+    .as("active");
+  return db
+    .select({ slug: blogs.slug, title: blogs.title, nickname: profiles.nickname, postCount: active.postCount })
+    .from(active)
+    .innerJoin(blogs, eq(blogs.id, active.blogId))
+    .innerJoin(profiles, eq(profiles.userId, blogs.ownerId))
+    .orderBy(desc(active.lastAt), desc(blogs.id))
+    .limit(limit);
 }
