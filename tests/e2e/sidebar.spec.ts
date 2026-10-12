@@ -91,6 +91,9 @@ test.describe("BLOG-06 방문자", () => {
     const b = await browser.newPage();
     await b.goto(`/@${o.username}/${id}`);
     await expect(views(b)).toHaveText("👀 2");
+    // "👀 2"는 서버 렌더가 미리 +1 한 값이다. 기록 요청이 방문자 쿠키를 심기 전에 떠나면
+    // 홈에서 새 방문자로 한 번 더 세어진다(가끔 오늘 3이 되던 원인). 쿠키가 생길 때까지 기다린다.
+    await expect.poll(async () => (await b.context().cookies()).some((c) => c.name === "bv_visitor")).toBe(true);
     await b.goto(`/@${o.username}`);
     await expect(visit(b, "오늘")).toHaveText("2");
 
