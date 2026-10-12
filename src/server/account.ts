@@ -53,3 +53,33 @@ export async function deleteMember(userId: string, username: string): Promise<vo
     await tx.delete(users).where(eq(users.id, userId));
   });
 }
+
+export type ResetResult = { ok: true; password: string } | { ok: false; error: string };
+
+export const RESET_ERRORS = {
+  notFound: "회원을 찾을 수 없어요.",
+  admin: "관리자의 비밀번호는 초기화할 수 없어요.",
+  noPassword: "아이디·비밀번호로 가입한 회원이 아니에요.",
+} as const;
+
+/**
+ * 관리자 비밀번호 초기화 (AUTH-07 열린 질문): 임시 비밀번호로 바꾸고 그 회원의 모든 로그인과 로그인 실패 기록을 지운다 (한 트랜잭션).
+ * 관리자 계정은 거절한다. 임시 비밀번호 원문은 돌려줄 뿐 어디에도 남기지 않는다.
+ */
+export async function resetMemberPassword(userId: string, tempPassword: string): Promise<ResetResult> {
+  const hash = await hashPassword(tempPassword);
+  return db.transaction(async (tx) => {
+    const [user] = await tx.select({ username: users.username, role: users.role }).from(users).where(eq(users.id, userId)).for("update");
+    if (!user) return { ok: false, error: RESET_ERRORS.notFound };
+    if (user.role === "admin") return { ok: false, error: RESET_ERRORS.admin };
+    const updated = await tx
+      .update(accounts)
+      .set({ password: hash, updatedAt: new Date() })
+      .where(and(eq(accounts.userId, userId), eq(accounts.providerId, "credential")))
+      .returning({ id: accounts.id });
+    if (updated.length === 0) return { ok: false, error: RESET_ERRORS.noPassword };
+    await tx.delete(sessions).where(eq(sessions.userId, userId));
+    if (user.username) await tx.delete(loginAttempts).where(eq(loginAttempts.username, user.username));
+    return { ok: true, password: tempPassword };
+  });
+}
