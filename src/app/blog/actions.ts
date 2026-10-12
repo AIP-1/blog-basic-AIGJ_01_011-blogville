@@ -8,7 +8,8 @@ import { db } from "@/db";
 import { blogs, posts } from "@/db/schema";
 import { createComment, createReply, removeComment, removeReply } from "@/server/comments";
 import { getSession, requireMember } from "@/server/dal";
-import { toggleFollow as storeFollow, unfollow } from "@/server/follows";
+import { toggleFavorite, toggleFollow as storeFollow, unfollow } from "@/server/follows";
+import { FAVORITE_MESSAGES } from "@/lib/social";
 import { toggleLike as storeLike } from "@/server/likes";
 import { getBlogVisitStats, recordView, recordVisit, type VisitStats } from "@/server/stats";
 import { ensureVisitorId } from "@/server/visitor";
@@ -123,4 +124,17 @@ export async function removeNeighbor(formData: FormData): Promise<void> {
   if (typeof followeeId !== "string" || followeeId.length < 1 || followeeId.length > 64) return;
   await unfollow(member.userId, followeeId);
   revalidatePath("/", "layout");
+}
+
+/**
+ * 내 이웃 목록의 ☆/⭐ (TOWN-08 즐겨찾는 이웃): 켜기·끄기. 1~64자 문자열이 아니면 `이웃을 찾을 수 없어요.`
+ * 거절하면 문구를 돌려주고 저장하지 않는다.
+ */
+export async function favoriteNeighbor(formData: FormData): Promise<{ error: string | null }> {
+  const member = await requireMember();
+  const followeeId = formData.get("followeeId");
+  if (typeof followeeId !== "string" || followeeId.length < 1 || followeeId.length > 64) return { error: FAVORITE_MESSAGES.notFound };
+  const error = await toggleFavorite(member.userId, followeeId);
+  if (!error) revalidatePath("/", "layout");
+  return { error };
 }

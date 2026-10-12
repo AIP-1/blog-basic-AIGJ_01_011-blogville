@@ -361,7 +361,7 @@ export const postLikes = pgTable(
 );
 
 // 이웃 (SOC-04). 기본 키가 "같은 이웃은 한 번만"을, CHECK가 "나는 내 이웃이 아님"을 지킨다.
-// 즐겨찾기(is_favorite)는 마을(TOWN-04)이 생길 때 더한다.
+// is_favorite: 즐겨찾는 이웃 ⭐ (TOWN-08, 최대 10명은 서버가 회원별 잠금으로 지킨다). 이웃을 취소하면 행과 함께 풀린다.
 export const follows = pgTable(
   "follows",
   {
@@ -371,6 +371,7 @@ export const follows = pgTable(
     followeeId: text("followee_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    isFavorite: boolean("is_favorite").notNull().default(false),
     createdAt: createdAt(),
   },
   (t) => [

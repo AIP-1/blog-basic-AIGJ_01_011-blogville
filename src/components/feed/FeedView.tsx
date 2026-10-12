@@ -60,6 +60,7 @@ export function FeedView({ title, tab, showFollowingTab, feed, page, tags, empty
                 commentCount={row.commentCount}
                 likeCount={row.likeCount}
                 author={{ nickname: row.nickname, blogTitle: row.blogTitle }}
+                pinned={row.pinned}
               />
             ))}
           </div>

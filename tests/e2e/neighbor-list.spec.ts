@@ -132,7 +132,10 @@ test.describe("SOC-04 내 이웃 목록", () => {
 
     // 65자 값, 다른 회원 ID, 남이 이웃한(나는 이웃하지 않은) 회원 ID로 바꿔 보내도 내 이웃·남의 이웃은 그대로다
     me.page.on("dialog", (dlg) => dlg.accept());
-    const input = rows(me.page).locator('input[name="followeeId"]');
+    const input = rows(me.page)
+      .locator("form")
+      .filter({ has: me.page.getByRole("button", { name: "✓ 이웃" }) })
+      .locator('input[name="followeeId"]');
     for (const value of ["x".repeat(65), other.userId, x.userId]) {
       // 앞 액션이 끝나며 폼을 되돌리면(React 폼 액션) 바꾼 값이 원래 값으로 돌아가 진짜 이웃이 지워지므로 새로 연다
       await me.page.reload();

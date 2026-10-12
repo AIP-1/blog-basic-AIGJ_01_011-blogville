@@ -1,7 +1,9 @@
 import "server-only";
-import { and, asc, count, eq, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { blogs, follows, posts, profiles } from "@/db/schema";
+import { NOTICE_SLUG } from "@/lib/names";
+import { FAVORITE_MESSAGES, favoriteRefusal } from "@/lib/social";
 
 /** 블로그 홈의 `이웃 N`: 이 블로그 주인을 이웃 추가한 사람 수 (SOC-04) */
 export async function countFollowers(ownerId: string): Promise<number> {
@@ -44,15 +46,26 @@ export async function toggleFollow(followerId: string, followeeId: string): Prom
 /** 내 이웃 목록은 이만큼만 보여 준다 (최근 공개 글 순) */
 export const NEIGHBOR_LIST_LIMIT = 200;
 
-export type Neighbor = { userId: string; slug: string; blogTitle: string; nickname: string; postCount: number; mutual: boolean };
+export type Neighbor = {
+  userId: string;
+  slug: string;
+  blogTitle: string;
+  nickname: string;
+  postCount: number;
+  mutual: boolean;
+  isFavorite: boolean;
+  /** 공지사항 블로그 (⭐ 대신 📢, 켤 수 없다) */
+  isNotice: boolean;
+};
 
 /**
  * 이웃 새 글 위 `내 이웃 N` (SOC-04 열린 질문의 제안): 내가 이웃 추가한 회원의 블로그.
- * 최근 공개 글 순(공개 글이 없으면 뒤로, 그다음 닉네임 순). 공개 글 수와 `서로 이웃`(상대도 나를 이웃 추가) 여부를 함께.
+ * 즐겨찾기(⭐, TOWN-08) 먼저, 그다음 최근 공개 글 순(공개 글이 없으면 뒤로, 그다음 닉네임 순).
+ * 공개 글 수와 `서로 이웃`(상대도 나를 이웃 추가) 여부를 함께. `favorites`는 공지 블로그를 뺀 즐겨찾기 수.
  */
-export async function listMyNeighbors(userId: string): Promise<{ items: Neighbor[]; total: number }> {
+export async function listMyNeighbors(userId: string): Promise<{ items: Neighbor[]; total: number; favorites: number }> {
   const lastPublic = sql`(select max(p.created_at) from ${posts} p where p.blog_id = ${blogs.id} and p.is_public)`;
-  const [items, [{ total }]] = await Promise.all([
+  const [items, [{ total }], favorites] = await Promise.all([
     db
       .select({
         userId: follows.followeeId,
@@ -61,16 +74,56 @@ export async function listMyNeighbors(userId: string): Promise<{ items: Neighbor
         nickname: profiles.nickname,
         postCount: sql<number>`(select count(*) from ${posts} p where p.blog_id = ${blogs.id} and p.is_public)::int`,
         mutual: sql<boolean>`exists (select 1 from ${follows} back where back.follower_id = ${follows.followeeId} and back.followee_id = ${userId})`,
+        isFavorite: follows.isFavorite,
+        isNotice: sql<boolean>`${blogs.slug} = ${NOTICE_SLUG}`,
       })
       .from(follows)
       .innerJoin(blogs, eq(blogs.ownerId, follows.followeeId))
       .innerJoin(profiles, eq(profiles.userId, follows.followeeId))
       .where(eq(follows.followerId, userId))
-      .orderBy(sql`${lastPublic} desc nulls last`, asc(profiles.nickname), asc(blogs.slug))
+      .orderBy(desc(follows.isFavorite), sql`${lastPublic} desc nulls last`, asc(profiles.nickname), asc(blogs.slug))
       .limit(NEIGHBOR_LIST_LIMIT),
     db.select({ total: count() }).from(follows).where(eq(follows.followerId, userId)),
+    countFavorites(db, userId),
   ]);
-  return { items, total };
+  return { items, total, favorites };
+}
+
+type Runner = Pick<typeof db, "select">;
+
+/** 공지사항 블로그를 뺀 내 즐겨찾기 수 (TOWN-08 `{n}/10`과 10명 제한) */
+async function countFavorites(runner: Runner, userId: string): Promise<number> {
+  const [row] = await runner
+    .select({ n: count() })
+    .from(follows)
+    .innerJoin(blogs, eq(blogs.ownerId, follows.followeeId))
+    .where(and(eq(follows.followerId, userId), eq(follows.isFavorite, true), sql`${blogs.slug} <> ${NOTICE_SLUG}`));
+  return row.n;
+}
+
+/**
+ * 즐겨찾는 이웃 ⭐ 켜기·끄기 (TOWN-08). 같은 회원의 요청은 잠금으로 줄 세워 동시에 눌러도 10명을 넘지 않는다.
+ * 이웃 행이 없으면 거절한다. 켤 때만 공지 블로그와 10명 제한을 본다 (이미 켜 둔 ⭐는 언제나 끌 수 있다).
+ * 거절하면 보여 줄 문구를, 바꾸면 null을 돌려준다.
+ */
+export async function toggleFavorite(followerId: string, followeeId: string): Promise<string | null> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"fav:" + followerId}))`);
+    const [row] = await tx
+      .select({ isFavorite: follows.isFavorite, slug: blogs.slug })
+      .from(follows)
+      .leftJoin(blogs, eq(blogs.ownerId, follows.followeeId))
+      .where(and(eq(follows.followerId, followerId), eq(follows.followeeId, followeeId)));
+    if (!row) return FAVORITE_MESSAGES.notNeighbor;
+    const turningOn = !row.isFavorite;
+    const refusal = favoriteRefusal({ turningOn, isNotice: row.slug === NOTICE_SLUG, count: turningOn ? await countFavorites(tx, followerId) : 0 });
+    if (refusal) return refusal;
+    await tx
+      .update(follows)
+      .set({ isFavorite: turningOn })
+      .where(and(eq(follows.followerId, followerId), eq(follows.followeeId, followeeId)));
+    return null;
+  });
 }
 
 /** 이웃 취소만 한다 (내 이웃 목록의 [✓ 이웃]). 겹쳐 눌러도 다시 추가되지 않는다 */

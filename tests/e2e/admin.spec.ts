@@ -199,50 +199,98 @@ test.describe("AUTH-08 관리자", () => {
     await sql`delete from posts where id = ${secret}`;
   });
 
-  test("공지 블로그 주소 notice: 관리자는 그대로 저장·되돌리기가 되고, 일반 회원과 다른 예약어는 안 된다", async ({ page, browser }) => {
-    const member = await browser.newPage();
-    await signUpOk(member);
-    await member.goto("/settings/blog");
-    await member.getByLabel("블로그 주소").fill("notice");
-    await member.getByRole("button", { name: "주소 바꾸기" }).click();
-    await expect(member.locator("p[role=alert]")).toHaveText("이 주소는 쓸 수 없어요");
+  // 아래 두 시험은 개발 DB의 진짜 /@notice를 쓴다. 하나가 그 주소를 잠깐 옮기므로 같은 일꾼에서 차례로 돈다.
+  test.describe("공지 블로그 /@notice", () => {
+    test.describe.configure({ mode: "default" });
 
-    const me = await makeAdmin(page);
-    const slug = page.getByLabel("블로그 주소");
-    const save = page.getByRole("button", { name: "주소 바꾸기" });
-    // 개발 DB에 있는 진짜 공지 블로그는 시험 동안 다른 주소로 옮겨 둔다
-    const moved = await sql`update blogs set slug = ${uid("nb")} where slug = 'notice' returning id`;
-    try {
-      await page.goto("/settings/blog");
-      await slug.fill("town");
-      await save.click();
-      await expect(page.locator("p[role=alert]")).toHaveText("이 주소는 쓸 수 없어요");
+    test("공지 블로그 주소 notice: 관리자는 그대로 저장·되돌리기가 되고, 일반 회원과 다른 예약어는 안 된다", async ({ page, browser }) => {
+      const member = await browser.newPage();
+      await signUpOk(member);
+      await member.goto("/settings/blog");
+      await member.getByLabel("블로그 주소").fill("notice");
+      await member.getByRole("button", { name: "주소 바꾸기" }).click();
+      await expect(member.locator("p[role=alert]")).toHaveText("이 주소는 쓸 수 없어요");
 
-      await slug.fill("Notice");
-      await save.click();
-      await expect(page.getByRole("status")).toHaveText("저장했어요 ✓");
-      expect((await page.goto("/@notice"))!.status()).toBe(200);
+      const me = await makeAdmin(page);
+      const slug = page.getByLabel("블로그 주소");
+      const save = page.getByRole("button", { name: "주소 바꾸기" });
+      // 개발 DB에 있는 진짜 공지 블로그는 시험 동안 다른 주소로 옮겨 둔다
+      const moved = await sql`update blogs set slug = ${uid("nb")} where slug = 'notice' returning id`;
+      try {
+        await page.goto("/settings/blog");
+        await slug.fill("town");
+        await save.click();
+        await expect(page.locator("p[role=alert]")).toHaveText("이 주소는 쓸 수 없어요");
 
-      // 지금 주소 notice를 그대로 두고 눌러도 저장된다
-      await page.goto("/settings/blog");
-      await expect(slug).toHaveValue("notice");
-      await save.click();
-      await expect(page.getByRole("status")).toHaveText("저장했어요 ✓");
+        await slug.fill("Notice");
+        await save.click();
+        await expect(page.getByRole("status")).toHaveText("저장했어요 ✓");
+        expect((await page.goto("/@notice"))!.status()).toBe(200);
 
-      // 다른 주소로 바꿨다가 notice로 되돌린다 (앞의 `저장했어요 ✓`가 남지 않게 새로 연다)
-      await page.goto("/settings/blog");
-      await slug.fill(me);
-      await save.click();
-      await expect(page.getByRole("status")).toHaveText("저장했어요 ✓");
-      expect((await page.goto("/@notice"))!.status()).toBe(404);
-      await page.goto("/settings/blog");
-      await slug.fill("notice");
-      await save.click();
-      await expect(page.getByRole("status")).toHaveText("저장했어요 ✓");
-      expect((await page.goto("/@notice"))!.status()).toBe(200);
-    } finally {
-      await sql`update blogs set slug = ${me} where slug = 'notice' and owner_id = (select id from users where username = ${me})`;
-      if (moved.length) await sql`update blogs set slug = 'notice' where id = ${moved[0].id}`;
-    }
+        // 지금 주소 notice를 그대로 두고 눌러도 저장된다
+        await page.goto("/settings/blog");
+        await expect(slug).toHaveValue("notice");
+        await save.click();
+        await expect(page.getByRole("status")).toHaveText("저장했어요 ✓");
+
+        // 다른 주소로 바꿨다가 notice로 되돌린다 (앞의 `저장했어요 ✓`가 남지 않게 새로 연다)
+        await page.goto("/settings/blog");
+        await slug.fill(me);
+        await save.click();
+        await expect(page.getByRole("status")).toHaveText("저장했어요 ✓");
+        expect((await page.goto("/@notice"))!.status()).toBe(404);
+        await page.goto("/settings/blog");
+        await slug.fill("notice");
+        await save.click();
+        await expect(page.getByRole("status")).toHaveText("저장했어요 ✓");
+        expect((await page.goto("/@notice"))!.status()).toBe(200);
+      } finally {
+        await sql`update blogs set slug = ${me} where slug = 'notice' and owner_id = (select id from users where username = ${me})`;
+        if (moved.length) await sql`update blogs set slug = 'notice' where id = ${moved[0].id}`;
+      }
+    });
+
+    test("공지 블로그는 내 이웃 목록에 ⭐ 대신 📢, 조작해도 즐겨찾기되지 않고 10명에 세지 않는다, 이미 켜 둔 ⭐는 끌 수 있다 (TOWN-08)", async ({ page, browser }) => {
+      const me = await signUpOk(page);
+      const friend = await browser.newPage();
+      const friendName = await signUpOk(friend);
+      const [{ id: meId }] = await sql`select id from users where username = ${me}`;
+      const [{ id: friendId }] = await sql`select id from users where username = ${friendName}`;
+      const [notice] = await sql`select owner_id, title from blogs where slug = 'notice'`;
+      test.skip(!notice, "개발 DB에 공지 블로그가 없다");
+      await sql`insert into follows (follower_id, followee_id, is_favorite) values (${meId}, ${notice.owner_id}, true), (${meId}, ${friendId}, true)`;
+
+      const rows = page.getByRole("list", { name: "내 이웃" }).getByRole("listitem");
+      const noticeRow = rows.filter({ has: page.locator('a[href="/@notice"]') });
+      const friendRow = rows.filter({ has: page.getByRole("link", { name: `${friendName}의 블로그`, exact: true }) });
+      const open = async () => {
+        await page.goto("/feed/following");
+        await page.locator("summary").filter({ hasText: "내 이웃" }).click();
+      };
+      await open();
+      // 공지 블로그의 ⭐는 세지 않는다
+      await expect(page.getByText("(1/10)")).toBeVisible();
+      const noticeStar = noticeRow.getByRole("button", { name: /즐겨찾기$/ });
+      await expect(noticeStar).toHaveText("⭐");
+      await noticeStar.click();
+      await expect(noticeRow.getByRole("button", { name: /즐겨찾기$/ })).toHaveCount(0);
+      await expect(noticeRow.getByText("📢")).toBeVisible();
+      // ⭐가 📢로 바뀌어도 키보드 초점이 그 자리에 남는다
+      await expect(noticeRow.locator('[tabindex="-1"]')).toBeFocused();
+      await expect(noticeRow.getByText("공지사항 블로그는 즐겨찾기할 수 없어요")).toHaveCount(1);
+      expect((await sql`select is_favorite from follows where follower_id = ${meId} and followee_id = ${notice.owner_id}`)[0].is_favorite).toBe(false);
+
+      // 다른 줄의 폼 값을 공지 블로그 주인으로 바꿔 보내도 거절
+      await open();
+      await friendRow
+        .locator("form")
+        .filter({ has: page.getByRole("button", { name: `${friendName} 즐겨찾기` }) })
+        .locator('input[name="followeeId"]')
+        .evaluate((el, v) => ((el as HTMLInputElement).value = v), notice.owner_id as string);
+      await friendRow.getByRole("button", { name: `${friendName} 즐겨찾기` }).click();
+      await expect(friendRow.getByRole("alert")).toHaveText("공지사항 블로그는 즐겨찾기할 수 없어요.");
+      expect((await sql`select is_favorite from follows where follower_id = ${meId} and followee_id = ${notice.owner_id}`)[0].is_favorite).toBe(false);
+      expect((await sql`select is_favorite from follows where follower_id = ${meId} and followee_id = ${friendId}`)[0].is_favorite).toBe(true);
+    });
   });
 });
