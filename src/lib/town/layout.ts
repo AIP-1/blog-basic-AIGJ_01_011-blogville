@@ -43,6 +43,8 @@ export const HOUSE_LOTS: readonly Point[] = [
 
 export const BOARD_POS = { x: CENTER.x, y: CENTER.y - 300 } as const;
 export const SHOP_POS = { x: CENTER.x + 360, y: CENTER.y - 30 } as const;
+/** 동물 농장 (TOWN-09): 내 집으로 가는 길 오른쪽 */
+export const FARM_POS = { x: CENTER.x + 260, y: CENTER.y + 280 } as const;
 export const FOUNTAIN_POS = { x: CENTER.x, y: CENTER.y + 40 } as const;
 
 const band = (x1: number, y1: number, x2: number, y2: number): Rect => ({
@@ -63,6 +65,7 @@ export const ROADS: readonly Rect[] = [
   ...[1, 2, 3, 4].map((i) => band(HOUSE_LOTS[i].x, HOUSE_LOTS[i].y + 40, WEST_ROAD, HOUSE_LOTS[i].y + 40)),
   ...[5, 6, 7, 8].map((i) => band(EAST_ROAD, HOUSE_LOTS[i].y + 40, HOUSE_LOTS[i].x, HOUSE_LOTS[i].y + 40)),
   band(SHOP_POS.x, SHOP_POS.y + 30, SHOP_POS.x, CENTER.y),
+  band(CENTER.x, FARM_POS.y + 30, FARM_POS.x, FARM_POS.y + 30), // 농장 앞
   // 북쪽 언덕 (TOWN-05): 서쪽·동쪽 길이 계단으로 올라가 언덕 위 길로 이어진다
   band(WEST_ROAD, HILL_ROAD, WEST_ROAD, HOUSE_LOTS[1].y + 40),
   band(EAST_ROAD, HILL_ROAD, EAST_ROAD, HOUSE_LOTS[5].y + 40),

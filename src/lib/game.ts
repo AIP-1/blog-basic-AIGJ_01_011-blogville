@@ -35,9 +35,9 @@ export function levelsGained(before: number, after: number): number[] {
 }
 
 /** 보상 사유 */
-export type RewardReason = "signup" | "attendance" | "post" | "comment" | "like_received";
-/** 원장 사유 (`point_ledger.reason`): 보상과 상점 구매(SHOP-01, 코인만 줄어든다) */
-export type LedgerReason = RewardReason | "purchase";
+export type RewardReason = "signup" | "attendance" | "post" | "comment" | "like_received" | "farm_care";
+/** 원장 사유 (`point_ledger.reason`): 보상, 상점 구매(SHOP-01)·알 사기(TOWN-09)는 코인만 줄어든다, 다 키운 동물 보상 */
+export type LedgerReason = RewardReason | "purchase" | "farm_grown" | "egg_purchase";
 
 /** 보상 규칙 표 (GAME-05). 하루는 한국 시간 0시 기준. 출석은 일차별 표(`attendance_rewards`)라 여기 없다 */
 export const REWARD_RULES: Record<Exclude<RewardReason, "attendance">, { exp: number; coin: number; dailyLimit: number }> = {
@@ -45,6 +45,8 @@ export const REWARD_RULES: Record<Exclude<RewardReason, "attendance">, { exp: nu
   post: { exp: 30, coin: 30, dailyLimit: 3 },
   comment: { exp: 5, coin: 5, dailyLimit: 10 },
   like_received: { exp: 2, coin: 2, dailyLimit: 20 },
+  // 동물 돌보기 (TOWN-09): 경험치만, 하루 15번까지
+  farm_care: { exp: 2, coin: 0, dailyLimit: 15 },
 };
 
 /** 글쓰기 보상을 받는 본문 글자 수 (공개 새 글) */
@@ -63,6 +65,9 @@ export const REASON_LABEL: Record<LedgerReason, string> = {
   comment: "💬 댓글 작성",
   like_received: "♥ 공감 받음",
   purchase: "🏪 상점 구매",
+  farm_care: "🐮 동물 돌보기",
+  farm_grown: "🏅 동물 다 키움",
+  egg_purchase: "🥚 알 사기",
 };
 
 /** 내역 한 페이지 줄 수 */

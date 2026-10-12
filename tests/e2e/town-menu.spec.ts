@@ -33,7 +33,7 @@ test.describe("TOWN-12 ☰ 마을 메뉴", () => {
     await expect(panel(page).getByRole("button", { name: "로그아웃" })).toBeVisible();
     await expect(panel(page).getByRole("link", { name: "👑 관리자" })).toHaveCount(0);
     // 헤더가 없어 바로 가기 링크
-    await expect(panel(page).getByRole("navigation", { name: "바로 가기" }).getByRole("link")).toHaveText(["✏️ 글쓰기", "📋 마을 소식", "🏪 상점", "📮 출석"]);
+    await expect(panel(page).getByRole("navigation", { name: "바로 가기" }).getByRole("link")).toHaveText(["✏️ 글쓰기", "📋 마을 소식", "🏪 상점", "📮 출석", "🐮 동물 농장"]);
 
     await panel(page).getByRole("button", { name: /👤 내 프로필/ }).click();
     await expect(panel(page).getByRole("heading")).toHaveText("👤 내 프로필");
@@ -58,12 +58,12 @@ test.describe("TOWN-12 ☰ 마을 메뉴", () => {
     await expect(page).toHaveURL("/");
   });
 
-  test("텔레포트: 마을 3곳 + 집 11자리, 빈 집터는 누를 수 없고 ⭐ 안내, 고르면 닫히고 그 앞으로", async ({ page }) => {
+  test("텔레포트: 마을 4곳 + 집 11자리, 빈 집터는 누를 수 없고 ⭐ 안내, 고르면 닫히고 그 앞으로", async ({ page }) => {
     await signUpOk(page);
     await openTown(page);
     await menuButton(page).click();
     await panel(page).getByRole("button", { name: /✨ 텔레포트/ }).click();
-    await expect(panel(page).getByRole("button", { name: /광장 분수|마을 게시판|상점$/ })).toHaveCount(3);
+    await expect(panel(page).getByRole("button", { name: /광장 분수|마을 게시판|상점$|동물 농장/ })).toHaveCount(4);
     const lots = panel(page).locator("[data-spot]");
     await expect(lots).toHaveCount(11);
     await expect(lots.first()).toContainText("🏠 내 집");

@@ -286,6 +286,48 @@ export function shopArt(): PixelArt {
   });
 }
 
+/** 동물 농장 (TOWN-09): 빨간 헛간(흰 X 문, 둥근 창)과 왼쪽 나무 울타리, 건초 더미 */
+export function farmArt(): PixelArt {
+  const g = grid(44, 34);
+  // 헛간 벽
+  fill(g, 12, 13, 28, 21, "R");
+  fill(g, 12, 13, 1, 21, "r");
+  fill(g, 39, 13, 1, 21, "r");
+  // 지붕 (박공)
+  gable(g, 26, 1, 12, "B", "b");
+  // 둥근 창 (건초)
+  fill(g, 24, 7, 4, 4, "W");
+  fill(g, 25, 8, 2, 2, "H");
+  // 문: 흰 테두리 + X
+  fill(g, 20, 20, 12, 14, "D");
+  frame(g, 20, 20, 12, 14, "W");
+  for (let i = 0; i < 12; i++) {
+    const y = 20 + Math.round((i * 13) / 11);
+    g[y][20 + i] = "W";
+    g[y][31 - i] = "W";
+  }
+  // 울타리
+  for (let x = 0; x < 12; x += 3) fill(g, x, 24, 1, 10, "F");
+  fill(g, 0, 26, 12, 1, "f");
+  fill(g, 0, 30, 12, 1, "f");
+  // 건초 더미
+  fill(g, 40, 28, 4, 6, "H");
+  fill(g, 41, 27, 2, 1, "H");
+  fill(g, 40, 30, 4, 1, "h");
+  return art(g, {
+    R: "#c0392b",
+    r: "#922b21",
+    B: "#6e4b3a",
+    b: "#4a3226",
+    W: "#fdf6e3",
+    H: "#f4d35e",
+    h: "#c9a227",
+    D: "#a93226",
+    F: "#a0703c",
+    f: "#c48a4a",
+  });
+}
+
 /** 분수: 둥근 돌 수반과 물줄기 */
 export function fountainArt(): PixelArt {
   const g = grid(30, 22);

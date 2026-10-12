@@ -9,6 +9,7 @@ import { POST_ERRORS, type PostInput } from "@/lib/post-rules";
 import { htmlToText, sanitizePostHtml } from "@/lib/sanitize";
 import { lockLinkable, syncPostAttachments } from "./attachments";
 import { commentCountSql } from "./comments";
+import { growForPost } from "./farm";
 import { grantReward } from "./points";
 import { likeCountSql } from "./likes";
 import { resolveCategory } from "./category";
@@ -57,7 +58,8 @@ export async function savePost(blogId: number, ownerId: string, input: PostInput
     }
     await syncPostAttachments(tx, postId, extractFileKeys(contentHtml));
     // 공개 새 글(본문 100자 이상)이면 글쓰기 보상, 하루 3번까지 (GAME-05). 고친 글은 보상이 없다
-    if (postEarnsReward(input.postId === null, input.isPublic, contentText.length)) await grantReward(tx, ownerId, "post", String(postId));
+    // 받았으면 키우는 동물이 모두 성장 +10 (TOWN-09)
+    if (postEarnsReward(input.postId === null, input.isPublic, contentText.length) && (await grantReward(tx, ownerId, "post", String(postId)))) await growForPost(tx, ownerId);
     await syncPostTags(tx, postId, input.tags);
     return postId;
   });
