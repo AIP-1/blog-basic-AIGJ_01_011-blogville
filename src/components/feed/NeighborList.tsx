@@ -31,7 +31,8 @@ export function NeighborList({ items, total }: { items: Neighbor[]; total: numbe
                 </Link>
                 <p className="text-sm text-ink-soft">
                   {n.nickname} · 글 {n.postCount}
-                  {n.mutual && <span className="ml-2 rounded-full bg-[#e1f5fe] px-2 py-0.5 text-xs font-semibold text-[#01579b]">서로 이웃</span>}
+                  {n.mutual && " "}
+                  {n.mutual && <span className="ml-1 rounded-full bg-[#e1f5fe] px-2 py-0.5 text-xs font-semibold text-[#01579b]">서로 이웃</span>}
                 </p>
               </div>
               <UnfollowButton followeeId={n.userId} describedBy={`neighbor-${n.slug}`} />

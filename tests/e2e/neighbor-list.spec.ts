@@ -49,7 +49,7 @@ test.describe("SOC-04 내 이웃 목록", () => {
     await summary(me.page).click();
     await expect(rows(me.page)).toHaveCount(3);
     await expect(rows(me.page).getByRole("link")).toHaveText([`${c.username}의 블로그`, `${b.username}의 블로그`, `${d.username}의 블로그`]);
-    await expect(row(me.page, b.username)).toContainText(`${b.username} · 글 2서로 이웃`);
+    await expect(row(me.page, b.username)).toContainText(`${b.username} · 글 2 서로 이웃`);
     await expect(row(me.page, c.username)).toContainText(`${c.username} · 글 1`);
     await expect(row(me.page, c.username)).not.toContainText("서로 이웃");
     await expect(row(me.page, d.username)).toContainText(`${d.username} · 글 0`);
@@ -74,6 +74,10 @@ test.describe("SOC-04 내 이웃 목록", () => {
 
     await me.page.goto("/feed/following");
     await summary(me.page).click();
+    const actionPosts: string[] = [];
+    me.page.on("request", (r) => {
+      if (r.method() === "POST" && r.headers()["next-action"]) actionPosts.push(r.url());
+    });
     const messages: string[] = [];
     let accept = false;
     me.page.on("dialog", (dlg) => {
@@ -86,9 +90,14 @@ test.describe("SOC-04 내 이웃 목록", () => {
     await expect(rows(me.page)).toHaveCount(2);
     expect(await followRows(me.userId)).toEqual([b.username, c.username].sort());
 
+    // 키보드로 누르면 지운 뒤 초점이 남은 줄의 [✓ 이웃]으로 간다
     accept = true;
-    await row(me.page, c.username).getByRole("button", { name: "✓ 이웃" }).click();
+    await row(me.page, c.username).getByRole("button", { name: "✓ 이웃" }).focus();
+    await me.page.keyboard.press("Enter");
     await expect(rows(me.page)).toHaveCount(1);
+    await expect(row(me.page, b.username).getByRole("button", { name: "✓ 이웃" })).toBeFocused();
+    // 확인 창에서 취소한 첫 클릭은 서버에 아무것도 보내지 않았다 (액션은 차례로 처리되니 지금쯤 다 왔다)
+    expect(actionPosts).toHaveLength(1);
     await expect(summary(me.page)).toHaveText(/^▸ ?👫 내 이웃 1$/);
     // 펼친 채로 다시 그려진다
     await expect(row(me.page, b.username)).toBeVisible();
@@ -110,19 +119,21 @@ test.describe("SOC-04 내 이웃 목록", () => {
 
     const b = await member(browser);
     const other = await member(browser);
+    const x = await member(browser);
     await sql`update blogs set title = ${"아주긴블로그이름".repeat(5)} where owner_id = ${b.userId}`;
     await follow(me.userId, b.userId);
     await follow(other.userId, b.userId);
+    await follow(other.userId, x.userId); // 나는 x를 이웃하지 않았다
     await me.page.reload();
     await summary(me.page).click();
     await expect(rows(me.page)).toHaveCount(1);
     expect(await me.page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
     expect((await rows(me.page).getByRole("button", { name: "✓ 이웃" }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
 
-    // 65자 값, 다른 회원의 이웃(내 이웃 아님)으로 바꿔 보내도 내 이웃·남의 이웃은 그대로다
+    // 65자 값, 다른 회원 ID, 남이 이웃한(나는 이웃하지 않은) 회원 ID로 바꿔 보내도 내 이웃·남의 이웃은 그대로다
     me.page.on("dialog", (dlg) => dlg.accept());
     const input = rows(me.page).locator('input[name="followeeId"]');
-    for (const value of ["x".repeat(65), other.userId]) {
+    for (const value of ["x".repeat(65), other.userId, x.userId]) {
       await input.evaluate((el, v) => ((el as HTMLInputElement).value = v), value);
       await Promise.all([
         me.page.waitForResponse((r) => r.request().method() === "POST" && !!r.request().headers()["next-action"]),
@@ -130,7 +141,15 @@ test.describe("SOC-04 내 이웃 목록", () => {
       ]);
     }
     expect(await followRows(me.userId)).toEqual([b.username]);
-    expect(await followRows(other.userId)).toEqual([b.username]);
+    expect(await followRows(other.userId)).toEqual([b.username, x.username].sort());
+
+    // 자바스크립트가 없으면(화면이 준비되기 전과 같다) 확인 창 없이 지워지지 않는다
+    const noJs = await (await browser.newContext({ javaScriptEnabled: false, storageState: await me.page.context().storageState() })).newPage();
+    await noJs.goto("/feed/following");
+    await summary(noJs).click();
+    await rows(noJs).getByRole("button", { name: "✓ 이웃" }).click();
+    await noJs.waitForLoadState("load");
+    expect(await followRows(me.userId)).toEqual([b.username]);
 
     // 띄어쓰기 없는 긴 블로그 이름은 블로그 홈 제목에서도 줄을 바꾼다
     await me.page.goto(`/@${b.username}`);
