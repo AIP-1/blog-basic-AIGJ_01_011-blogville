@@ -6,6 +6,7 @@ import { CategoryNav } from "@/components/blog/CategoryNav";
 import { FollowButton } from "@/components/blog/FollowButton";
 import { Pagination } from "@/components/blog/Pagination";
 import { PostCard } from "@/components/blog/PostCard";
+import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { parseSearchQuery, parseTagFilter, SEARCH_EMPTY, TOWN_SEARCH_EMPTY, TOWN_SEARCH_NONE } from "@/lib/blog-search";
 import { parseId, parsePage } from "@/lib/ids";
 import { getBlogBySlug, searchBlogs } from "@/server/blog";
@@ -27,7 +28,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
   const query = await searchParams;
   const found = await getBlogBySlug(slug);
   if (!found) notFound();
-  const { blog, nickname } = found;
+  const { blog, nickname, photoKey } = found;
 
   const member = await getSession();
   const isOwner = member?.userId === blog.ownerId;
@@ -96,11 +97,15 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
       )}
 
       <header className="rounded-2xl border border-line bg-surface p-5">
-        <h1 className="text-2xl font-extrabold">
-          <Link href={`/@${blog.slug}`} className="-ml-1 inline-flex min-h-11 min-w-11 max-w-full items-center px-1 hover:underline">
-            {blog.title}
-          </Link>
-        </h1>
+        <div className="flex items-center gap-3">
+          {/* 주인 프로필 사진 (BLOG-04, 없으면 닉네임 첫 글자 원) */}
+          <ProfileAvatar photoKey={photoKey} nickname={nickname} />
+          <h1 className="min-w-0 text-2xl font-extrabold">
+            <Link href={`/@${blog.slug}`} className="-ml-1 inline-flex min-h-11 min-w-11 max-w-full items-center px-1 hover:underline">
+              {blog.title}
+            </Link>
+          </h1>
+        </div>
         {blog.intro && <p className="mt-2 text-ink-soft">{blog.intro}</p>}
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-ink-soft" aria-label="블로그 정보">

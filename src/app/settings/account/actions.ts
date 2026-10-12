@@ -8,7 +8,8 @@ import { AUTH_ERRORS, checkPasswordChange, PASSWORD_MAX } from "@/lib/auth-rules
 import { BLOG_ERRORS, checkNickname } from "@/lib/blog-rules";
 import { changeMemberPassword, deleteMember, verifyMemberPassword } from "@/server/account";
 import { requireMember } from "@/server/dal";
-import { updateNickname as saveNickname } from "@/server/profile";
+import { KEY_PATTERN } from "@/lib/attachments";
+import { PHOTO_ERRORS, removeProfilePhoto, setProfilePhoto, updateNickname as saveNickname } from "@/server/profile";
 import type { SettingsState } from "../blog/actions";
 
 export async function updateNickname(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
@@ -56,4 +57,25 @@ export async function deleteAccount(_prev: WithdrawState, formData: FormData): P
   await deleteMember(member.userId, member.username);
   revalidatePath("/", "layout");
   redirect("/");
+}
+
+export type PhotoState = { error: string } | { message: string } | null;
+
+/** 프로필 사진 바꾸기 (BLOG-03): 화면이 `/api/uploads`로 올린 사진의 키를 받는다 */
+export async function saveProfilePhoto(formData: FormData): Promise<PhotoState> {
+  const member = await requireMember();
+  const key = formData.get("key");
+  if (typeof key !== "string" || !KEY_PATTERN.test(key)) return { error: PHOTO_ERRORS.invalid };
+  const error = await setProfilePhoto(member.userId, key);
+  if (error) return { error };
+  revalidatePath("/", "layout");
+  return { message: PHOTO_ERRORS.saved };
+}
+
+/** 프로필 사진 지우기 */
+export async function deleteProfilePhoto(): Promise<PhotoState> {
+  const member = await requireMember();
+  await removeProfilePhoto(member.userId);
+  revalidatePath("/", "layout");
+  return { message: PHOTO_ERRORS.removed };
 }

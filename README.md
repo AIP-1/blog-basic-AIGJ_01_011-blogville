@@ -34,6 +34,7 @@
 | `specs/027-session-keep/` | 로그인 유지 7일 연장(SessionKeeper)·만료 세션과 로그인 실패 기록 정리의 spec·plan·tasks |
 | `specs/028-char-count/` | 글쓰기 아래 실시간 글자 수 `N자`의 spec·plan·tasks |
 | `specs/029-admin-password-reset/` | 관리자 회원 찾기·비밀번호 초기화의 spec·plan·tasks |
+| `specs/030-profile-photo/` | 👤 내 정보 프로필 사진 올리기·지우기, 블로그 홈 머리글 사진의 spec·plan·tasks |
 | `src/` | Next.js 16 앱 |
 
 ## 실행

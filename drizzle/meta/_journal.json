@@ -78,6 +78,13 @@
       "when": 1791785914430,
       "tag": "0010_follows_favorite",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791791581080,
+      "tag": "0011_profile_photo",
+      "breakpoints": true
     }
   ]
 }
