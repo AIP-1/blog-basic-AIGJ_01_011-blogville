@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import { Pagination } from "@/components/blog/Pagination";
 import { parsePage } from "@/lib/ids";
-import { NOTIFICATION_EMPTY, NOTIFICATIONS_PAGE_SIZE, notificationText, notificationTime } from "@/lib/notifications";
+import { levelUpText, NOTIFICATION_EMPTY, NOTIFICATIONS_PAGE_SIZE, notificationText, notificationTime } from "@/lib/notifications";
 import { requireMember } from "@/server/dal";
 import { countUnreadNotifications, listNotifications } from "@/server/notifications";
 import { markAllNotificationsRead, openNotification } from "./actions";
 
 export const metadata: Metadata = { title: "알림함 | Blogville" };
 
-// 알림함 (GAME-08): 내 글에 달린 공감·댓글, 내 댓글에 달린 답글. 최신순 20개씩.
+// 알림함 (GAME-08): 내 글에 달린 공감·댓글, 내 댓글에 달린 답글, 레벨업(GAME-06). 최신순 20개씩.
 export default async function NotificationsPage({ searchParams }: PageProps<"/notifications">) {
   const member = await requireMember();
   const page = parsePage((await searchParams).page);
@@ -41,10 +41,11 @@ export default async function NotificationsPage({ searchParams }: PageProps<"/no
                   type="submit"
                   className={`flex min-h-11 w-full flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-4 py-3 text-left hover:bg-ink/5 ${n.read ? "" : "bg-[#fff3d6] font-bold"}`}
                   data-notification={n.read ? "read" : "unread"}
+                  data-kind={n.kind}
                 >
                   <span className="min-w-0 break-words">
                     {!n.read && <span className="sr-only">안 읽음, </span>}
-                    {notificationText(n.kind, n.nickname, n.postTitle)}
+                    {n.kind === "level_up" ? levelUpText(n.level) : notificationText(n.kind, n.nickname, n.postTitle)}
                   </span>
                   <time className="shrink-0 text-sm font-normal text-ink-soft" dateTime={n.createdAt.toISOString()}>
                     {notificationTime(n.createdAt, now)}

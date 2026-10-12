@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { PASSWORD, signIn, signUpOk, sql, writePost } from "./helpers";
 
 // 블로그 관리 방문자 카드(BLOG-06)·카테고리 글 수(BLOG-05), 비밀번호 바꾸기·헤더 내 정보, specs/015-settings-visits-password

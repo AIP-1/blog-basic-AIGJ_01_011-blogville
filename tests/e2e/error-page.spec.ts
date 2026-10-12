@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { signUpOk, sql } from "./helpers";
 
 // 오류 화면 `잠깐 문제가 생겼어요`의 [다시 시도]와 루트 오류 화면 (NF-19, 화면 목록), specs/020-error-retry

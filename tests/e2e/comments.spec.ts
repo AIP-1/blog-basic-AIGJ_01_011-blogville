@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Browser, type Locator, type Page } from "./fixtures";
 import { signUpOk, sql, writePost } from "./helpers";
 
 async function member(browser: Browser) {

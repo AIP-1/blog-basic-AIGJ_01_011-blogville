@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { PASSWORD, signIn, signUp, signUpOk, sql, writePost } from "./helpers";
 
 // 회원 탈퇴 (AUTH-06, specs/011-withdraw)

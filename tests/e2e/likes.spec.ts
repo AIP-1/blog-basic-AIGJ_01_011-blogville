@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { signUpOk, sql, writePost } from "./helpers";
 
 // 공감 (SOC-03, specs/007-likes)

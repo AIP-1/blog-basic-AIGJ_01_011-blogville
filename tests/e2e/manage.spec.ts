@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { insertPosts, signUpOk, sql, writePost } from "./helpers";
 
 // 주인 도구 막대·글 관리 (BLOG-08, specs/006-post-manager)

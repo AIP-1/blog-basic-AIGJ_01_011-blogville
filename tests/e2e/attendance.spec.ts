@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { signUpOk, sql } from "./helpers";
 
 // 자동 출석 (GAME-04), specs/033-attendance

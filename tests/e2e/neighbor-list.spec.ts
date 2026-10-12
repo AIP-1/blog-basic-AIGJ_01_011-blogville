@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Browser, type Page } from "./fixtures";
 import { signUpOk, sql } from "./helpers";
 
 // 이웃 새 글 위 내 이웃 목록과 이웃 취소 (SOC-04 열린 질문의 제안), specs/018-neighbor-list

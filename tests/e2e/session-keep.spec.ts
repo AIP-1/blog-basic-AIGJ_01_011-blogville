@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { expect, test, type BrowserContext } from "@playwright/test";
+import { expect, test, type BrowserContext } from "./fixtures";
 import { PASSWORD, signIn, signUpOk, sql, uid } from "./helpers";
 
 // [로그인 상태 유지] 7일 연장(SessionKeeper)·남은 dont_remember 쿠키·만료 세션과 실패 기록 정리 (AUTH-09, NF-26), specs/027-session-keep

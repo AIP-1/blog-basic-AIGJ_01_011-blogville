@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { PASSWORD, signIn, signUpOk, sql, writePost } from "./helpers";
 
 // 임시 저장 (POST-08, specs/009-drafts)

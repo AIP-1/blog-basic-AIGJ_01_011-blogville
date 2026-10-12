@@ -38,6 +38,7 @@
 | `specs/031-points-levels/` | 경험치·레벨·코인 원장, 글·댓글·공감 보상, 헤더 Lv·🪙, 📒 내역 화면의 spec·plan·tasks |
 | `specs/032-pixel-characters/` | 가입 때 도트 캐릭터 고르기, 헤더·블로그 홈 캐릭터의 spec·plan·tasks |
 | `specs/033-attendance/` | 자동 출석·7일 보상표·📮 출석 체크 화면의 spec·plan·tasks |
+| `specs/034-level-up/` | 레벨업 알림·가운데 팝업·알림함 레벨업 줄의 spec·plan·tasks |
 | `src/` | Next.js 16 앱 |
 
 ## 실행

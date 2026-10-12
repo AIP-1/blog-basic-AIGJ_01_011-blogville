@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Browser, type Page } from "./fixtures";
 import { signUpOk, sql, writePost } from "./helpers";
 
 // 알림함과 헤더 🔔 (GAME-08의 공감·댓글·답글), specs/017-notifications
@@ -13,6 +13,8 @@ async function member(browser: Browser, viewport?: { width: number; height: numb
 
 const bell = (page: Page) => page.getByRole("navigation", { name: "메뉴" }).getByRole("link", { name: /^알림/ });
 const badge = (page: Page) => bell(page).locator("[data-unread]");
+/** 댓글 보상 등으로 생긴 레벨업 알림 (GAME-06) 지우기 */
+const clearLevelUps = (userId: string) => sql`delete from notifications where user_id = ${userId} and kind = 'level_up'`;
 const rows = (page: Page) => page.getByRole("list", { name: "알림" }).getByRole("listitem");
 const section = (page: Page) => page.locator("#comments");
 
@@ -113,6 +115,8 @@ test.describe("GAME-08 알림", () => {
     expect(await kindsFor(a.userId)).toEqual([`reply:${b.username}`, `reply:${owner.username}`]);
     expect(await kindsFor(b.userId)).toEqual([]);
 
+    // 댓글 보상으로 오른 레벨업 알림(GAME-06)은 이 시험과 관계없어 지운다
+    await clearLevelUps(a.userId);
     await a.page.goto("/notifications");
     await expect(rows(a.page)).toHaveCount(2);
     await expect(rows(a.page).nth(0)).toContainText(`💬 ${owner.username}님이 내 댓글에 답글을 달았어요`);
@@ -209,6 +213,7 @@ test.describe("GAME-08 알림", () => {
 
     // 주인이 글을 비공개로 바꾸면 에이에게는 그 글의 답글 알림이 보이지 않는다
     await sql`update posts set is_public = false where id = ${keep}`;
+    await clearLevelUps(a.userId);
     await a.page.goto("/notifications");
     await expect(a.page.getByText("아직 알림이 없어요")).toBeVisible();
     await expect(badge(a.page)).toHaveCount(0);

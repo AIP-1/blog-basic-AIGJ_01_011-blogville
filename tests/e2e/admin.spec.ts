@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { signUpOk, sql, uid, writePost } from "./helpers";
 
 // 관리자 (AUTH-08, specs/012-admin)

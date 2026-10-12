@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { signUpOk, sql } from "./helpers";
 
 // 마을 소식 1페이지 `🏡 블로그 둘러보기` (SOC-05 열린 질문의 제안), specs/025-blog-browse

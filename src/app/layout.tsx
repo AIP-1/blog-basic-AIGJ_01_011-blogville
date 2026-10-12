@@ -4,12 +4,13 @@ import { HeaderLoginLink } from "@/components/auth/HeaderLoginLink";
 import { SessionKeeper } from "@/components/auth/SessionKeeper";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { AttendanceDayWatcher } from "@/components/game/AttendanceDayWatcher";
+import { LevelUpDialog } from "@/components/game/LevelUpDialog";
 import { PixelCharacter } from "@/components/game/PixelCharacter";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { getMyBlog, getSession } from "@/server/dal";
 import { formatNumber } from "@/lib/game";
 import { todayKST } from "@/lib/kst";
-import { countUnreadNotifications } from "@/server/notifications";
+import { countUnreadNotifications, getPendingLevelUp } from "@/server/notifications";
 import { ensureTodayAttendance } from "@/server/attendance";
 import { getCharacter } from "@/server/items";
 import { getWallet } from "@/server/points";
@@ -33,9 +34,15 @@ async function Header() {
   const member = await getSession();
   // 헤더의 코인·레벨이 출석 보상까지 반영되게 먼저 한다
   if (member) await attendToday(member.userId, member.sessionId);
-  const [blog, unread, wallet, character] = member
-    ? await Promise.all([getMyBlog(member.userId), countUnreadNotifications(member.userId), getWallet(member.userId), getCharacter(member.userId)])
-    : [null, 0, null, null];
+  const [blog, unread, wallet, character, levelUp] = member
+    ? await Promise.all([
+        getMyBlog(member.userId),
+        countUnreadNotifications(member.userId),
+        getWallet(member.userId),
+        getCharacter(member.userId),
+        getPendingLevelUp(member.userId),
+      ])
+    : [null, 0, null, null, null];
   return (
     <header className="border-b border-line bg-surface">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-2 px-4 py-2">
@@ -84,6 +91,8 @@ async function Header() {
               <SignOutButton userId={member.userId} />
               {member.rememberMe && <SessionKeeper />}
               <AttendanceDayWatcher day={todayKST()} />
+              {/* 안 읽은 레벨업이 있으면 가운데 팝업 (GAME-06) */}
+              <LevelUpDialog pending={{ level: levelUp }} />
             </>
           )}
           {!member && <HeaderLoginLink />}

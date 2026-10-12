@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { signUpOk, sql } from "./helpers";
 
 // 에디터 도구 모음 (POST-01 에디터 도구, NF-18 초점), specs/019-editor-toolbar

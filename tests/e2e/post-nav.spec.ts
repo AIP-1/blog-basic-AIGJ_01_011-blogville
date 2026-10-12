@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { signUpOk, sql } from "./helpers";
 
 // 글 상세 이전 글·다음 글, 블로그 이름 링크, 비공개 글 탭 제목 (POST-05, BLOG-02, POST-02), specs/016-post-nav

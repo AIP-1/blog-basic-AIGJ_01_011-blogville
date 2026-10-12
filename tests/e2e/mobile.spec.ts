@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { signUpOk } from "./helpers";
 
 test("375px: 가로 스크롤 없음, 버튼은 44px 이상 (NF-06)", async ({ page }) => {
