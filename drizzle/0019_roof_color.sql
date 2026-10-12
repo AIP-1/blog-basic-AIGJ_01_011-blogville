@@ -1,0 +1,2 @@
+ALTER TABLE "blogs" ADD COLUMN "roof_color" text;--> statement-breakpoint
+ALTER TABLE "blogs" ADD CONSTRAINT "blogs_roof_color_check" CHECK ("blogs"."roof_color" in ('red', 'orange', 'yellow', 'green', 'sky', 'blue', 'purple', 'brown', 'pink', 'mint'));

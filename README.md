@@ -45,6 +45,7 @@
 | `specs/038-town/` | 마을 광장(캔버스 마을 걷기·건물 들어가기·이웃집·집 단계 그림)의 spec·plan·tasks |
 | `specs/039-town-menu/` | 마을 ☰ 메뉴(프로필·알림·텔레포트·친구 목록), 로그인하면 마을, 첫 마을 환영의 spec·plan·tasks |
 | `specs/040-phone-tabs/` | 휴대폰 회원 아래 탭과 휴대폰 ☰ 메뉴 화면의 spec·plan·tasks |
+| `specs/041-roof-color/` | 우리 집 지붕 색 고르기(10색, 단계마다 열림)와 마을 지붕의 spec·plan·tasks |
 | `src/` | Next.js 16 앱 |
 
 ## 실행

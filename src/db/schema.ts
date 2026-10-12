@@ -242,6 +242,8 @@ export const blogs = pgTable(
     intro: text("intro").notNull().default(""),
     // 미니룸 배경 (SHOP-04): 가진 배경만 (복합 외래 키)
     backgroundItemId: integer("background_item_id"),
+    // 마을의 내 집 지붕 색 (TOWN-07). NULL이면 이 블로그 색 순서의 첫 색 (src/lib/roof.ts)
+    roofColor: text("roof_color"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -258,6 +260,10 @@ export const blogs = pgTable(
       sql`char_length(${t.title}) between 1 and 40 and ${t.title} = btrim(${t.title})`,
     ),
     check("blogs_intro_check", sql`char_length(${t.intro}) <= 160`),
+    check(
+      "blogs_roof_color_check",
+      sql`${t.roofColor} in ('red', 'orange', 'yellow', 'green', 'sky', 'blue', 'purple', 'brown', 'pink', 'mint')`,
+    ),
   ],
 );
 

@@ -9,6 +9,7 @@ import { PostCard } from "@/components/blog/PostCard";
 import { Miniroom } from "@/components/game/Miniroom";
 import { HouseRoom } from "@/components/house/HouseRoom";
 import { houseInfo } from "@/lib/house";
+import { currentRoof, roofOrder, unlockedRoofCount } from "@/lib/roof";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { parseSearchQuery, parseTagFilter, SEARCH_EMPTY, TOWN_SEARCH_EMPTY, TOWN_SEARCH_NONE } from "@/lib/blog-search";
 import { parseId, parsePage } from "@/lib/ids";
@@ -80,6 +81,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
     getPlacedFurniture(blog.ownerId),
     isOwner ? getOwnedFurniture(blog.ownerId) : null,
   ]);
+  const house = houseInfo(ownerWallet.progress.level);
   const filterQuery: Record<string, string> = {};
   if (town) filterQuery.q = town;
   else if (search) filterQuery.s = search;
@@ -162,7 +164,14 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
         )}
       </header>
 
-      <HouseRoom slug={blog.slug} welcome={isOwner && query.welcome === "1"} info={houseInfo(ownerWallet.progress.level)} placed={placed} owned={owned} />
+      <HouseRoom
+        slug={blog.slug}
+        welcome={isOwner && query.welcome === "1"}
+        info={house}
+        placed={placed}
+        owned={owned}
+        roof={isOwner ? { current: currentRoof(blog.id, blog.roofColor), order: roofOrder(blog.id), unlocked: unlockedRoofCount(house.stage) } : null}
+      />
 
       <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_260px] lg:grid-cols-[minmax(0,1fr)_300px]">
         <section aria-labelledby="list-title" className="min-w-0">
