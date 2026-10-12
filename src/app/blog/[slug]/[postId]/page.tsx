@@ -34,7 +34,7 @@ export async function generateMetadata({ params }: PageProps<"/blog/[slug]/[post
   const { slug, postId } = await params;
   const data = await load(slug, postId);
   if (!data) return { title: "길을 잃었어요 | Blogville" };
-  // 비공개 글은 주인이 봐도 제목을 탭·기록에 남기지 않는다 (POST-03)
+  // 비공개 글은 주인이 봐도 제목을 탭·기록에 남기지 않는다 (POST-02)
   return { title: data.post.isPublic ? `${data.post.title} | ${data.blog.title}` : "글 | Blogville" };
 }
 
@@ -54,7 +54,7 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]/[post
 
   return (
     <article className="mx-auto max-w-3xl rounded-2xl border border-line bg-surface p-5 md:p-8">
-      <Link href={`/@${blog.slug}`} className="-ml-1 inline-flex min-h-11 max-w-full items-center px-1 font-semibold text-ink-soft hover:text-ink" data-blog-link>
+      <Link href={`/@${blog.slug}`} className="-ml-1 flex min-h-11 w-fit max-w-full items-center px-1 font-semibold text-ink-soft hover:text-ink" data-blog-link>
         <span className="truncate">📖 {blog.title}</span>
       </Link>
       <CategoryBadge categoryName={categoryName} subcategoryName={subcategoryName} href={categoryHref} />

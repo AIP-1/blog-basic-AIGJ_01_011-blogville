@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { signUpOk, sql } from "./helpers";
 
-// 글 상세 이전 글·다음 글, 블로그 이름 링크, 비공개 글 탭 제목 (POST-05, POST-03), specs/016-post-nav
+// 글 상세 이전 글·다음 글, 블로그 이름 링크, 비공개 글 탭 제목 (POST-05, BLOG-02, POST-02), specs/016-post-nav
 test.describe.configure({ timeout: 60_000 });
 
 /** 같은 시각(마이크로초까지)에 글을 차례로 넣고 [id] — 30일 전이라 다른 시험의 목록 첫 쪽에 끼지 않는다 */
@@ -75,12 +75,17 @@ test.describe("블로그 이름 링크·탭 제목", () => {
     const owner = await signUpOk(page);
     const [{ title: blogTitle }] = await sql`select b.title from blogs b join users u on u.id = b.owner_id where u.username = ${owner}`;
     const [pub, priv] = await insertSameTime(owner, [{ title: "공개 글" }, { title: "숨긴 글", isPublic: false }]);
+    await sql`update posts set category_id = (select c.id from categories c where c.blog_id = posts.blog_id and c.name = '일상') where id = ${pub}`;
 
     await page.goto(`/@${owner}/${pub}`);
     await expect(page).toHaveTitle(`공개 글 | ${blogTitle}`);
     const blogLink = page.locator("article [data-blog-link]");
     await expect(blogLink).toHaveText(`📖 ${blogTitle}`);
-    expect((await blogLink.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    const box = (await blogLink.boundingBox())!;
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    // 블로그 이름은 카테고리 배지 위 자기 줄에
+    const badge = (await page.locator("article").getByRole("link", { name: "일상", exact: true }).boundingBox())!;
+    expect(badge.y).toBeGreaterThanOrEqual(box.y + box.height - 1);
     await blogLink.click();
     await expect(page).toHaveURL(new RegExp(`/@${owner}$`));
 
@@ -89,7 +94,9 @@ test.describe("블로그 이름 링크·탭 제목", () => {
     await expect(page).toHaveTitle("글 | Blogville");
 
     await page.goto(`/@${owner}?s=${encodeURIComponent("공개")}`);
-    await page.getByRole("heading", { level: 1 }).getByRole("link", { name: blogTitle }).click();
+    const homeLink = page.getByRole("heading", { level: 1 }).getByRole("link", { name: blogTitle });
+    expect((await homeLink.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await homeLink.click();
     await expect(page).toHaveURL(new RegExp(`/@${owner}$`));
   });
 });
