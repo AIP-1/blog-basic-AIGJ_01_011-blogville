@@ -1,6 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { signUpOk, writePost } from "./helpers";
 
+// 글 두 개를 쓰고 카테고리를 지우는 시험은 혼자 돌려도 30초 가까이 걸린다
+test.describe.configure({ timeout: 60_000 });
+
 async function addCategory(page: Page, name: string) {
   await page.getByLabel("새 카테고리 이름").fill(name);
   await page.getByLabel("새 카테고리 이름").press("Enter");
