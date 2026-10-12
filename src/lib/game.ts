@@ -37,7 +37,7 @@ export function levelsGained(before: number, after: number): number[] {
 /** 보상 사유 */
 export type RewardReason = "signup" | "attendance" | "post" | "comment" | "like_received" | "farm_care";
 /** 원장 사유 (`point_ledger.reason`): 보상, 상점 구매(SHOP-01)·알 사기(TOWN-09)는 코인만 줄어든다, 다 키운 동물 보상 */
-export type LedgerReason = RewardReason | "purchase" | "farm_grown" | "egg_purchase";
+export type LedgerReason = RewardReason | "purchase" | "farm_grown" | "egg_purchase" | "growth_purchase";
 
 /** 보상 규칙 표 (GAME-05). 하루는 한국 시간 0시 기준. 출석은 일차별 표(`attendance_rewards`)라 여기 없다 */
 export const REWARD_RULES: Record<Exclude<RewardReason, "attendance">, { exp: number; coin: number; dailyLimit: number }> = {
@@ -68,6 +68,7 @@ export const REASON_LABEL: Record<LedgerReason, string> = {
   farm_care: "🐮 동물 돌보기",
   farm_grown: "🏅 동물 다 키움",
   egg_purchase: "🥚 알 사기",
+  growth_purchase: "🌱 성장 아이템 구매",
 };
 
 /** 내역 한 페이지 줄 수 */

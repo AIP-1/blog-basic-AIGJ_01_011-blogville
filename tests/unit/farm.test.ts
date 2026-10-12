@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { animalStage, FARM_ERRORS, grownMessage, levelEggs, pickSpecies, SPECIES, SPECIES_CODES } from "@/lib/farm";
+import { animalStage, FARM_ERRORS, feedMessage, grownMessage, levelEggs, pickSpecies, SPECIES, SPECIES_CODES } from "@/lib/farm";
 import { findArt } from "@/lib/art";
 
 describe("동물 농장 규칙 (TOWN-09)", () => {
@@ -37,9 +37,10 @@ describe("동물 농장 규칙 (TOWN-09)", () => {
     expect(grownMessage("calf")).toBe("🎉 송아지가 다 자랐어요! 경험치 +160, 🪙 +80");
     expect(FARM_ERRORS.cared("feed")).toBe("오늘은 이미 밥 주기를 했어요");
     expect(FARM_ERRORS.coins(30)).toBe("코인이 30개 부족해요");
+    expect(feedMessage("동물 먹이", 20)).toBe("🌱 동물 먹이 먹였어요! 성장 +20");
   });
-  it("알과 동물 4종은 16×16 그림이 있다", () => {
-    for (const key of ["animal.egg", ...SPECIES_CODES.map((c) => `animal.${c}`)]) {
+  it("알과 동물 4종, 성장 아이템 3종은 16×16 그림이 있다", () => {
+    for (const key of ["animal.egg", ...SPECIES_CODES.map((c) => `animal.${c}`), "growth.feed", "growth.feed_plus", "growth.booster"]) {
       const art = findArt(key)!;
       expect(art.rows).toHaveLength(16);
       for (const row of art.rows) {

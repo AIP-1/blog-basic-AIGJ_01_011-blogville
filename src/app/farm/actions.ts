@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { FARM_ERRORS, isCareAction } from "@/lib/farm";
 import { parseId } from "@/lib/ids";
 import { requireMember } from "@/server/dal";
-import { buyEgg, careAnimal, claimEgg, hatchEgg, type FarmResult } from "@/server/farm";
+import { buyEgg, careAnimal, claimEgg, feedGrowthItem, hatchEgg, type FarmResult } from "@/server/farm";
 
 // 동물 농장 (TOWN-09). 버튼 하나가 폼 하나다. 화면 버튼을 우회해도 서버가 다시 확인한다.
 
@@ -16,7 +16,7 @@ function done(result: FarmResult): FarmState {
   return { ok: true, message: result.message };
 }
 
-/** `intent`: `claim`(egg = "first" | 레벨), `buy`, `hatch`(id), `care`(id, action) */
+/** `intent`: `claim`(egg = "first" | 레벨), `buy`, `hatch`(id), `care`(id, action), `feed`(id, item) */
 export async function farmAction(_prev: FarmState, formData: FormData): Promise<FarmState> {
   const member = await requireMember();
   const intent = formData.get("intent");
@@ -33,6 +33,12 @@ export async function farmAction(_prev: FarmState, formData: FormData): Promise<
     const action = formData.get("action");
     if (id === null || !isCareAction(action)) return { ok: false, message: FARM_ERRORS.notAnimal };
     return done(await careAnimal(member.userId, id, action));
+  }
+  if (intent === "feed") {
+    const item = parseId(formData.get("item"));
+    if (id === null) return { ok: false, message: FARM_ERRORS.notFeedable };
+    if (item === null) return { ok: false, message: FARM_ERRORS.noItem };
+    return done(await feedGrowthItem(member.userId, id, item));
   }
   return { ok: false, message: FARM_ERRORS.notAnimal };
 }

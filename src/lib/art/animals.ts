@@ -1,6 +1,7 @@
 import type { PixelArt } from "./characters";
 
 // 농장 동물 (TOWN-09, specs/044-farm): 16×16 도트. 알 하나와 동물 4종. 아기·청소년·어른은 화면에서 크기로 나눈다.
+// 성장 아이템 3종(specs/045-growth-items)도 여기에 둔다.
 
 const OUTLINE = "#3b2a20";
 
@@ -109,5 +110,68 @@ export const ANIMAL_ART: Readonly<Record<string, PixelArt>> = {
       "..KK........KK..",
     ],
     palette: { K: OUTLINE, W: "#fbfaf6", B: "#4a3b30", E: "#2b2b2b", N: "#f2b8a2", H: "#e9d9a8" },
+  },
+  "growth.feed": {
+    rows: [
+      "................",
+      "................",
+      ".....KKKKKK.....",
+      "....KTTTTTTK....",
+      ".....KTKKTK.....",
+      "....KSSSSSSK....",
+      "...KSSSSSSSSK...",
+      "...KSSGGGGSSK...",
+      "..KSSGYYYYGSSK..",
+      "..KSSGYYYYGSSK..",
+      "..KSSSGGGGSSSK..",
+      "..KSSSSSSSSSSK..",
+      "..KSSSSSSSSSSK..",
+      "...KSSSSSSSSK...",
+      "....KKKKKKKK....",
+      "................",
+    ],
+    palette: { K: OUTLINE, S: "#d9b98a", T: "#b8935f", G: "#7bc96f", Y: "#f4d35e" },
+  },
+  "growth.feed_plus": {
+    rows: [
+      "................",
+      ".......Y........",
+      ".....KKKKKK.....",
+      "....KTTTTTTK....",
+      ".....KTKKTK.....",
+      "....KSSSSSSK....",
+      "...KSSSSSSSSK...",
+      "...KSSRRRRSSK...",
+      "..KSSRYYYYRSSK..",
+      "..KSSRYWWYRSSK..",
+      "..KSSSRRRRSSSK..",
+      "..KSSSSSSSSSSK..",
+      "..KSSSSSSSSSSK..",
+      "...KSSSSSSSSK...",
+      "....KKKKKKKK....",
+      "................",
+    ],
+    palette: { K: OUTLINE, S: "#f2d16b", T: "#c9a227", R: "#e74c3c", Y: "#fff6e0", W: "#ffffff" },
+  },
+  "growth.booster": {
+    rows: [
+      "................",
+      "......KKKK......",
+      "......KCCK......",
+      "......KCCK......",
+      ".....KKKKKK.....",
+      "......KGGK......",
+      "......KGGK......",
+      ".....KGGGGK.....",
+      "....KGGWGGGK....",
+      "...KGGWGGGGGK...",
+      "...KGGGGGGGGK...",
+      "...KGGGGGGPGK...",
+      "...KGGGGGPGGK...",
+      "....KGGGGGGK....",
+      ".....KKKKKK.....",
+      "................",
+    ],
+    palette: { K: OUTLINE, C: "#a0703c", G: "#7d5fff", W: "#e6deff", P: "#ff7ad9" },
   },
 };

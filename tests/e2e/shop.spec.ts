@@ -20,17 +20,18 @@ async function member(browser: Browser) {
 }
 
 test.describe("SHOP-01·02·03 마을 상점", () => {
-  test("구역 세 개, 기본 아이템·캐릭터는 없고, 밀짚모자를 사면 안내·보유 중·코인 50이 준다", async ({ browser }) => {
+  test("구역 네 개, 기본 아이템·캐릭터는 없고, 밀짚모자를 사면 안내·보유 중·코인 50이 준다", async ({ browser }) => {
     const { page, id } = await member(browser);
     await page.getByRole("link", { name: "마을 상점" }).click();
     await expect(page).toHaveURL(/\/shop$/);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("🏪 마을 상점");
     await expect(page.locator("[data-shop-wallet]")).toHaveText("Lv.1 🪙 110");
-    await expect(page.locator("[data-shop-section] h2")).toHaveText(["👕 아바타 꾸미기", "🪑 가구", "🖼 배경"]);
+    await expect(page.locator("[data-shop-section] h2")).toHaveText(["👕 아바타 꾸미기", "🪑 가구", "🖼 배경", "🌱 성장 아이템"]);
     for (const name of ["남자 주민", "여자 주민"]) await expect(card(page, name)).toHaveCount(0);
     await expect(page.locator('[data-shop-section="avatar"] [data-item]')).toHaveCount(9);
     await expect(page.locator('[data-shop-section="furniture"] [data-item]')).toHaveCount(6);
     await expect(page.locator('[data-shop-section="background"] [data-item]')).toHaveCount(5);
+    await expect(page.locator('[data-shop-section="growth"] [data-item] h3')).toHaveText(["동물 먹이", "고급 먹이", "성장 촉진제"]);
 
     // 레벨 부족·코인 부족도 목록에는 보인다 (SHOP-02)
     await expect(card(page, "털모자").getByRole("button")).toHaveText("🔒 Lv.2");
