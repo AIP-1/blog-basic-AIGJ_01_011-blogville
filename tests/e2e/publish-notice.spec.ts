@@ -17,14 +17,22 @@ test.describe("POST-01 발행 안내", () => {
     expect(top).toBeLessThan((await page.getByRole("heading", { level: 1, name: "발행 안내 글" }).boundingBox())!.y);
     await expect(page).toHaveURL(`/@${username}/${id}`);
 
-    await page.reload();
+    // 화면 안 링크로 옮겼다가 뒤로·앞으로 가도 (Next가 저장해 둔 화면을 다시 꺼내도) 다시 안 보인다
+    await page.getByRole("link", { name: "목록으로" }).click();
+    await expect(page).toHaveURL(`/@${username}`);
+    await page.goBack();
+    await expect(page).toHaveURL(`/@${username}/${id}`);
+    await expect(page.getByRole("heading", { level: 1, name: "발행 안내 글" })).toBeVisible();
+    await expect(notice(page)).toHaveCount(0);
+    await page.goBack();
+    await expect(page).toHaveURL("/write");
+    await page.goForward();
+    await expect(page).toHaveURL(`/@${username}/${id}`);
     await expect(page.getByRole("heading", { level: 1, name: "발행 안내 글" })).toBeVisible();
     await expect(notice(page)).toHaveCount(0);
 
-    // 뒤로 가기로 ?new=1 주소가 돌아오지 않는다 (지운 주소로 바꿔 두었다)
-    await page.goto(`/@${username}`);
-    await page.goBack();
-    await expect(page).toHaveURL(`/@${username}/${id}`);
+    await page.reload();
+    await expect(page.getByRole("heading", { level: 1, name: "발행 안내 글" })).toBeVisible();
     await expect(notice(page)).toHaveCount(0);
 
     // 고친 뒤에는 안내 없이 글로 돌아간다
@@ -54,6 +62,14 @@ test.describe("POST-01 발행 안내", () => {
     // 10분 안이면 주인이 다시 열어도 보인다 (명세 열린 질문대로 둔다), 10분이 지나면 없다
     await page.goto(`/@${username}/${id}?new=1`);
     await expect(notice(page)).toBeVisible();
+    await expect(page).toHaveURL(`/@${username}/${id}`);
+    // 처음 열 때 지운 주소도 Next 기록과 맞아, 다른 화면에 갔다가 뒤로 오면 그 글이 다시 그려진다
+    await page.getByRole("link", { name: "목록으로" }).click();
+    await expect(page).toHaveURL(`/@${username}`);
+    await page.goBack();
+    await expect(page).toHaveURL(`/@${username}/${id}`);
+    await expect(page.getByRole("heading", { level: 1, name: "남이 여는 글" })).toBeVisible();
+    await expect(notice(page)).toHaveCount(0);
     await sql`update posts set created_at = now() - interval '11 minutes' where id = ${id}`;
     await page.goto(`/@${username}/${id}?new=1`);
     await expect(page.getByRole("heading", { level: 1, name: "남이 여는 글" })).toBeVisible();
