@@ -75,7 +75,7 @@ test.describe("US1 가입·로그인·로그아웃", () => {
     expect(n).toBe(1);
   });
 
-  test("로그아웃하면 첫 화면, 로그인하면 내 블로그. 아이디는 대소문자·공백 무시", async ({ page }) => {
+  test("로그아웃하면 첫 화면, 로그인하면 마을. 아이디는 대소문자·공백 무시", async ({ page }) => {
     const username = await signUpOk(page);
     await page.getByRole("button", { name: "로그아웃" }).click();
     await expect(page).toHaveURL("/");
@@ -83,7 +83,7 @@ test.describe("US1 가입·로그인·로그아웃", () => {
     await expect(page).toHaveURL("/");
 
     await signIn(page, ` ${username.toUpperCase()} `);
-    await expect(page).toHaveURL(`/@${username}`);
+    await expect(page).toHaveURL("/town");
   });
 
   test("로그인 실패 문구는 하나, 5번 틀리면 6번째는 맞는 비밀번호도 잠금", async ({ page }) => {
@@ -106,7 +106,7 @@ test.describe("US1 가입·로그인·로그아웃", () => {
     // 5분이 지나면 풀린다
     await sql`update login_attempts set locked_until = now() - interval '1 second' where username = ${username}`;
     await signIn(page, username, PASSWORD);
-    await expect(page).toHaveURL(`/@${username}`);
+    await expect(page).toHaveURL("/town");
   });
 
   test("유지 안 함은 세션 쿠키 + 2시간, 유지는 7일 쿠키", async ({ page, context }) => {
@@ -123,7 +123,7 @@ test.describe("US1 가입·로그인·로그아웃", () => {
     await expect(page).toHaveURL("/");
 
     await signIn(page, username, PASSWORD, true);
-    await expect(page).toHaveURL(`/@${username}`);
+    await expect(page).toHaveURL("/town");
     const days = ((await session()).expires * 1000 - Date.now()) / 86_400_000;
     expect(days).toBeGreaterThan(6.9);
   });

@@ -82,12 +82,29 @@ function drawTag(ctx: CanvasRenderingContext2D, text: string, x: number, y: numb
  * 방향키·WASD·클릭으로 걷고, 입구 앞에서 Space·Enter(또는 건물 클릭)로 들어간다.
  * 시험용으로 캔버스에 발 위치 `data-feet`를 적고, `bv-teleport` 이벤트(`{x, y}`)로 옮길 수 있다.
  */
-export function TownGame({ houses, member, layers, name, start }: { houses: TownHouseInput[]; member: boolean; layers: string[]; name: string; start: Point }) {
+export function TownGame({
+  houses,
+  member,
+  layers,
+  name,
+  start,
+  startKey,
+}: {
+  houses: TownHouseInput[];
+  member: boolean;
+  layers: string[];
+  name: string;
+  start: Point;
+  /** 시작 자리를 고른 주소 값(`?at`). 같으면 다시 만들 때 서 있던 자리를 이어 쓴다 */
+  startKey: string;
+}) {
   const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // 즐겨찾기를 바꿔 집 목록이 다시 오면 게임을 다시 만들되 서 있던 자리는 그대로 (TOWN-12 친구 목록)
+  const lastPos = useRef<{ from: string; pos: Point } | null>(null);
   const [prompt, setPrompt] = useState<string | null>(null);
   const [touch, setTouch] = useState(false);
-  const data = JSON.stringify({ houses, member, layers, name, start });
+  const data = JSON.stringify({ houses, member, layers, name, start, startKey });
   // 창 폭이 휴대폰 조건을 넘나들면 게임을 끄고 다시 만든다
   const phone = useSyncExternalStore(
     subscribePhone,
@@ -98,12 +115,13 @@ export function TownGame({ houses, member, layers, name, start }: { houses: Town
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || phone) return;
-    const { houses, member, layers, name, start } = JSON.parse(data) as {
+    const { houses, member, layers, name, start, startKey } = JSON.parse(data) as {
       houses: TownHouseInput[];
       member: boolean;
       layers: string[];
       name: string;
       start: Point;
+      startKey: string;
     };
     setTouch(window.matchMedia("(pointer: coarse)").matches);
     const ctx = canvas.getContext("2d")!;
@@ -115,7 +133,9 @@ export function TownGame({ houses, member, layers, name, start }: { houses: Town
     const player = playerArts.length > 0 ? bake(playerArts, PLAYER_SIZE / 16) : null;
     const ground = bakeGround();
 
-    let pos: Point = { ...start };
+    // 시작 자리(?at)가 바뀌었으면 새 자리에서. 환영(?welcome)을 주소에서 지운 뒤 다시 그려도 자리는 그대로
+    const from = startKey;
+    let pos: Point = lastPos.current?.from === from ? lastPos.current.pos : { ...start };
     let target: Point | null = null;
     let enterNext = false;
     let facingLeft = false;
@@ -301,6 +321,7 @@ export function TownGame({ houses, member, layers, name, start }: { houses: Town
         drawTag(ctx, s.label, x, y, s.id === "house:0", s.sub);
       }
       drawTag(ctx, name, pos.x - camera.x, pos.y - camera.y - PLAYER_SIZE - bob, true);
+      lastPos.current = { from, pos };
       if (frame++ % 3 === 0) canvas.dataset.feet = `${Math.round(pos.x)},${Math.round(pos.y)}`;
       raf = requestAnimationFrame(tick);
     };
@@ -328,7 +349,7 @@ export function TownGame({ houses, member, layers, name, start }: { houses: Town
       />
       <p
         role="status"
-        className={`pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-black/75 px-4 py-2 text-sm font-semibold text-white ${prompt ? "" : "hidden"}`}
+        className={`pointer-events-none absolute left-1/2 top-16 -translate-x-1/2 rounded-full bg-black/75 px-4 py-2 text-sm font-semibold text-white ${prompt ? "" : "hidden"}`}
         data-town-prompt
       >
         {prompt}

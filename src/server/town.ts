@@ -6,6 +6,12 @@ import { roofColor } from "@/lib/art/town";
 import { levelFromExp } from "@/lib/game";
 import { houseStage } from "@/lib/house";
 import { NOTICE_SLUG } from "@/lib/names";
+import { levelUpText, notificationText, notificationTime } from "@/lib/notifications";
+import { getMyBlog, getNickname } from "./dal";
+import { listMyNeighbors } from "./follows";
+import { getAvatar } from "./items";
+import { countUnreadNotifications, listNotifications } from "./notifications";
+import { getWallet } from "./points";
 
 /** 마을 길가의 집 하나 (TOWN-04). `lot`은 집 자리 번호(0은 내 집) */
 export type TownHouse = {
@@ -102,3 +108,43 @@ export async function getGuestHouses(): Promise<TownHouse[]> {
     .limit(NEIGHBOR_HOUSES);
   return rows.map((r, i) => toHouse(r, i + 1, false));
 }
+
+export type HudNotification = { id: number; text: string; time: string; read: boolean };
+
+/** ☰ 메뉴에 보일 회원 정보 (TOWN-12): 지갑·안 읽은 수·최근 알림 5개·이웃 목록. 페이지를 열 때 한 번 읽는다 */
+export async function getHudMember(userId: string) {
+  const now = new Date();
+  const [wallet, unread, recent, neighbors, blog, avatar, nickname] = await Promise.all([
+    getWallet(userId),
+    countUnreadNotifications(userId),
+    listNotifications(userId, 1),
+    listMyNeighbors(userId),
+    getMyBlog(userId),
+    getAvatar(userId),
+    getNickname(userId),
+  ]);
+  const notifications: HudNotification[] = recent.items.slice(0, HUD_NOTIFICATIONS).map((n) => ({
+    id: n.id,
+    text: n.kind === "level_up" ? levelUpText(n.level) : notificationText(n.kind, n.nickname, n.postTitle),
+    time: notificationTime(n.createdAt, now),
+    read: n.read,
+  }));
+  return {
+    nickname,
+    layers: avatar.layers,
+    blog: { slug: blog.slug, title: blog.title },
+    level: wallet.progress.level,
+    coin: wallet.coin,
+    exp: { current: wallet.progress.current, needed: wallet.progress.needed, ratio: wallet.progress.ratio, isMax: wallet.progress.isMax },
+    unread,
+    notifications,
+    neighbors: neighbors.items.map((n) => ({ userId: n.userId, slug: n.slug, nickname: n.nickname, blogTitle: n.blogTitle, isFavorite: n.isFavorite, isNotice: n.isNotice })),
+    neighborTotal: neighbors.total,
+    favorites: neighbors.favorites,
+  };
+}
+
+export type HudMember = Awaited<ReturnType<typeof getHudMember>>;
+
+/** ☰ 🔔 알림 창의 최근 알림 수 */
+export const HUD_NOTIFICATIONS = 5;

@@ -43,6 +43,7 @@
 | `specs/036-closet/` | 꾸미기(배경 걸기·모자·옷·소품 입기, 블로그 미니룸)의 spec·plan·tasks |
 | `specs/037-house/` | 우리 집(집 단계, 블로그 홈 가구 칸에 놓기·옮기기·비우기)의 spec·plan·tasks |
 | `specs/038-town/` | 마을 광장(캔버스 마을 걷기·건물 들어가기·이웃집·집 단계 그림)의 spec·plan·tasks |
+| `specs/039-town-menu/` | 마을 ☰ 메뉴(프로필·알림·텔레포트·친구 목록), 로그인하면 마을, 첫 마을 환영의 spec·plan·tasks |
 | `src/` | Next.js 16 앱 |
 
 ## 실행

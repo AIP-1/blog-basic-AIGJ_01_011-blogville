@@ -57,7 +57,7 @@ test.describe("AUTH-07 관리자 비밀번호 초기화", () => {
     await signIn(member, username, PASSWORD);
     await expect(member.locator("p[role=alert]")).toHaveText("아이디 또는 비밀번호가 맞지 않아요");
     await signIn(member, username, password);
-    await expect(member).toHaveURL(`/@${username}`);
+    await expect(member).toHaveURL("/town");
 
     // 내 정보에서 새 비밀번호로 바꾼다
     await member.goto("/settings/account");
@@ -69,7 +69,7 @@ test.describe("AUTH-07 관리자 비밀번호 초기화", () => {
     await expect(form.getByRole("status")).toHaveText("비밀번호를 바꿨어요");
     const again = await browser.newPage();
     await signIn(again, username, "newpass123");
-    await expect(again).toHaveURL(`/@${username}`);
+    await expect(again).toHaveURL("/town");
   });
 
   test("없는 아이디·관리자는 초기화가 없고, 조작해도 관리자 계정은 거절, 일반 회원이 같은 요청을 보내면 404이고 그대로다", async ({ page, browser }) => {

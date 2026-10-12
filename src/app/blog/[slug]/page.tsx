@@ -103,7 +103,11 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
       {isOwner && query.welcome === "1" && (
         <section className="rounded-2xl border border-accent/40 bg-accent/5 p-4" aria-label="환영">
           <p className="font-semibold">🎉 {nickname}님, Blogville에 오신 걸 환영해요!</p>
-          <p className="mt-1 text-ink-soft">여기는 {nickname}님의 블로그예요. 첫 글을 써 보세요.</p>
+          <p className="mt-1 text-ink-soft">
+            여기는 {nickname}님의 블로그이자 집 안이에요. 첫 글을 써 보세요.
+            {/* 휴대폰에는 마을이 없다 (TOWN-01) */}
+            <span className="max-sm:hidden"> 아래 우리 집의 🚪 밖으로를 눌러 마을을 구경해 보세요.</span>
+          </p>
         </section>
       )}
 
@@ -157,7 +161,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
         )}
       </header>
 
-      <HouseRoom slug={blog.slug} info={houseInfo(ownerWallet.progress.level)} placed={placed} owned={owned} />
+      <HouseRoom slug={blog.slug} welcome={isOwner && query.welcome === "1"} info={houseInfo(ownerWallet.progress.level)} placed={placed} owned={owned} />
 
       <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_260px] lg:grid-cols-[minmax(0,1fr)_300px]">
         <section aria-labelledby="list-title" className="min-w-0">

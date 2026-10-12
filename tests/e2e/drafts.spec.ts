@@ -113,7 +113,9 @@ test.describe("POST-08 임시 저장", () => {
     // A로 다시 로그인해 로그아웃하면 A의 임시 글이 지워진다
     await page.context().clearCookies();
     await signIn(page, a, PASSWORD);
-    await expect(page).toHaveURL(new RegExp(`/@${a}$`));
+    await expect(page).toHaveURL("/town");
+    // 마을에는 헤더 막대가 없어 블로그에서 로그아웃한다
+    await page.goto(`/@${a}`);
     // 화면이 다 준비된 뒤 누른다 (준비 전이면 브라우저가 폼을 바로 보내 지우는 코드가 돌지 않는다)
     await page.waitForLoadState("networkidle");
     await page.getByRole("button", { name: "로그아웃" }).click();

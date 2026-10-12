@@ -27,7 +27,7 @@ test.describe("AUTH-09 로그인 유지 연장", () => {
     await sql`update sessions set updated_at = now() - interval '3 hours' where user_id = (select id from users where username = ${username})`;
     const firstKeep = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/auth/get-session");
     await signIn(page, username, PASSWORD, true);
-    await expect(page).toHaveURL(`/@${username}`);
+    await expect(page).toHaveURL("/town");
     expect(await cookie(context, "dont_remember")).toBeUndefined();
     const [row] = await sessionRows(username);
     expect(row.remember_me).toBe(true);
@@ -44,7 +44,8 @@ test.describe("AUTH-09 로그인 유지 연장", () => {
 
     // 10분 안에는 다시 묻지 않는다. 서버가 화면을 그릴 때는 늘리지 않는다 (쿠키를 못 바꾸므로 DB만 늘면 연장이 사라진다)
     await page.reload();
-    await expect(page.getByRole("link", { name: "내 정보" })).toBeVisible();
+    // 마을에는 헤더가 없어 ☰ 메뉴로 화면이 다 그려졌는지 본다 (039)
+    await expect(page.locator("[data-town-menu]")).toBeVisible();
     await page.waitForTimeout(500);
     expect(keeps).toHaveLength(1);
     expect(Number((await sessionRows(username))[0].days)).toBeLessThan(5.1);

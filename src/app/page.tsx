@@ -1,14 +1,14 @@
 import { redirect } from "next/navigation";
 import { AuthPanel } from "@/components/auth/AuthPanel";
 import { safeNext } from "@/lib/safe-next";
-import { getMyBlog, getSession } from "@/server/dal";
+import { getSession } from "@/server/dal";
 import { listStarterCharacters } from "@/server/items";
 
 export default async function Home({ searchParams }: PageProps<"/">) {
   // 로그인하면 돌아갈 주소 (댓글·공감·헤더의 [로그인]이 붙여 보낸다). 다른 사이트 주소는 버린다.
   const next = safeNext((await searchParams).next);
   const member = await getSession();
-  if (member) redirect(next ?? `/@${(await getMyBlog(member.userId)).slug}`);
+  if (member) redirect(next ?? "/town");
 
   return (
     <div className="grid items-center gap-8 py-6 md:grid-cols-[1fr_380px] md:py-12">
