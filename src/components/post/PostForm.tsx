@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { savePost, type PostFormState } from "@/app/write/actions";
 import { clearDraft, DRAFT_ASK, DRAFT_DELAY_MS, DRAFT_HINT, isEmptyDraft, readDraft, savedLabel, writeDraft } from "@/lib/draft";
 import { checkPostInput, CONTENT_BYTES_MAX, POST_ERRORS, TAGS_MAX_CHARS, TITLE_MAX, utf8Bytes } from "@/lib/post-rules";
+import { postTextLength } from "@/lib/text-length";
 import { RichEditor } from "../editor/RichEditor";
 
 export type CategoryOption = { id: number; name: string; subs: { id: number; name: string }[] };
@@ -68,6 +69,8 @@ function Form({ categories, initial, draftOwnerId, start }: Props & { start: Sta
   const [title, setTitle] = useState(initial?.title ?? start.title);
   const [contentHtml, setContentHtml] = useState(initial?.contentHtml ?? start.contentHtml);
   const [contentText, setContentText] = useState("");
+  // 아래 `N자`: 서버가 저장할 본문 글자 수와 같은 규칙 (POST-01)
+  const charCount = useMemo(() => postTextLength(contentHtml), [contentHtml]);
   const [categoryId, setCategoryId] = useState(initial ? (initial.categoryId ? String(initial.categoryId) : "") : start.categoryId);
   const [subcategoryId, setSubcategoryId] = useState(initial ? (initial.subcategoryId ? String(initial.subcategoryId) : "") : start.subcategoryId);
   const [visibility, setVisibility] = useState<"public" | "private">(initial ? (initial.isPublic ? "public" : "private") : start.visibility);
@@ -262,7 +265,10 @@ function Form({ categories, initial, draftOwnerId, start }: Props & { start: Sta
         ))}
       </fieldset>
 
-      <div className="flex items-center justify-end gap-3">
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        <p className="mr-auto text-sm text-ink-soft" data-char-count>
+          {charCount.toLocaleString("ko-KR")}자{initial && " · 글을 고치고 있어요"}
+        </p>
         {error && (
           <p role="alert" className="form-error">
             {error}
