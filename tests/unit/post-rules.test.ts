@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkPostInput, POST_ERRORS, rawPostInput, type RawPostInput } from "@/lib/post-rules";
+import { checkPostInput, linkHref, POST_ERRORS, rawPostInput, type RawPostInput } from "@/lib/post-rules";
 
 const ok: RawPostInput = { postId: "", title: "첫 글", contentHtml: "<p>안녕</p>", categoryId: "", subcategoryId: "", visibility: "public", tags: "" };
 const error = (patch: Partial<RawPostInput>) => {
@@ -30,5 +30,23 @@ describe("checkPostInput", () => {
   it("비공개", () => {
     const r = checkPostInput({ ...ok, visibility: "private" });
     expect(r.ok && r.value.isPublic).toBe(false);
+  });
+});
+
+describe("linkHref (링크 창)", () => {
+  it("비우거나 https://만 남기면 링크 풀기", () => {
+    for (const v of ["", "  ", "https://", "http://", " HTTPS:// "]) expect(linkHref(v)).toBe("");
+  });
+  it("http·https·mailto와 /로 시작하는 주소는 그대로", () => {
+    for (const v of ["https://example.com/blog", "http://a.kr", "mailto:me@example.com", "/@demo/12", "HTTPS://A.KR"]) expect(linkHref(v)).toBe(v.trim());
+  });
+  it("scheme 없이 넣은 주소에는 https://를 붙인다", () => {
+    expect(linkHref("naver.com")).toBe("https://naver.com");
+    expect(linkHref(" blog.naver.com/x?y=1 ")).toBe("https://blog.naver.com/x?y=1");
+    expect(linkHref("naver.com:8080/a")).toBe("https://naver.com:8080/a");
+    expect(linkHref("//cdn.example.com/a")).toBe("https://cdn.example.com/a");
+  });
+  it("저장하면 사라지거나 엉뚱한 곳으로 가는 주소는 거부", () => {
+    for (const v of ["javascript:alert(1)", "tel:01012345678", "ftp://a.kr", "data:text/html,x", "hello", "naver com", "#top"]) expect(linkHref(v)).toBeNull();
   });
 });

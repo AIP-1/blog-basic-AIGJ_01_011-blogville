@@ -8,6 +8,7 @@ import {
   renameCategory,
   type CategoryState,
 } from "@/app/settings/blog/actions";
+import { confirmFirst } from "@/lib/confirm-action";
 import type { CategoryTree } from "@/server/category";
 
 /** count: 이 카테고리의 글 수 (비공개 포함, 대분류는 소분류 글도) */
@@ -151,7 +152,7 @@ function CategoryRow({ row, onAddSub }: { row: Row; onAddSub?: () => void }) {
       <button type="button" className="btn btn-ghost px-2 text-sm" onClick={() => setEditing(true)}>
         이름 바꾸기
       </button>
-      <form action={deleteCategory} onSubmit={(e) => !confirm(confirmText) && e.preventDefault()}>
+      <form action={confirmFirst(confirmText, deleteCategory)}>
         {hidden}
         <button type="submit" className="btn btn-danger btn-ghost px-2 text-sm">
           삭제

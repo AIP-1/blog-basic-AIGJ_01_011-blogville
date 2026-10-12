@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { addComment, addReply, deleteComment, deleteReply, type CommentResult } from "@/app/blog/actions";
 import { COMMENT_MAX, formatDateTime } from "@/lib/comment-rules";
+import { confirmFirst } from "@/lib/confirm-action";
 import type { CommentLine, CommentThreadItem } from "@/server/comments";
 
 type Props = { postId: number; items: CommentThreadItem[]; count: number; signedIn: boolean };
@@ -113,12 +114,7 @@ function Line({ line, anchor, remove, children }: LineProps) {
         <div className="mt-1 flex gap-1">
           {children}
           {line.canDelete && (
-            <form
-              action={remove}
-              onSubmit={(e) => {
-                if (!confirm("댓글을 삭제할까요?")) e.preventDefault();
-              }}
-            >
+            <form action={confirmFirst("댓글을 삭제할까요?", remove)}>
               <input type="hidden" name="id" value={line.id} />
               <button type="submit" className="btn btn-ghost px-2 text-danger">
                 삭제

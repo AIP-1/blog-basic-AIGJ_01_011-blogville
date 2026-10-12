@@ -87,8 +87,13 @@ test.describe("BLOG-08 글 관리", () => {
     expect(is_public).toBe(false);
     expect(after).toEqual(before);
 
-    page.once("dialog", (d) => d.dismiss());
+    const messages: string[] = [];
+    page.once("dialog", (d) => {
+      messages.push(d.message());
+      void d.dismiss();
+    });
     await page.getByRole("button", { name: "지울 글 삭제" }).click();
+    await expect.poll(() => messages).toEqual(["이 글을 삭제할까요? 댓글과 공감도 함께 지워져요."]);
     await expect(page.getByLabel("글 수", { exact: true })).toHaveText("전체 2 · 공개 1 · 비공개 1");
     page.once("dialog", (d) => d.accept());
     await page.getByRole("button", { name: "지울 글 삭제" }).click();
