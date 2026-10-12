@@ -35,10 +35,10 @@ export function levelsGained(before: number, after: number): number[] {
 }
 
 /** 원장 사유 (`point_ledger.reason`) */
-export type RewardReason = "signup" | "post" | "comment" | "like_received";
+export type RewardReason = "signup" | "attendance" | "post" | "comment" | "like_received";
 
-/** 보상 규칙 표 (GAME-05). 하루는 한국 시간 0시 기준 */
-export const REWARD_RULES: Record<RewardReason, { exp: number; coin: number; dailyLimit: number }> = {
+/** 보상 규칙 표 (GAME-05). 하루는 한국 시간 0시 기준. 출석은 일차별 표(`attendance_rewards`)라 여기 없다 */
+export const REWARD_RULES: Record<Exclude<RewardReason, "attendance">, { exp: number; coin: number; dailyLimit: number }> = {
   signup: { exp: 0, coin: 100, dailyLimit: 1 },
   post: { exp: 30, coin: 30, dailyLimit: 3 },
   comment: { exp: 5, coin: 5, dailyLimit: 10 },
@@ -56,6 +56,7 @@ export function postEarnsReward(isNew: boolean, isPublic: boolean, textLength: n
 /** 내역 화면의 활동 이름 (GAME-07) */
 export const REASON_LABEL: Record<RewardReason, string> = {
   signup: "🎉 가입 축하",
+  attendance: "📮 출석",
   post: "✏️ 글 작성",
   comment: "💬 댓글 작성",
   like_received: "♥ 공감 받음",
@@ -67,4 +68,16 @@ export const LEDGER_PAGE_SIZE = 20;
 /** `1,234` */
 export function formatNumber(n: number): string {
   return n.toLocaleString("ko-KR");
+}
+
+/** 출석 주기 (GAME-04) */
+export const ATTENDANCE_CYCLE = 7;
+
+/**
+ * 오늘 출석 일차 (1~7). 마지막 출석이 어제면 이어서 +1(7일차 다음은 1), 아니면(없음·하루 이상 빠짐) 1.
+ * 날짜는 한국 날짜 `YYYY-MM-DD`.
+ */
+export function nextCycleDay(last: { date: string; cycleDay: number } | null, today: string, yesterday: string): number {
+  if (!last || last.date !== yesterday) return 1;
+  return last.cycleDay >= ATTENDANCE_CYCLE ? 1 : last.cycleDay + 1;
 }

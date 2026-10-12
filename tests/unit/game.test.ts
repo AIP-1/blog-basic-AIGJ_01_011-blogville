@@ -40,3 +40,34 @@ describe("보상 규칙 (GAME-05)", () => {
     expect(postEarnsReward(false, true, 500)).toBe(false);
   });
 });
+
+describe("출석 일차 (GAME-04)", () => {
+  it("처음·어제 이어서·7일차 다음·하루 빠짐", async () => {
+    const { nextCycleDay } = await import("@/lib/game");
+    expect(nextCycleDay(null, "2026-10-01", "2026-09-30")).toBe(1);
+    expect(nextCycleDay({ date: "2026-10-01", cycleDay: 1 }, "2026-10-02", "2026-10-01")).toBe(2);
+    expect(nextCycleDay({ date: "2026-10-06", cycleDay: 6 }, "2026-10-07", "2026-10-06")).toBe(7);
+    expect(nextCycleDay({ date: "2026-10-07", cycleDay: 7 }, "2026-10-08", "2026-10-07")).toBe(1);
+    expect(nextCycleDay({ date: "2026-10-09", cycleDay: 2 }, "2026-10-11", "2026-10-10")).toBe(1);
+    expect(nextCycleDay({ date: "2026-12-31", cycleDay: 3 }, "2027-01-01", "2026-12-31")).toBe(4);
+  });
+  it("10/1~10/11(10/10 빠짐)은 1~7, 1, 2, (없음), 1", async () => {
+    const { nextCycleDay } = await import("@/lib/game");
+    const { previousDay } = await import("@/lib/kst");
+    const days = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "11"].map((d) => `2026-10-${d}`);
+    let last: { date: string; cycleDay: number } | null = null;
+    const got = days.map((d) => {
+      const cycleDay = nextCycleDay(last, d, previousDay(d));
+      last = { date: d, cycleDay };
+      return cycleDay;
+    });
+    expect(got).toEqual([1, 2, 3, 4, 5, 6, 7, 1, 2, 1]);
+  });
+  it("달력: 2026년 10월은 목요일 시작, 31일", async () => {
+    const { monthCalendar } = await import("@/lib/kst");
+    const c = monthCalendar("2026-10-12");
+    expect(c).toMatchObject({ year: 2026, month: 10, start: "2026-10-01", end: "2026-10-31" });
+    expect(c.cells.slice(0, 5)).toEqual([null, null, null, null, "2026-10-01"]);
+    expect(c.cells).toHaveLength(35);
+  });
+});

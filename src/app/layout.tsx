@@ -3,11 +3,14 @@ import Link from "next/link";
 import { HeaderLoginLink } from "@/components/auth/HeaderLoginLink";
 import { SessionKeeper } from "@/components/auth/SessionKeeper";
 import { SignOutButton } from "@/components/auth/SignOutButton";
+import { AttendanceDayWatcher } from "@/components/game/AttendanceDayWatcher";
 import { PixelCharacter } from "@/components/game/PixelCharacter";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { getMyBlog, getSession } from "@/server/dal";
 import { formatNumber } from "@/lib/game";
+import { todayKST } from "@/lib/kst";
 import { countUnreadNotifications } from "@/server/notifications";
+import { ensureTodayAttendance } from "@/server/attendance";
 import { getCharacter } from "@/server/items";
 import { getWallet } from "@/server/points";
 import "./globals.css";
@@ -17,8 +20,19 @@ export const metadata: Metadata = {
   description: "글을 쓸수록 내 마을이 자라는 블로그",
 };
 
+/** 그날 처음 그리는 헤더가 자동 출석을 기록한다 (GAME-04). 실패해도 화면은 그대로 열린다 */
+async function attendToday(userId: string, sessionId: string) {
+  try {
+    await ensureTodayAttendance(userId, sessionId);
+  } catch (error) {
+    console.error("자동 출석 실패", error);
+  }
+}
+
 async function Header() {
   const member = await getSession();
+  // 헤더의 코인·레벨이 출석 보상까지 반영되게 먼저 한다
+  if (member) await attendToday(member.userId, member.sessionId);
   const [blog, unread, wallet, character] = member
     ? await Promise.all([getMyBlog(member.userId), countUnreadNotifications(member.userId), getWallet(member.userId), getCharacter(member.userId)])
     : [null, 0, null, null];
@@ -54,6 +68,9 @@ async function Header() {
                   <span className="whitespace-nowrap">🪙 {formatNumber(wallet.coin)}</span>
                 </Link>
               )}
+              <Link href="/attendance" className="btn btn-ghost px-2" aria-label="출석 체크">
+                📮<span className="hidden sm:inline">출석</span>
+              </Link>
               <NotificationBell unread={{ count: unread }} />
               <Link href="/settings/account" className="btn btn-ghost px-2" aria-label="내 정보">
                 👤<span className="hidden sm:inline">내 정보</span>
@@ -66,6 +83,7 @@ async function Header() {
               </Link>
               <SignOutButton userId={member.userId} />
               {member.rememberMe && <SessionKeeper />}
+              <AttendanceDayWatcher day={todayKST()} />
             </>
           )}
           {!member && <HeaderLoginLink />}
