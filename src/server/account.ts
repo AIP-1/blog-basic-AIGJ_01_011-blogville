@@ -1,8 +1,8 @@
 import "server-only";
-import { verifyPassword } from "better-auth/crypto";
-import { and, eq, isNotNull, sql } from "drizzle-orm";
+import { hashPassword, verifyPassword } from "better-auth/crypto";
+import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
 import { db, type Tx } from "@/db";
-import { accounts, comments, loginAttempts, replies, users } from "@/db/schema";
+import { accounts, comments, loginAttempts, replies, sessions, users } from "@/db/schema";
 
 /** 아이디·비밀번호 로그인 수단의 비밀번호가 맞는지 */
 export async function verifyMemberPassword(userId: string, password: string): Promise<boolean> {
@@ -12,6 +12,20 @@ export async function verifyMemberPassword(userId: string, password: string): Pr
     .where(and(eq(accounts.userId, userId), eq(accounts.providerId, "credential"), isNotNull(accounts.password)));
   if (!row?.hash) return false;
   return verifyPassword({ hash: row.hash, password });
+}
+
+/**
+ * 비밀번호 바꾸기: 새 해시로 바꾸고, 지금 쓰는 세션만 남기고 다른 기기의 로그인을 끊는다 (한 트랜잭션).
+ */
+export async function changeMemberPassword(userId: string, keepSessionId: string, newPassword: string): Promise<void> {
+  const hash = await hashPassword(newPassword);
+  await db.transaction(async (tx) => {
+    await tx
+      .update(accounts)
+      .set({ password: hash, updatedAt: new Date() })
+      .where(and(eq(accounts.userId, userId), eq(accounts.providerId, "credential")));
+    await tx.delete(sessions).where(and(eq(sessions.userId, userId), ne(sessions.id, keepSessionId)));
+  });
 }
 
 /**

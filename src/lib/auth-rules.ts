@@ -16,7 +16,21 @@ export const AUTH_ERRORS = {
   locked: "로그인을 너무 많이 시도했어요. 5분 뒤에 다시 시도해 주세요",
   withdrawEmpty: "비밀번호를 적어 주세요",
   withdrawWrong: "비밀번호가 맞지 않아요",
+  changeEmpty: "지금 비밀번호와 새 비밀번호를 적어 주세요",
+  changeWrong: "지금 비밀번호가 맞지 않아요",
+  changeSame: "지금과 다른 비밀번호를 적어 주세요",
+  changed: "비밀번호를 바꿨어요",
 } as const;
+
+/** 비밀번호 바꾸기 입력 검사 (빈칸 → 새 비밀번호 길이 → 확인 → 같은 값). 지금 비밀번호가 맞는지는 서버에서 본다. */
+export function checkPasswordChange(input: { current: string; next: string; confirm: string }): string | null {
+  if (!input.current || !input.next) return AUTH_ERRORS.changeEmpty;
+  if (input.next.length < PASSWORD_MIN) return AUTH_ERRORS.passwordTooShort;
+  if (input.next.length > PASSWORD_MAX) return AUTH_ERRORS.passwordTooLong;
+  if (input.next !== input.confirm) return AUTH_ERRORS.passwordMismatch;
+  if (input.next === input.current) return AUTH_ERRORS.changeSame;
+  return null;
+}
 
 export type SignUpInput = {
   username: string;

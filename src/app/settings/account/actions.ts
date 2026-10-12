@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { AUTH_ERRORS, PASSWORD_MAX } from "@/lib/auth-rules";
+import { AUTH_ERRORS, checkPasswordChange, PASSWORD_MAX } from "@/lib/auth-rules";
 import { BLOG_ERRORS, checkNickname } from "@/lib/blog-rules";
-import { deleteMember, verifyMemberPassword } from "@/server/account";
+import { changeMemberPassword, deleteMember, verifyMemberPassword } from "@/server/account";
 import { requireMember } from "@/server/dal";
 import { updateNickname as saveNickname } from "@/server/profile";
 import type { SettingsState } from "../blog/actions";
@@ -19,6 +19,25 @@ export async function updateNickname(_prev: SettingsState, formData: FormData): 
   if (error) return { error, values: { nickname } };
   revalidatePath("/", "layout");
   return { message: BLOG_ERRORS.saved, values: { nickname: nickname.trim() } };
+}
+
+export type PasswordState = { error: string } | { message: string } | null;
+
+/** 비밀번호 바꾸기. 지금 비밀번호를 확인하고, 다른 기기의 로그인은 끊는다. */
+export async function changePassword(_prev: PasswordState, formData: FormData): Promise<PasswordState> {
+  const member = await requireMember();
+  const text = (name: string) => {
+    const v = formData.get(name);
+    return typeof v === "string" ? v : "";
+  };
+  const input = { current: text("current"), next: text("next"), confirm: text("confirm") };
+  const error = checkPasswordChange(input);
+  if (error) return { error };
+  if (input.current.length > PASSWORD_MAX || !(await verifyMemberPassword(member.userId, input.current))) {
+    return { error: AUTH_ERRORS.changeWrong };
+  }
+  await changeMemberPassword(member.userId, member.sessionId, input.next);
+  return { message: AUTH_ERRORS.changed };
 }
 
 export type WithdrawState = { error: string } | null;

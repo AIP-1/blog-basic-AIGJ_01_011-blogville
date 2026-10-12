@@ -1,8 +1,8 @@
 import "server-only";
-import { and, count, eq, lt, sql } from "drizzle-orm";
+import { and, count, eq, gte, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { blogVisits, posts, postViews } from "@/db/schema";
-import { previousDay, todayKST } from "@/lib/kst";
+import { fillDays, lastDays, previousDay, todayKST } from "@/lib/kst";
 
 export type VisitStats = { today: number; yesterday: number; total: number };
 
@@ -18,6 +18,17 @@ export async function getBlogVisitStats(blogId: number): Promise<VisitStats> {
     .from(blogVisits)
     .where(eq(blogVisits.blogId, blogId));
   return row;
+}
+
+/** 블로그 관리의 최근 7일 방문자 (BLOG-06). 오래된 날부터 7칸, 기록이 없는 날은 0. */
+export async function getBlogVisitDays(blogId: number) {
+  const days = lastDays(todayKST(), 7);
+  const rows = await db
+    .select({ date: blogVisits.date, count: sql<number>`count(*)::int` })
+    .from(blogVisits)
+    .where(and(eq(blogVisits.blogId, blogId), gte(blogVisits.date, days[0])))
+    .groupBy(blogVisits.date);
+  return fillDays(days, rows);
 }
 
 /** 이 브라우저가 오늘 이 블로그를 처음 왔으면 1번 남긴다 */

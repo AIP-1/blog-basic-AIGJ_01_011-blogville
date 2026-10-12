@@ -30,6 +30,9 @@ async function Header() {
                   👑<span className="hidden sm:inline">관리자</span>
                 </Link>
               )}
+              <Link href="/settings/account" className="btn btn-ghost px-2" aria-label="내 정보">
+                👤<span className="hidden sm:inline">내 정보</span>
+              </Link>
               <Link href={`/@${blog.slug}`} className="btn btn-ghost header-my-blog">
                 내 블로그
               </Link>
@@ -38,6 +41,11 @@ async function Header() {
               </Link>
               <SignOutButton userId={member.userId} />
             </>
+          )}
+          {!member && (
+            <Link href="/" className="btn btn-ghost">
+              로그인
+            </Link>
           )}
         </nav>
       </div>
