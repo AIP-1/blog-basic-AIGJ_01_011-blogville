@@ -32,6 +32,7 @@
 | `specs/025-blog-browse/` | 마을 소식 블로그 둘러보기의 spec·plan·tasks |
 | `specs/026-favorite-neighbors/` | 즐겨찾는 이웃 ⭐(내 이웃 목록, 이웃 새 글 맨 위)의 spec·plan·tasks |
 | `specs/027-session-keep/` | 로그인 유지 7일 연장(SessionKeeper)·만료 세션과 로그인 실패 기록 정리의 spec·plan·tasks |
+| `specs/028-char-count/` | 글쓰기 아래 실시간 글자 수 `N자`의 spec·plan·tasks |
 | `src/` | Next.js 16 앱 |
 
 ## 실행
