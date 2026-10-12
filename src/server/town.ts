@@ -10,7 +10,7 @@ import { currentRoof, ROOF_HEX } from "@/lib/roof";
 import { levelUpText, notificationText, notificationTime } from "@/lib/notifications";
 import { getMyBlog, getNickname } from "./dal";
 import { listMyNeighbors } from "./follows";
-import { getAvatar } from "./items";
+import { avatarLayersOf, getAvatar } from "./items";
 import { countUnreadNotifications, listNotifications } from "./notifications";
 import { getWallet } from "./points";
 
@@ -27,6 +27,8 @@ export type TownHouse = {
   mine: boolean;
   /** 집 앞 우체통에 보일 최근 공개 글 3개 (TOWN-13), 최신순 */
   recentPosts: MailboxPost[];
+  /** 집 주인의 입은 모습 (걸어 다니는 이웃, TOWN-19) */
+  layers: string[];
 };
 
 export type MailboxPost = { id: number; title: string };
@@ -87,13 +89,15 @@ function toHouse(row: HouseRow, lot: number, mine: boolean): TownHouse & { blogI
     roof: ROOF_HEX[currentRoof(row.blogId, row.roofColor)],
     mine,
     recentPosts: [],
+    layers: [],
   };
 }
 
-/** 집마다 최근 공개 글 3개를 붙인다 (TOWN-13): 작성 시각 내림차순, 같으면 글 번호 내림차순 */
+/** 집마다 최근 공개 글 3개(TOWN-13: 작성 시각 내림차순, 같으면 글 번호 내림차순)와 주인의 입은 모습(TOWN-19)을 붙인다 */
 async function withRecentPosts(houses: (TownHouse & { blogId: number })[]): Promise<TownHouse[]> {
   if (houses.length === 0) return [];
   const ids = houses.map((h) => h.blogId);
+  const avatars = await avatarLayersOf(houses.map((h) => h.userId));
   const rows = await db.execute<{ blog_id: number; id: number; title: string }>(sql`
     select blog_id, id, title from (
       select p.blog_id, p.id, p.title, row_number() over (partition by p.blog_id order by p.created_at desc, p.id desc) as n
@@ -102,6 +106,7 @@ async function withRecentPosts(houses: (TownHouse & { blogId: number })[]): Prom
   return houses.map(({ blogId, ...house }) => ({
     ...house,
     recentPosts: rows.filter((r) => Number(r.blog_id) === blogId).map((r) => ({ id: Number(r.id), title: r.title })),
+    layers: avatars.get(house.userId) ?? [],
   }));
 }
 
