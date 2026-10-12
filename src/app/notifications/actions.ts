@@ -26,15 +26,15 @@ export async function markAllNotificationsRead(): Promise<void> {
 }
 
 /**
- * 레벨업 팝업 [확인]·[내역 보기]·Esc (GAME-06): 그 레벨 이하의 내 안 읽은 레벨업을 모두 읽음으로.
- * 레벨이 2~99가 아니거나 `go`가 이상하면 아무것도 바꾸지 않는다. `go = wallet`이면 내역 화면으로.
+ * 레벨업 팝업 [확인]·[상점 가기]·Esc (GAME-06): 그 레벨 이하의 내 안 읽은 레벨업을 모두 읽음으로.
+ * 레벨이 2~99가 아니거나 `go`가 이상하면 아무것도 바꾸지 않는다. `go = shop`이면 상점으로.
  */
 export async function dismissLevelUp(formData: FormData): Promise<void> {
   const member = await requireMember();
   const level = parseLevel(formData.get("level"));
   const go = formData.get("go");
-  if (level === null || (go !== "stay" && go !== "wallet")) return;
+  if (level === null || (go !== "stay" && go !== "shop")) return;
   await dismissLevelUps(member.userId, level);
   revalidatePath("/", "layout");
-  if (go === "wallet") redirect("/wallet");
+  if (go === "shop") redirect("/shop");
 }

@@ -1,0 +1,275 @@
+// 상점 아이템 도트 그림 (SHOP-01·06). 캐릭터와 같은 16×16 글자 칸 (src/lib/art/characters.ts).
+// 모자·옷·소품은 캐릭터 위에 겹쳐 그리는 층이라 그 부위 칸만 칠한다. 가구·배경은 그림 하나.
+
+import type { PixelArt } from "./characters";
+
+const OUTLINE = "#3b2a20";
+const EMPTY = "................";
+
+/** `start`번 줄부터 `rows`를 놓고 나머지는 빈 줄 */
+function layer(start: number, rows: string[]): string[] {
+  return Array.from({ length: 16 }, (_, y) => rows[y - start] ?? EMPTY);
+}
+
+/** 아바타 아이템을 입혀 보여 주는 회색 마네킹 (SHOP-06) */
+export const MANNEQUIN_ART: PixelArt = {
+  rows: [
+    "................",
+    ".....KKKKKK.....",
+    "....KSSSSSSK....",
+    "...KSSSSSSSSK...",
+    "...KSSSSSSSSK...",
+    "...KSSSSSSSSK...",
+    "...KSSSSSSSSK...",
+    "...KSSSSSSSSK...",
+    "....KSSSSSSK....",
+    ".....KKSSKK.....",
+    "....KBBBBBBK....",
+    "...KSBBBBBBSK...",
+    "...KSBBBBBBSK...",
+    "....KBBBBBBK....",
+    "....KBBKKBBK....",
+    "....KKK..KKK....",
+  ],
+  palette: { K: "#8a8f98", S: "#d9dce1", B: "#c3c7ce" },
+};
+
+export const ITEM_ART: Readonly<Record<string, PixelArt>> = {
+  // ── 모자 (0~4줄)
+  "hat.straw": {
+    rows: layer(0, ["......KKKK......", ".....KYYYYK.....", "....KRRRRRRK....", ".KKYYYYYYYYYYKK."]),
+    palette: { K: OUTLINE, Y: "#f2cf6b", R: "#d9534f" },
+  },
+  "hat.ribbon": {
+    rows: layer(0, ["...KK......KK...", "..KRRK....KRRK..", "..KRRRKKKKRRRK..", "...KKRRRRRRKK..."]),
+    palette: { K: OUTLINE, R: "#e2384f" },
+  },
+  "hat.beanie": {
+    rows: layer(0, [".......WW.......", ".....KBBBBK.....", "....KBBBBBBK....", "...KBBBBBBBBK...", "...KWWWWWWWWK..."]),
+    palette: { K: OUTLINE, B: "#3f7fd1", W: "#f4f4f4" },
+  },
+  // ── 옷 (9~15줄)
+  "clothes.overalls": {
+    rows: layer(10, ["....KWDWWDWK....", "...KSDDDDDDSK...", "...KSDDYYDDSK...", "....KDDDDDDK....", "....KDDKKDDK....", "....KKK..KKK...."]),
+    palette: { K: OUTLINE, W: "#f4f4f4", D: "#4f74b8", Y: "#f2cf6b", S: "#ffd7b0" },
+  },
+  "clothes.hoodie": {
+    rows: layer(9, [".....KGSSGK.....", "....KGGGGGGK....", "...KGGGWWGGGK...", "...KSGGGGGGSK..."]),
+    palette: { K: OUTLINE, G: "#4caf6a", W: "#f4f4f4", S: "#ffd7b0" },
+  },
+  "clothes.dress": {
+    rows: layer(10, ["....KYYYYYYK....", "...KSYYFYYYSK...", "...KSYYYYFYSK...", "...KYYYYYYYYK...", "....KKSKKSKK....", ".....KK..KK....."]),
+    palette: { K: OUTLINE, Y: "#f7d354", F: "#ef7aa0", S: "#ffd7b0" },
+  },
+  // ── 소품
+  "acc.glasses": {
+    rows: layer(5, ["....KKK..KKK....", "....KEKKKKEK....", "....KKK..KKK...."]),
+    palette: { K: "#2b2b2b", E: "#2b2b2b" },
+  },
+  "acc.scarf": {
+    rows: layer(9, ["....KRWRWRWK....", ".........KRK....", ".........KWK....", ".........KRK...."]),
+    palette: { K: OUTLINE, R: "#d9534f", W: "#f4f4f4" },
+  },
+  "acc.bag": {
+    rows: layer(10, [".....N..........", "......N.........", ".......N....KNNK", "............KYNK", "............KKKK"]),
+    palette: { K: OUTLINE, N: "#9a5b2e", Y: "#f2cf6b" },
+  },
+  // ── 가구
+  "furn.table": {
+    rows: layer(3, [
+      "......KKKK......",
+      "......KWWKK.....",
+      "...KKKKKKKKKK...",
+      "..KTTTTTTTTTTK..",
+      "..KDDDDDDDDDDK..",
+      "...KKKKKKKKKK...",
+      "......KTTK......",
+      "......KTTK......",
+      "......KTTK......",
+      "......KTTK......",
+      "....KKTTTTKK....",
+      "....KTTTTTTK....",
+      "....KKKKKKKK....",
+    ]),
+    palette: { K: OUTLINE, W: "#f4f4f4", T: "#c58b4f", D: "#9a6a3a" },
+  },
+  "furn.rug": {
+    rows: layer(10, ["..KKKKKKKKKKKK..", ".KRRRRRRRRRRRRK.", ".KYYYYYYYYYYYYK.", ".KGGGGGGGGGGGGK.", ".KBBBBBBBBBBBBK.", "..KKKKKKKKKKKK.."]),
+    palette: { K: OUTLINE, R: "#e86a6a", Y: "#f7d354", G: "#6cc28a", B: "#5b9bd5" },
+  },
+  "furn.shelf": {
+    rows: layer(1, [
+      "..KKKKKKKKKKKK..",
+      "..KWWWWWWWWWWK..",
+      "..KWRRBBGYYRWK..",
+      "..KWRRBBGYYRWK..",
+      "..KWRRBBGYYRWK..",
+      "..KWWWWWWWWWWK..",
+      "..KWBGGRRYBBWK..",
+      "..KWBGGRRYBBWK..",
+      "..KWBGGRRYBBWK..",
+      "..KWWWWWWWWWWK..",
+      "..KWYYRBBGGRWK..",
+      "..KWYYRBBGGRWK..",
+      "..KWYYRBBGGRWK..",
+      "..KWWWWWWWWWWK..",
+      "..KKKKKKKKKKKK..",
+    ]),
+    palette: { K: OUTLINE, W: "#b9824a", R: "#d9534f", B: "#4f74b8", G: "#4caf6a", Y: "#f2cf6b" },
+  },
+  "furn.lamp": {
+    rows: layer(1, [
+      "......KKKK......",
+      ".....KYYYYK.....",
+      "....KYYYYYYK....",
+      "...KYYYYYYYYK...",
+      "...KKKKKKKKKK...",
+      ".......KK.......",
+      ".......KK.......",
+      ".......KK.......",
+      ".......KK.......",
+      ".......KK.......",
+      ".......KK.......",
+      ".......KK.......",
+      ".....KKKKKK.....",
+      "....KDDDDDDK....",
+      "....KKKKKKKK....",
+    ]),
+    palette: { K: OUTLINE, Y: "#ffe58a", D: "#7a7f88" },
+  },
+  "furn.bed": {
+    rows: layer(5, [
+      "..KKKK..........",
+      "..KDDK..........",
+      "..KDDKKKKKKKKK..",
+      "..KDDKWWWBBBBBK.",
+      "..KDDKWWWBBBBBK.",
+      "..KDDKKKKBBBBBK.",
+      "..KDDDDDDDDDDDK.",
+      "..KDDDDDDDDDDDK.",
+      "..KKKKKKKKKKKKK.",
+      "..KK.........KK.",
+    ]),
+    palette: { K: OUTLINE, D: "#b9824a", W: "#f4f4f4", B: "#7aa7e0" },
+  },
+  "furn.sofa": {
+    rows: layer(6, [
+      "...KKKKKKKKKK...",
+      "..KPPPPPPPPPPK..",
+      "..KPPPPPPPPPPK..",
+      ".KKPPPPPPPPPPKK.",
+      "KPPKKKKKKKKKKPPK",
+      "KPPLLLLLLLLLLPPK",
+      "KPPLLLLLLLLLLPPK",
+      "KKKKKKKKKKKKKKKK",
+      ".KK..........KK.",
+    ]),
+    palette: { K: OUTLINE, P: "#c0617a", L: "#e48aa0" },
+  },
+  // ── 배경 (칸 전체)
+  "bg.beach": {
+    rows: [
+      "AAAAAAAAAAAAAAAA",
+      "AAAAAAAAAAAOOAAA",
+      "AAWWWAAAAAOOOOAA",
+      "AWWWWWAAAAOOOOAA",
+      "AAAAAAAAAAAOOAAA",
+      "AAAAAAAAAAAAAAAA",
+      "AAAAAAAAAAAAAAAA",
+      "SSSSSSSSSSSSSSSS",
+      "SSWWSSSSSSSWWSSS",
+      "SSSSSSSSSSSSSSSS",
+      "WWWWWWWWWWWWWWWW",
+      "YYYYYYYYYYYYYYYY",
+      "YYYYYYYYYYYYYYYY",
+      "YYYDYYYYYYYYYYYY",
+      "YYYYYYYYYYYYDYYY",
+      "YYYYYYYYYYYYYYYY",
+    ],
+    palette: { A: "#9fd8f5", O: "#ffd34d", W: "#ffffff", S: "#3b8fd4", Y: "#f3dc9b", D: "#e8a0a0" },
+  },
+  "bg.snow": {
+    rows: [
+      "AAAAAAAAAAAAAAAA",
+      "AWAAAAAWAAAAAAWA",
+      "AAAAWAAAAAAWAAAA",
+      "AAAAAAAAAAAAAAAA",
+      "AAWAAAAAAAAAAWAA",
+      "AAAAAAAWWWAAAAAA",
+      "AAAAAAWWWWWAAAAA",
+      "AAAAARRRRRRRAAAA",
+      "AAAAAKBBBBBKAAAA",
+      "AAAAAKBYBDBKAAAA",
+      "AAAAAKBBBDBKAAAA",
+      "WWWWWWWWWWWWWWWW",
+      "WWWWWWWWWWWWWWWW",
+      "WWLWWWWWWWLWWWWW",
+      "WWWWWWLWWWWWWWLW",
+      "WWWWWWWWWWWWWWWW",
+    ],
+    palette: { A: "#b8c9e0", W: "#ffffff", R: "#c0504d", K: OUTLINE, B: "#e9d8b8", Y: "#ffd34d", D: "#8a5a3a", L: "#d6e6f5" },
+  },
+  "bg.blossom": {
+    rows: [
+      "AAAAAAAAAAAAAAAA",
+      "AAPPPAAAAAAPPPAA",
+      "APPPPPAAAAPPPPPA",
+      "PPPFPPPAAPPPFPPP",
+      "APPPPPAAAAPPPPPA",
+      "AAPPPAAFAAAPPPAA",
+      "AAANAAAAAAAANAAA",
+      "AAANAAAFAAAANAAA",
+      "GGGNGGGGGGGGNGGG",
+      "GGGGGGGTTGGGGGGG",
+      "GGGGGGTTTTGGGGGG",
+      "GGFGGTTTTTTGGGGG",
+      "GGGGTTTTTTTTGGFG",
+      "GGGTTTTTTTTTTGGG",
+      "GGTTTTTTTTTTTTGG",
+      "GTTTTTTTTTTTTTTG",
+    ],
+    palette: { A: "#cfe8fb", P: "#f7b6cc", F: "#ef7aa0", N: "#8a5a3a", G: "#8fd18f", T: "#e9d2a8" },
+  },
+  "bg.night": {
+    rows: [
+      "NNNNNNNNNNNNNNNN",
+      "NWNNNNNNNNNNMMNN",
+      "NNNNNWNNNNNNMMMN",
+      "NNNNNNNNNWNNMMNN",
+      "NNWNNNNNNNNNNNNN",
+      "NNNNNNNBBBNNNNNN",
+      "NBBBNNNBYBNNNNNN",
+      "NBYBNNNBBBNBBBBN",
+      "NBBBNBBBYBNBYYBN",
+      "NBYBNBYBBBNBBBBN",
+      "BBBBBBBBBYBBYYBB",
+      "BYBBYBBYBBBBBBYB",
+      "BBBBBBBBBBBBBBBB",
+      "GGGGGGGGGGGGGGGG",
+      "GGWWGGGWWGGGWWGG",
+      "GGGGGGGGGGGGGGGG",
+    ],
+    palette: { N: "#1d2547", W: "#ffffff", M: "#ffe58a", B: "#3a3f5c", Y: "#ffd34d", G: "#4a4a55" },
+  },
+  "bg.space": {
+    rows: [
+      "NNNNNNNNNNNNNNNN",
+      "NNWNNNNNNNNNWNNN",
+      "NNNNNNOONNNNNNNN",
+      "NNNNNOOOONNNNNNW",
+      "NWNNNOOOONNNNNNN",
+      "NNNNNNOONNNNNNNN",
+      "NNNNNNNNNNNWNNNN",
+      "NNNNWNNNNNNNNNNN",
+      "NNNNNNNNNNPPPNNN",
+      "NNNNNNNNRPPPPPRN",
+      "NNWNNNNNNPPPPPNN",
+      "NNNNNNNNNNPPPNNN",
+      "NNNNNNNNNNNNNNNN",
+      "NNNNWNNNNNNNNNWN",
+      "NNNNNNNNWNNNNNNN",
+      "NNNNNNNNNNNNNNNN",
+    ],
+    palette: { N: "#140f2e", W: "#ffffff", O: "#ff9f5a", P: "#9b7be0", R: "#d9c8ff" },
+  },
+};

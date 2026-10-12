@@ -39,6 +39,7 @@
 | `specs/032-pixel-characters/` | 가입 때 도트 캐릭터 고르기, 헤더·블로그 홈 캐릭터의 spec·plan·tasks |
 | `specs/033-attendance/` | 자동 출석·7일 보상표·📮 출석 체크 화면의 spec·plan·tasks |
 | `specs/034-level-up/` | 레벨업 알림·가운데 팝업·알림함 레벨업 줄의 spec·plan·tasks |
+| `specs/035-shop/` | 마을 상점(아바타·가구·배경 도트 아이템, 정렬, 사기)의 spec·plan·tasks |
 | `src/` | Next.js 16 앱 |
 
 ## 실행

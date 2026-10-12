@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CHARACTER_ART, pixelRects } from "@/lib/art/characters";
+import { ITEM_ART, MANNEQUIN_ART } from "@/lib/art/items";
 
 describe("도트 캐릭터 (GAME-01)", () => {
   it.each(Object.entries(CHARACTER_ART))("%s는 16×16이고 모든 글자에 색이 있다", (_, art) => {
@@ -15,5 +16,15 @@ describe("도트 캐릭터 (GAME-01)", () => {
       { x: 4, y: 0, width: 1, fill: "#222222" },
       { x: 0, y: 1, width: 1, fill: "#111111" },
     ]);
+  });
+});
+
+describe("상점 아이템 도트 (SHOP-01·06)", () => {
+  it.each([...Object.entries(ITEM_ART), ["mannequin", MANNEQUIN_ART] as const])("%s는 16×16이고 모든 글자에 색이 있다", (_, art) => {
+    expect(art.rows).toHaveLength(16);
+    for (const row of art.rows) {
+      expect(row).toHaveLength(16);
+      for (const ch of row) if (ch !== ".") expect(art.palette[ch]).toMatch(/^#[0-9a-f]{6}$/);
+    }
   });
 });

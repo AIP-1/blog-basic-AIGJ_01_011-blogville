@@ -34,8 +34,10 @@ export function levelsGained(before: number, after: number): number[] {
   return Array.from({ length: Math.max(0, to - from) }, (_, i) => from + i + 1);
 }
 
-/** 원장 사유 (`point_ledger.reason`) */
+/** 보상 사유 */
 export type RewardReason = "signup" | "attendance" | "post" | "comment" | "like_received";
+/** 원장 사유 (`point_ledger.reason`): 보상과 상점 구매(SHOP-01, 코인만 줄어든다) */
+export type LedgerReason = RewardReason | "purchase";
 
 /** 보상 규칙 표 (GAME-05). 하루는 한국 시간 0시 기준. 출석은 일차별 표(`attendance_rewards`)라 여기 없다 */
 export const REWARD_RULES: Record<Exclude<RewardReason, "attendance">, { exp: number; coin: number; dailyLimit: number }> = {
@@ -54,12 +56,13 @@ export function postEarnsReward(isNew: boolean, isPublic: boolean, textLength: n
 }
 
 /** 내역 화면의 활동 이름 (GAME-07) */
-export const REASON_LABEL: Record<RewardReason, string> = {
+export const REASON_LABEL: Record<LedgerReason, string> = {
   signup: "🎉 가입 축하",
   attendance: "📮 출석",
   post: "✏️ 글 작성",
   comment: "💬 댓글 작성",
   like_received: "♥ 공감 받음",
+  purchase: "🏪 상점 구매",
 };
 
 /** 내역 한 페이지 줄 수 */

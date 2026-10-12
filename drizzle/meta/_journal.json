@@ -113,6 +113,13 @@
       "when": 1791799536148,
       "tag": "0015_level_up",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1791802877927,
+      "tag": "0016_shop",
+      "breakpoints": true
     }
   ]
 }
