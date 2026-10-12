@@ -21,6 +21,8 @@ export type CommentLine = {
   createdAt: Date;
   content: string;
   deleted: boolean;
+  /** 작성자가 탈퇴해 자리만 남은 댓글: 닉네임·시각도 보이지 않는다 (AUTH-06) */
+  withdrawn: boolean;
   canDelete: boolean;
 };
 export type CommentThreadItem = CommentLine & { canReply: boolean; replies: CommentLine[] };
@@ -66,6 +68,7 @@ export async function getCommentThread(postId: number, blogOwnerId: string, view
     createdAt: x.createdAt,
     content: x.deletedAt ? "" : x.content,
     deleted: x.deletedAt !== null,
+    withdrawn: x.authorId === null,
     canDelete: canDelete(x.authorId, x.deletedAt !== null),
   });
 
@@ -173,4 +176,67 @@ export async function removeReply(member: Member, replyId: number): Promise<numb
     .where(and(eq(replies.id, replyId), isNull(replies.deletedAt), mayDelete(member, replies.authorId, parentPost)))
     .returning({ commentId: replies.commentId });
   return row ? row.commentId : null;
+}
+
+export const MANAGE_COMMENTS_PAGE_SIZE = 20;
+
+export type ManagedComment = {
+  kind: "comment" | "reply";
+  id: number;
+  postId: number;
+  postTitle: string;
+  content: string;
+  nickname: string | null;
+  authorSlug: string | null;
+  createdAt: Date;
+};
+
+/**
+ * 댓글 관리 (SOC-01 열린 질문): 내 블로그 글(비공개 포함)에 달린, 지우지 않은 댓글과 답글을 최신순으로 한 쪽씩.
+ * 작성자 회원 ID는 넘기지 않는다.
+ */
+export async function listBlogComments(blogId: number, page: number): Promise<{ items: ManagedComment[]; total: number }> {
+  const all = sql`
+    select 'comment' as kind, c.id, c.post_id, c.author_id, c.content, c.created_at
+    from ${comments} c join ${posts} p on p.id = c.post_id
+    where p.blog_id = ${blogId} and c.deleted_at is null
+    union all
+    select 'reply' as kind, r.id, c.post_id, r.author_id, r.content, r.created_at
+    from ${replies} r join ${comments} c on c.id = r.comment_id join ${posts} p on p.id = c.post_id
+    where p.blog_id = ${blogId} and r.deleted_at is null
+  `;
+  const [rows, [{ total }]] = await Promise.all([
+    db.execute<{
+      kind: "comment" | "reply";
+      id: number;
+      post_id: number;
+      post_title: string;
+      content: string;
+      nickname: string | null;
+      author_slug: string | null;
+      created_at: string | Date;
+    }>(sql`
+      select t.kind, t.id, t.post_id, p.title as post_title, t.content, pr.nickname, b.slug as author_slug, t.created_at
+      from (${all}) t
+      join ${posts} p on p.id = t.post_id
+      left join ${profiles} pr on pr.user_id = t.author_id
+      left join ${blogs} b on b.owner_id = t.author_id
+      order by t.created_at desc, t.kind desc, t.id desc
+      limit ${MANAGE_COMMENTS_PAGE_SIZE} offset ${(page - 1) * MANAGE_COMMENTS_PAGE_SIZE}
+    `),
+    db.execute<{ total: number }>(sql`select count(*)::int as total from (${all}) t`),
+  ]);
+  return {
+    total,
+    items: rows.map((r) => ({
+      kind: r.kind,
+      id: r.id,
+      postId: r.post_id,
+      postTitle: r.post_title,
+      content: r.content,
+      nickname: r.nickname,
+      authorSlug: r.author_slug,
+      createdAt: new Date(r.created_at),
+    })),
+  };
 }
