@@ -67,6 +67,33 @@ test.describe("TOWN 마을", () => {
     await expect.poll(async () => (await feet(page))[0], { timeout: 5000 }).toBeGreaterThan(before[0] + 60);
   });
 
+  test("높낮이: 절벽 앞면은 막히고 계단 4곳으로만 오르내린다 (TOWN-05)", async ({ page }) => {
+    await openTown(page);
+    const stairs = (await canvas(page).getAttribute("data-stairs"))!.split(" ").map((s) => s.split(",").map(Number));
+    expect(stairs).toHaveLength(4);
+    const hold = async (key: string, ms: number) => {
+      await page.keyboard.down(key);
+      await page.waitForTimeout(ms);
+      await page.keyboard.up(key);
+    };
+    for (const [tx, ty, bx, by] of stairs) {
+      await teleport(page, bx, by);
+      await expect.poll(async () => (await feet(page))[1]).toBe(by);
+      await hold("ArrowUp", 700);
+      await expect.poll(async () => (await feet(page))[1]).toBeLessThanOrEqual(ty);
+      expect(Math.abs((await feet(page))[0] - tx)).toBeLessThan(2);
+      await teleport(page, tx, ty);
+      await hold("ArrowDown", 700);
+      await expect.poll(async () => (await feet(page))[1]).toBeGreaterThanOrEqual(by);
+      // 계단 옆(앞면)으로는 못 올라간다: 앞면 아래에 멈춘다
+      await teleport(page, tx + 200, by);
+      await expect.poll(async () => (await feet(page))[0]).toBe(tx + 200);
+      await hold("ArrowUp", 600);
+      await page.waitForTimeout(100);
+      expect((await feet(page))[1]).toBeGreaterThan(ty + 40);
+    }
+  });
+
   test("회원: 블로그 🚪 밖으로 → 내 집 앞, Enter로 다시 블로그. 즐겨찾는 이웃의 집이 1번 자리에 서고 들어가면 그 블로그", async ({ page, browser }) => {
     const username = await signUpOk(page);
     const other = await browser.newPage();

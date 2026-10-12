@@ -1,10 +1,11 @@
 // 마을에 놓을 것과 입구 (TOWN-03·04, specs/038-town). 그림은 `src/lib/art/town.ts`, 좌표는 `layout.ts`.
 import type { PixelArt } from "@/lib/art/characters";
-import { boardArt, emptyLotArt, fountainArt, houseArt, lampArt, shopArt, TOWN_CELL, treeArt } from "@/lib/art/town";
+import { benchArt, boardArt, emptyLotArt, fountainArt, houseArt, lampArt, shopArt, TOWN_CELL, treeArt } from "@/lib/art/town";
 import {
   BOARD_POS,
   CENTER,
   FOUNTAIN_POS,
+  HILL_ROAD,
   HOUSE_LOTS,
   lotFront,
   PLAZA_RADIUS,
@@ -17,6 +18,7 @@ import {
   type Entrance,
   type Rect,
 } from "./layout";
+import { CLIFF_FACE, CLIFF_LINES, TERRAIN_WALLS } from "./terrain";
 
 export type TownHouseInput = {
   lot: number;
@@ -42,7 +44,8 @@ export type Structure = {
 /** 들어갈 곳. `href`가 `login`이면 로그인이 필요한 곳(방문자) */
 export type TownEntrance = Entrance & { label: string; href: string };
 
-export type TownLayout = { structures: Structure[]; entrances: TownEntrance[] };
+/** `walls`: 걸을 수 없는 땅 (절벽 앞면·하늘, TOWN-05) */
+export type TownLayout = { structures: Structure[]; entrances: TownEntrance[]; walls: readonly Rect[] };
 
 /** 그림 크기 (px) */
 export function artSize(art: PixelArt): { width: number; height: number } {
@@ -152,6 +155,16 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean): 
     });
   }
 
+  // 북쪽 언덕 위 전망대 의자 (TOWN-05): 언덕 길 바로 위
+  structures.push({
+    id: "lookout",
+    art: benchArt(),
+    x: CENTER.x,
+    y: HILL_ROAD - 32,
+    body: { x: CENTER.x - 40, y: HILL_ROAD - 44, width: 80, height: 12 },
+    label: "전망대",
+  });
+
   HOUSE_LOTS.forEach((lot, i) => {
     const house = houses.find((h) => h.lot === i);
     if (house) {
@@ -194,6 +207,8 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean): 
       width: r.width + 40,
       height: r.height + 80,
     })),
+    // 절벽 앞면과 그 위아래 가장자리
+    ...CLIFF_LINES.map((line) => ({ x: 0, y: line - 24, width: WORLD.width, height: CLIFF_FACE + 48 })),
     {
       x: CENTER.x - PLAZA_RADIUS - 30,
       y: CENTER.y - PLAZA_RADIUS - 30,
@@ -235,7 +250,7 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean): 
     });
   }
   structures.push(...trees);
-  return { structures, entrances };
+  return { structures, entrances, walls: TERRAIN_WALLS };
 }
 
 /** ✨ 텔레포트 한 줄 (TOWN-12): 고르면 그 앞(`x`, `y`)으로. 빈 집터는 고를 수 없다 */
