@@ -92,18 +92,21 @@ function Line({ line, anchor, remove, children }: LineProps) {
   return (
     // 옆 칸 `💬 최근 댓글`에서 `#comment-ID`·`#reply-ID`로 온다 (BLOG-09)
     <article id={anchor} className="scroll-mt-20" aria-label={line.deleted ? "삭제된 댓글" : `${line.nickname ?? "알 수 없음"}의 댓글`}>
-      <p className="flex flex-wrap items-center gap-x-2 text-sm">
-        {line.authorSlug ? (
-          <Link href={`/@${line.authorSlug}`} className="inline-flex min-h-11 items-center font-bold">
-            {line.nickname}
-          </Link>
-        ) : (
-          <span className="font-bold text-ink-soft">{line.nickname ?? "알 수 없음"}</span>
-        )}
-        <time dateTime={line.createdAt.toISOString()} className="text-ink-soft">
-          {formatDateTime(line.createdAt)}
-        </time>
-      </p>
+      {/* 탈퇴한 회원의 자리는 닉네임·시각 없이 문구만 (AUTH-06) */}
+      {!line.withdrawn && (
+        <p className="flex flex-wrap items-center gap-x-2 text-sm">
+          {line.authorSlug ? (
+            <Link href={`/@${line.authorSlug}`} className="inline-flex min-h-11 items-center font-bold">
+              {line.nickname}
+            </Link>
+          ) : (
+            <span className="font-bold text-ink-soft">{line.nickname ?? "알 수 없음"}</span>
+          )}
+          <time dateTime={line.createdAt.toISOString()} className="text-ink-soft">
+            {formatDateTime(line.createdAt)}
+          </time>
+        </p>
+      )}
       {line.deleted ? (
         <p className="italic text-ink-soft">삭제된 댓글이에요</p>
       ) : (

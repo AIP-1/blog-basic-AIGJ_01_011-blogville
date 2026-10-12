@@ -29,6 +29,9 @@ export default async function BlogSettingsPage() {
           <Link href="/settings/posts" className="btn">
             📝 글 관리
           </Link>
+          <Link href="/settings/comments" className="btn">
+            💬 댓글 관리
+          </Link>
           <Link href="/settings/account" className="btn">
             👤 내 정보
           </Link>

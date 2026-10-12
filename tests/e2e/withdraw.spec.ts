@@ -87,6 +87,10 @@ test.describe("AUTH-06 회원 탈퇴", () => {
     await other.goto(`/@${o}/${otherPost}`);
     await expect(other.getByText("삭제된 댓글이에요")).toBeVisible();
     await expect(other.getByText("남의 답글")).toBeVisible();
+    // 탈퇴한 회원의 자리는 닉네임·시각 없이 문구만 (AUTH-06)
+    const keptPlace = other.locator(`#comment-${kept.id}`);
+    await expect(keptPlace).toHaveText("삭제된 댓글이에요");
+    await expect(keptPlace.locator("time")).toHaveCount(0);
     const html = await other.content();
     for (const gone of ["혼자인 내 댓글", "답글 달린 내 댓글", "내 답글"]) expect(html).not.toContain(gone);
     expect(html).not.toContain(`/@${me}`);

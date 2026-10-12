@@ -13,7 +13,7 @@ test.describe("BLOG-08 글 관리", () => {
     await writePost(page, "비밀", "본문", { private: true });
     await page.goto(`/@${owner}`);
     const tools = page.getByRole("navigation", { name: "주인 도구" });
-    await expect(tools.getByRole("link")).toHaveText(["✏️ 새 글 쓰기", "📝 글 관리 2", "🗂 카테고리 관리", "⚙️ 블로그 설정"]);
+    await expect(tools.getByRole("link")).toHaveText(["✏️ 새 글 쓰기", "📝 글 관리 2", "💬 댓글 관리", "🗂 카테고리 관리", "⚙️ 블로그 설정"]);
     await tools.getByRole("link", { name: "🗂 카테고리 관리" }).click();
     await expect(page).toHaveURL("/settings/blog#categories");
     await expect(page.locator("#categories")).toBeInViewport();

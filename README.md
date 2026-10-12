@@ -28,6 +28,7 @@
 | `specs/021-login-next/` | 로그인 뒤 보던 글로 돌아오기의 spec·plan·tasks |
 | `specs/022-publish-notice/` | 새 글 발행 안내의 spec·plan·tasks |
 | `specs/023-admin-post-delete/` | 관리자 글 화면 삭제·공지 블로그 주소의 spec·plan·tasks |
+| `specs/024-comment-manage/` | 댓글 관리의 spec·plan·tasks |
 | `src/` | Next.js 16 앱 |
 
 ## 실행
