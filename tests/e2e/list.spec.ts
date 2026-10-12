@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { insertPosts, signUpOk } from "./helpers";
 
 // 화면을 열 번 넘게 여는 시험이라 전체를 함께 돌리면 30초를 넘기곤 했다

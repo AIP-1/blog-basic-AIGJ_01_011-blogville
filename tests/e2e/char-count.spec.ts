@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { signUpOk, sql } from "./helpers";
 
 // 글쓰기 아래 `N자` (POST-01 글자 수, 게임 보상 문구는 뺌), specs/028-char-count

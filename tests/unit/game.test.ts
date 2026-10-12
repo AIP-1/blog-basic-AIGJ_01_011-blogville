@@ -22,6 +22,12 @@ describe("레벨 (GAME-02)", () => {
     expect(levelsGained(0, 120)).toEqual([2, 3, 4]);
     expect(levelsGained(30, 40)).toEqual([]);
   });
+  it("명세의 예 (GAME-06): 19→20 [2], 18→70 [2, 3], 97,010→97,020 [99], 최고 레벨 뒤 []", () => {
+    expect(levelsGained(19, 20)).toEqual([2]);
+    expect(levelsGained(18, 70)).toEqual([2, 3]);
+    expect(levelsGained(97_010, 97_020)).toEqual([99]);
+    expect(levelsGained(97_020, 99_999)).toEqual([]);
+  });
 });
 
 describe("보상 규칙 (GAME-05)", () => {

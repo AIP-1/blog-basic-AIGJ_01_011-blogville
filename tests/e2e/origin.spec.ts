@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { signUpOk, sql, writePost } from "./helpers";
 
 type Captured = { url: string; headers: Record<string, string>; body: Buffer };

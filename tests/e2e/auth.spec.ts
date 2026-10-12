@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { PASSWORD, signIn, signUp, signUpOk, sql, uid } from "./helpers";
 
 test.describe("US1 가입·로그인·로그아웃", () => {

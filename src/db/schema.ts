@@ -433,8 +433,9 @@ export type Category = typeof categories.$inferSelect;
 export type Subcategory = typeof subcategories.$inferSelect;
 export type Attachment = typeof attachments.$inferSelect;
 
-// 알림 (GAME-08의 공감·댓글·답글, specs/017-notifications). 레벨업은 게임이 생기면 종류를 더한다.
+// 알림 (GAME-08의 공감·댓글·답글, specs/017-notifications · GAME-06 레벨업, specs/034-level-up).
 // 닉네임·글 제목은 저장하지 않고 보여 줄 때 JOIN한다. 받는 사람·행동한 사람·글이 지워지면 함께 지워진다.
+// 레벨업은 행동한 사람·글이 없고 `level`만 있다 (notifications_shape_check).
 export const notifications = pgTable(
   "notifications",
   {
@@ -443,12 +444,9 @@ export const notifications = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     kind: text("kind").notNull(),
-    actorId: text("actor_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    postId: integer("post_id")
-      .notNull()
-      .references(() => posts.id, { onDelete: "cascade" }),
+    actorId: text("actor_id").references(() => users.id, { onDelete: "cascade" }),
+    postId: integer("post_id").references(() => posts.id, { onDelete: "cascade" }),
+    level: integer("level"),
     createdAt: createdAt(),
     readAt: timestamp("read_at", { withTimezone: true }),
   },
@@ -459,8 +457,14 @@ export const notifications = pgTable(
     index("notifications_actor_idx").on(t.actorId),
     // 공감 알림은 같은 사람·같은 글에 한 번만 (껐다 켜도, 동시에 눌러도)
     uniqueIndex("notifications_like_uq").on(t.userId, t.actorId, t.postId).where(sql`${t.kind} = 'like'`),
-    check("notifications_kind_check", sql`${t.kind} in ('like', 'comment', 'reply')`),
-    check("notifications_not_self_check", sql`${t.userId} <> ${t.actorId}`),
+    // 같은 레벨 알림은 한 번만 (GAME-06)
+    uniqueIndex("notifications_level_up_uq").on(t.userId, t.level).where(sql`${t.kind} = 'level_up'`),
+    check("notifications_kind_check", sql`${t.kind} in ('like', 'comment', 'reply', 'level_up')`),
+    check("notifications_not_self_check", sql`${t.actorId} is null or ${t.userId} <> ${t.actorId}`),
+    check(
+      "notifications_shape_check",
+      sql`(${t.kind} = 'level_up' and ${t.actorId} is null and ${t.postId} is null and ${t.level} between 2 and 99) or (${t.kind} <> 'level_up' and ${t.actorId} is not null and ${t.postId} is not null and ${t.level} is null)`,
+    ),
   ],
 );
 

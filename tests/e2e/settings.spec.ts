@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { signUpOk, uid } from "./helpers";
 
 test.describe("US5 블로그 설정·닉네임", () => {

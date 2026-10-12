@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { PASSWORD, sql, uid } from "./helpers";
 
 // 도트 캐릭터 고르기 (GAME-01), specs/032-pixel-characters

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { signUpOk, sql, writePost } from "./helpers";
 
 // 새 글 발행 직후 글 상세 맨 위 `🎉 글을 발행했어요!` (POST-01 발행 안내, 게임 보상 없는 부분), specs/022-publish-notice

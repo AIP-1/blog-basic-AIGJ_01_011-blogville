@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { signUpOk, sql, uid } from "./helpers";
 
 // 마을 검색 (BLOG-07), specs/013-town-search

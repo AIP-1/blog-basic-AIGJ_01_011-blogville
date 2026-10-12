@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Browser, type Page } from "./fixtures";
 import { signUpOk, sql, writePost } from "./helpers";
 
 // 경험치·레벨·코인 (GAME-02·03·05·07), specs/031-points-levels

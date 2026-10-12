@@ -1,5 +1,5 @@
 import { request as pwRequest } from "node:http";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { dispatchFiles, makePng, PDF, png, uploadDirect } from "./files";
 import { signUpOk, sql } from "./helpers";
 

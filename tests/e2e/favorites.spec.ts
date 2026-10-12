@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Browser, type Page } from "./fixtures";
 import { signUpOk, sql } from "./helpers";
 
 // 즐겨찾는 이웃 ⭐ (TOWN-08 · SOC-04, 마을 없이 이웃 새 글의 내 이웃 목록에서), specs/026-favorite-neighbors

@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Browser, type Page } from "./fixtures";
 import { insertPosts, signUpOk, sql, writePost } from "./helpers";
 
 // 조회수(POST-06)·방문자(BLOG-06)·옆 칸 위젯과 블로그 안 검색(BLOG-09)

@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Browser, type Page } from "./fixtures";
 import { PASSWORD, signUpOk, sql } from "./helpers";
 
 // 로그인 뒤 보던 글로 돌아오기 (AUTH-09·SOC-01·SOC-03 열린 질문), specs/021-login-next

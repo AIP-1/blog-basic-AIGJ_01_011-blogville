@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { insertPosts, signUpOk, sql, writePost } from "./helpers";
 
 // 이웃 (SOC-04)·마을 소식 (SOC-05), specs/008-neighbors

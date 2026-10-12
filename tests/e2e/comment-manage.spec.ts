@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { signUpOk, sql, writePost } from "./helpers";
 
 // 블로그 관리 `💬 댓글 관리` (SOC-01 열린 질문), specs/024-comment-manage

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { signUpOk, sql, uid } from "./helpers";
 
 // 인기 태그 비교는 다른 시험이 태그를 쓰는 동안 다시 읽으므로 기본 30초로는 모자랄 때가 있다

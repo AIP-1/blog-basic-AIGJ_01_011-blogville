@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { PASSWORD, signIn, signUpOk, sql } from "./helpers";
 
 // 관리자 비밀번호 초기화 (AUTH-07 열린 질문, 비밀번호를 잊은 회원 복구), specs/029-admin-password-reset

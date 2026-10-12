@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { signUpOk, writePost } from "./helpers";
 
 // 글 두 개를 쓰고 카테고리를 지우는 시험은 혼자 돌려도 30초 가까이 걸린다

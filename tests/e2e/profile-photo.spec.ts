@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { PDF, dispatchFiles, png, uploadDirect } from "./files";
 import { signUpOk, sql } from "./helpers";
 

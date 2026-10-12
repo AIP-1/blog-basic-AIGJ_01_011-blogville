@@ -4,7 +4,7 @@ import { db, type Tx } from "@/db";
 import { attendanceRewards, attendances, pointLedger, sessions, users } from "@/db/schema";
 import { nextCycleDay } from "@/lib/game";
 import { previousDay, todayKST } from "@/lib/kst";
-import { lockUser } from "./points";
+import { addLedgerEntry, lockUser } from "./points";
 
 // 자동 출석 (GAME-04, specs/033-attendance)
 
@@ -37,10 +37,7 @@ export async function ensureTodayAttendance(userId: string, sessionId: string | 
     const [session] = sessionId ? await tx.select({ id: sessions.id }).from(sessions).where(eq(sessions.id, sessionId)).for("key share") : [];
     await tx.insert(attendances).values({ userId, date: today, cycleDay, sessionId: session?.id ?? null }).onConflictDoNothing();
     const [reward] = await tx.select().from(attendanceRewards).where(eq(attendanceRewards.day, cycleDay));
-    await tx
-      .insert(pointLedger)
-      .values({ userId, reason: "attendance", expDelta: reward.exp, coinDelta: reward.coins, refId: today })
-      .onConflictDoNothing();
+    await addLedgerEntry(tx, { userId, reason: "attendance", expDelta: reward.exp, coinDelta: reward.coins, refId: today });
     return { date: today, cycleDay, exp: reward.exp, coins: reward.coins };
   });
 }
