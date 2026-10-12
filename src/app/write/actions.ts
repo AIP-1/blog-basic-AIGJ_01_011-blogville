@@ -25,7 +25,8 @@ export async function savePost(_prev: PostFormState, formData: FormData): Promis
     throw e;
   }
   revalidatePath(`/blog/${blog.slug}`, "layout");
-  redirect(`/@${blog.slug}/${postId}`);
+  // 새 글이면 글 상세 맨 위에 발행 안내를 한 번 보인다 (POST-01). 수정은 안내 없이 돌아간다
+  redirect(`/@${blog.slug}/${postId}${checked.value.postId === null ? "?new=1" : ""}`);
 }
 
 export async function deletePost(formData: FormData) {

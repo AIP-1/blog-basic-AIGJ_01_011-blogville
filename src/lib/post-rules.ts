@@ -131,3 +131,12 @@ export function linkHref(input: string): string | null {
   if (href.startsWith("/")) return href;
   return /^[^/?#]+\.[^/?#]+/.test(href) ? `https://${href}` : null;
 }
+
+/** 발행 안내가 뜨는 시간: 글을 만든 뒤 10분 (POST-01) */
+export const PUBLISH_NOTICE_MS = 10 * 60 * 1000;
+
+/** 글 상세에 `?new`가 있을 때 발행 안내를 보일지: 글 주인이고 글을 만든 지 10분 안 */
+export function showsPublishNotice(isOwner: boolean, createdAt: Date, now = Date.now()): boolean {
+  const age = now - createdAt.getTime();
+  return isOwner && age >= -60_000 && age <= PUBLISH_NOTICE_MS;
+}

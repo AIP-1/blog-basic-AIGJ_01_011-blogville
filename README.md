@@ -26,6 +26,7 @@
 | `specs/019-editor-toolbar/` | 에디터 도구 모음 정리의 spec·plan·tasks |
 | `specs/020-error-retry/` | 오류 화면 [다시 시도]·루트 오류 화면의 spec·plan·tasks |
 | `specs/021-login-next/` | 로그인 뒤 보던 글로 돌아오기의 spec·plan·tasks |
+| `specs/022-publish-notice/` | 새 글 발행 안내의 spec·plan·tasks |
 | `src/` | Next.js 16 앱 |
 
 ## 실행
