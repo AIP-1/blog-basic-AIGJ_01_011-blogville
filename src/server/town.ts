@@ -41,6 +41,7 @@ const hasPublicPost = sql`exists (select 1 from posts p where p.blog_id = ${blog
 
 const houseColumns = {
   blogId: blogs.id,
+  ownerId: blogs.ownerId,
   slug: blogs.slug,
   nickname: profiles.nickname,
   blogTitle: blogs.title,
@@ -50,12 +51,26 @@ const houseColumns = {
 
 type HouseRow = {
   blogId: number;
+  ownerId: string;
   slug: string;
   nickname: string;
   blogTitle: string;
   roofColor: string | null;
   exp: number;
 };
+
+export type TownHost = { userId: string; nickname: string; slug: string };
+
+/** 친구 마을 구경 (TOWN-15): 블로그 주소의 주인. 없는 주소·공지 블로그면 null */
+export async function getTownHost(slug: string): Promise<TownHost | null> {
+  if (slug === NOTICE_SLUG) return null;
+  const [row] = await db
+    .select({ userId: blogs.ownerId, nickname: profiles.nickname, slug: blogs.slug })
+    .from(blogs)
+    .innerJoin(profiles, eq(profiles.userId, blogs.ownerId))
+    .where(eq(blogs.slug, slug));
+  return row ?? null;
+}
 
 function toHouse(row: HouseRow, lot: number, mine: boolean): TownHouse & { blogId: number } {
   return {
@@ -91,10 +106,11 @@ function houseQuery(where: SQL | undefined) {
 }
 
 /**
- * 회원의 마을 (TOWN-04): 0번은 내 집(공지 블로그 주인에게도 내 집), 1번부터 즐겨찾는 이웃의 집.
+ * 회원의 마을 (TOWN-04): 0번은 그 회원의 집(공지 블로그 주인에게도 내 집), 1번부터 그 회원이 즐겨찾는 이웃의 집.
  * 먼저 이웃이 된 순서로 10채까지, 공지 블로그는 빼고 공개 글이 없어도 선다.
+ * 친구 마을 구경(TOWN-15)이면 `viewerId`가 보는 사람: 그 사람의 집만 `mine`(내 집·내 우체통)이다.
  */
-export async function getMemberHouses(userId: string): Promise<TownHouse[]> {
+export async function getMemberHouses(userId: string, viewerId = userId): Promise<TownHouse[]> {
   const [mine, neighbors] = await Promise.all([
     houseQuery(eq(blogs.ownerId, userId)),
     db
@@ -106,7 +122,7 @@ export async function getMemberHouses(userId: string): Promise<TownHouse[]> {
       .orderBy(asc(follows.createdAt), asc(blogs.id))
       .limit(NEIGHBOR_HOUSES),
   ]);
-  return withRecentPosts([...mine.map((r) => toHouse(r, 0, true)), ...neighbors.map((r, i) => toHouse(r, i + 1, false))]);
+  return withRecentPosts([...mine.map((r) => toHouse(r, 0, r.ownerId === viewerId)), ...neighbors.map((r, i) => toHouse(r, i + 1, r.ownerId === viewerId))]);
 }
 
 /**

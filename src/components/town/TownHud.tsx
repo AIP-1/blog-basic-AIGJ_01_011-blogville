@@ -42,6 +42,7 @@ export function TownHud({
   spots,
   houses = [],
   phone = false,
+  host = null,
 }: {
   hud: HudMember | null;
   admin: boolean;
@@ -51,6 +52,8 @@ export function TownHud({
   /** 우체통 창에 보일 집들 (TOWN-13) */
   houses?: TownHouse[];
   phone?: boolean;
+  /** 친구 마을 구경이면 그 마을 주인 (TOWN-15): 로고 대신 마을 이름과 [🏠 내 마을로] */
+  host?: { nickname: string; slug: string } | null;
 }) {
   const [panel, setPanel] = useState<Panel | null>(phone ? "menu" : null);
   // 지금 연 우체통의 집 (자리 번호)
@@ -156,13 +159,23 @@ export function TownHud({
     <>
       {!phone && (
         <>
-          {/* 화면 위 가운데 로고 (TOWN-01) */}
-          <Link
-            href={userId ? "/town" : "/"}
-            className="absolute left-1/2 top-2 flex min-h-11 -translate-x-1/2 items-center px-2 text-xl font-extrabold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.45)]"
-          >
-            Blogville
-          </Link>
+          {host ? (
+            // 친구 마을 (TOWN-15): 위 가운데 마을 이름과 내 마을로
+            <div className="absolute left-1/2 top-2 flex -translate-x-1/2 items-center gap-2 rounded-2xl bg-white/90 py-1 pl-3 pr-1 text-[#3b2a20] shadow" data-town-host={host.slug}>
+              <span className="max-w-[40vw] truncate font-extrabold">🏘 {host.nickname}님의 마을</span>
+              <Link href="/town" className="btn min-h-9 px-2 text-sm">
+                🏠 내 마을로
+              </Link>
+            </div>
+          ) : (
+            /* 화면 위 가운데 로고 (TOWN-01) */
+            <Link
+              href={userId ? "/town" : "/"}
+              className="absolute left-1/2 top-2 flex min-h-11 -translate-x-1/2 items-center px-2 text-xl font-extrabold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.45)]"
+            >
+              Blogville
+            </Link>
+          )}
           <button
             ref={opener}
             type="button"
@@ -328,6 +341,11 @@ export function TownHud({
                 <Link href={`/@${mailHouse.slug}`} className="btn">
                   🏠 집에 들어가기
                 </Link>
+                {hud && mailHouse.slug !== host?.slug && (
+                  <Link href={`/town/${mailHouse.slug}`} className="btn">
+                    🏘 {mailHouse.nickname}님의 마을 구경
+                  </Link>
+                )}
                 <button
                   type="button"
                   className="btn"
@@ -360,7 +378,7 @@ export function TownHud({
               </section>
               <section aria-labelledby="tp-houses">
                 <h3 id="tp-houses" className="mb-1 text-sm font-bold text-ink-soft">
-                  집 (내 집 + 즐겨찾기 이웃 10자리)
+                  {host ? `집 (${host.nickname}님 집 + 즐겨찾기 이웃 10자리)` : "집 (내 집 + 즐겨찾기 이웃 10자리)"}
                 </h3>
                 <ul className="grid gap-1" aria-label="집">
                   {spots.houses.map((s) => (
@@ -401,6 +419,11 @@ export function TownHud({
                           <button type="button" className="btn btn-ghost min-w-11 px-2" aria-label={`${n.nickname}의 집으로 텔레포트`} onClick={() => go(home)}>
                             ✨
                           </button>
+                        )}
+                        {!n.isNotice && !phone && (
+                          <Link href={`/town/${n.slug}`} className="btn btn-ghost min-w-11 px-2" aria-label={`${n.nickname}님의 마을 구경`}>
+                            🏘
+                          </Link>
                         )}
                         <FavoriteButton followeeId={n.userId} on={n.isFavorite} name={n.nickname} notice={n.isNotice} favorites={hud.favorites} />
                       </li>

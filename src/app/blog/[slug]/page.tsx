@@ -13,6 +13,7 @@ import { currentRoof, roofOrder, unlockedRoofCount } from "@/lib/roof";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { parseSearchQuery, parseTagFilter, SEARCH_EMPTY, TOWN_SEARCH_EMPTY, TOWN_SEARCH_NONE } from "@/lib/blog-search";
 import { parseId, parsePage } from "@/lib/ids";
+import { NOTICE_SLUG } from "@/lib/names";
 import { getBlogBySlug, searchBlogs } from "@/server/blog";
 import { getOwnedFurniture, getPlacedFurniture } from "@/server/house";
 import { getAvatar } from "@/server/items";
@@ -131,7 +132,19 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
               <p className="text-sm text-ink-soft" aria-label="블로그 정보">
                 by {nickname} · @{blog.slug} · 글 {allTotal} · <span data-followers>이웃 {followers}</span>
               </p>
-              {member && !isOwner && <FollowButton ownerId={blog.ownerId} following={following} />}
+              {member && !isOwner && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* 친구 마을 구경 (TOWN-15): PC에서만, 공지 블로그는 없다 */}
+                  {blog.slug !== NOTICE_SLUG && (
+                    <span className="contents max-sm:hidden">
+                      <Link href={`/town/${blog.slug}`} className="btn" data-friend-town>
+                        🏘 마을 구경
+                      </Link>
+                    </span>
+                  )}
+                  <FollowButton ownerId={blog.ownerId} following={following} />
+                </div>
+              )}
             </div>
           </div>
           {/* 미니룸 (BLOG-04): 건 배경과 입은 캐릭터 */}
