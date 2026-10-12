@@ -1,4 +1,4 @@
-import { DeleteAccountForm, NicknameForm } from "@/components/settings/SettingsForms";
+import { DeleteAccountForm, NicknameForm, PasswordForm } from "@/components/settings/SettingsForms";
 import { getNickname, requireMember } from "@/server/dal";
 
 export const metadata = { title: "내 정보 | Blogville" };
@@ -11,6 +11,12 @@ export default async function AccountPage() {
       <section className="rounded-2xl border border-line bg-surface p-5">
         <p className="mb-4 text-sm text-ink-soft">아이디: {member.username}</p>
         <NicknameForm nickname={await getNickname(member.userId)} />
+      </section>
+      <section aria-labelledby="password" className="rounded-2xl border border-line bg-surface p-5">
+        <h2 id="password" className="mb-3 text-lg font-bold">
+          비밀번호 바꾸기
+        </h2>
+        <PasswordForm />
       </section>
       <section aria-labelledby="withdraw" className="rounded-2xl border border-danger/40 bg-surface p-5">
         <h2 id="withdraw" className="mb-3 text-lg font-bold text-danger">

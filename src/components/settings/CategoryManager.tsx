@@ -10,7 +10,8 @@ import {
 } from "@/app/settings/blog/actions";
 import type { CategoryTree } from "@/server/category";
 
-type Row = { kind: "category" | "sub"; id: number; name: string; parentName?: string; first: boolean; last: boolean };
+/** count: 이 카테고리의 글 수 (비공개 포함, 대분류는 소분류 글도) */
+type Row = { kind: "category" | "sub"; id: number; name: string; count: number; parentName?: string; first: boolean; last: boolean };
 
 export function CategoryManager({ tree }: { tree: CategoryTree }) {
   const [addState, addAction, adding] = useActionState<CategoryState, FormData>(addCategory, null);
@@ -22,11 +23,11 @@ export function CategoryManager({ tree }: { tree: CategoryTree }) {
       <ul className="space-y-1">
         {tree.map((c, i) => (
           <li key={c.id} className="rounded-lg border border-line">
-            <CategoryRow row={{ kind: "category", id: c.id, name: c.name, first: i === 0, last: i === tree.length - 1 }} onAddSub={() => setOpenSub(c.id)} />
+            <CategoryRow row={{ kind: "category", id: c.id, name: c.name, count: c.postCount, first: i === 0, last: i === tree.length - 1 }} onAddSub={() => setOpenSub(c.id)} />
             <ul className="pl-6">
               {c.subs.map((s, j) => (
                 <li key={s.id} className="border-t border-line">
-                  <CategoryRow row={{ kind: "sub", id: s.id, name: s.name, parentName: c.name, first: j === 0, last: j === c.subs.length - 1 }} />
+                  <CategoryRow row={{ kind: "sub", id: s.id, name: s.name, count: s.postCount, parentName: c.name, first: j === 0, last: j === c.subs.length - 1 }} />
                 </li>
               ))}
             </ul>
@@ -122,7 +123,12 @@ function CategoryRow({ row, onAddSub }: { row: Row; onAddSub?: () => void }) {
   );
   return (
     <div className="flex flex-wrap items-center gap-1 p-1">
-      <span className={`flex-1 px-2 ${row.kind === "category" ? "font-semibold" : ""}`}>{row.name}</span>
+      <span className="flex-1 px-2">
+        <span className={row.kind === "category" ? "font-semibold" : ""}>{row.name}</span>{" "}
+        <span className="text-sm text-ink-soft" data-post-count>
+          ({row.count})
+        </span>
+      </span>
       <form action={moveCategory}>
         {hidden}
         <input type="hidden" name="direction" value="-1" />

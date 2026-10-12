@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { CategoryManager } from "@/components/settings/CategoryManager";
+import { VisitChart } from "@/components/settings/VisitChart";
 import { BlogInfoForm, SlugForm } from "@/components/settings/SettingsForms";
 import { getCategoryTree } from "@/server/category";
 import { getMyBlog, requireMember } from "@/server/dal";
+import { getBlogVisitDays, getBlogVisitStats } from "@/server/stats";
 
 export const metadata = { title: "블로그 관리 | Blogville" };
 
@@ -18,7 +20,7 @@ function Card({ id, title, children }: { id?: string; title: string; children: R
 export default async function BlogSettingsPage() {
   const member = await requireMember();
   const blog = await getMyBlog(member.userId);
-  const tree = await getCategoryTree(blog.id, true);
+  const [tree, stats, days] = await Promise.all([getCategoryTree(blog.id, true), getBlogVisitStats(blog.id), getBlogVisitDays(blog.id)]);
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -35,6 +37,9 @@ export default async function BlogSettingsPage() {
           </Link>
         </div>
       </div>
+      <Card id="visits" title="👣 방문자">
+        <VisitChart stats={stats} days={days} />
+      </Card>
       <Card title="블로그 정보">
         <BlogInfoForm title={blog.title} intro={blog.intro} />
       </Card>

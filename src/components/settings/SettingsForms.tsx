@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { deleteAccount, updateNickname, type WithdrawState } from "@/app/settings/account/actions";
+import { changePassword, deleteAccount, updateNickname, type PasswordState, type WithdrawState } from "@/app/settings/account/actions";
 import { updateBlogInfo, updateBlogSlug, type SettingsState } from "@/app/settings/blog/actions";
 
 function Status({ state }: { state: SettingsState }) {
@@ -78,6 +78,40 @@ export function NicknameForm({ nickname }: { nickname: string }) {
         <Status state={state} />
         <button type="submit" className="btn btn-primary" disabled={pending}>
           저장
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** 비밀번호 바꾸기. 결과가 나오면 칸을 모두 비운다. */
+export function PasswordForm() {
+  const [state, action, pending] = useActionState<PasswordState, FormData>(changePassword, null);
+  const field = (name: string, label: string, autoComplete: string) => (
+    <label className="block">
+      <span className="mb-1 block text-sm font-semibold">{label}</span>
+      <input name={name} type="password" autoComplete={autoComplete} className="field" maxLength={64} />
+    </label>
+  );
+  return (
+    <form action={action} className="space-y-3" key={JSON.stringify(state)}>
+      {field("current", "지금 비밀번호", "current-password")}
+      {field("next", "새 비밀번호 (8~64자)", "new-password")}
+      {field("confirm", "새 비밀번호 확인", "new-password")}
+      <p className="text-sm text-ink-soft">바꾸면 이 브라우저를 뺀 다른 기기의 로그인은 끊겨요.</p>
+      <div className="flex items-center justify-end gap-3">
+        {state && "error" in state && (
+          <p role="alert" className="form-error">
+            {state.error}
+          </p>
+        )}
+        {state && "message" in state && (
+          <p role="status" className="text-sm text-accent">
+            {state.message}
+          </p>
+        )}
+        <button type="submit" className="btn btn-primary" disabled={pending}>
+          {pending ? "바꾸는 중..." : "비밀번호 바꾸기"}
         </button>
       </div>
     </form>

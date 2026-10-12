@@ -5,6 +5,9 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 import { dispatchFiles, png, uploadDirect } from "./files";
 import { signUpOk, sql } from "./helpers";
 
+// 회원 둘·업로드·글 수정을 한 시험에서 하므로, 전체 실행(4개 동시)에서 30초를 넘길 때가 있다
+test.describe.configure({ timeout: 60_000 });
+
 const IMAGE_INPUT = /^사진 올리기/;
 
 async function member(browser: Browser) {

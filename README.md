@@ -19,6 +19,7 @@
 | `specs/012-admin/` | 관리자의 spec·plan·tasks |
 | `specs/013-town-search/` | 마을 검색의 spec·plan·tasks |
 | `specs/014-paste-reupload/` | 내 다른 글 첨부 붙여 넣기의 spec·plan·tasks |
+| `specs/015-settings-visits-password/` | 방문자 그래프·카테고리 글 수·비밀번호 바꾸기의 spec·plan·tasks |
 | `src/` | Next.js 16 앱 |
 
 ## 실행
