@@ -193,3 +193,18 @@ body {
     transform: translateY(-6px);
   }
 }
+
+/* 마을 (TOWN-01, specs/038-town): PC·태블릿에서는 헤더 아래를 게임이 꽉 채우고 페이지는 스크롤하지 않는다 */
+@media (min-width: 640px) {
+  body:has([data-town]) {
+    height: 100dvh;
+    overflow: hidden;
+  }
+  main:has([data-town]) {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    max-width: none;
+    padding: 0;
+  }
+}

@@ -30,7 +30,29 @@ export const CHARACTER_ART: Readonly<Record<string, PixelArt>> = {
       "....KKK..KKK....",
     ],
     palette: { K: OUTLINE, H: "#7a4a2a", S: SKIN, E: EYE, C: CHEEK, B: "#4a90d9", P: "#3d5a80" },
+  },  // 방문자 (TOWN-01): 마을을 구경하는 회색 주민. 상점·가입에는 나오지 않는다
+  "char.visitor": {
+    rows: [
+      "................",
+      ".....KKKKKK.....",
+      "....KHHHHHHK....",
+      "...KHHHHHHHHK...",
+      "...KHHHHHHHHK...",
+      "...KHSSSSSSHK...",
+      "...KSESSSSESK...",
+      "...KSCSSSSCSK...",
+      "....KSSSSSSK....",
+      ".....KKSSKK.....",
+      "....KBBBBBBK....",
+      "...KSBBBBBBSK...",
+      "...KSBBBBBBSK...",
+      "....KPPPPPPK....",
+      "....KPPKKPPK....",
+      "....KKK..KKK....",
+    ],
+    palette: { K: "#4a4a4a", H: "#9a9a9a", S: "#e6e6e6", E: "#4a4a4a", C: "#cfcfcf", B: "#b5b5b5", P: "#8a8a8a" },
   },
+
   // 여자 주민: 긴 주황 머리, 분홍 원피스
   "char.girl": {
     rows: [
