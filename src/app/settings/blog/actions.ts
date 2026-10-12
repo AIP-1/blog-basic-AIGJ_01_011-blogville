@@ -32,7 +32,7 @@ export async function updateBlogInfo(_prev: SettingsState, formData: FormData): 
 export async function updateBlogSlug(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
   const member = await requireMember();
   const slug = text(formData, "slug");
-  const result = await saveSlug(member.userId, slug);
+  const result = await saveSlug(member.userId, slug, member.role);
   if ("error" in result) return { error: result.error, values: { slug } };
   refresh(result.oldSlug);
   refresh(result.slug);

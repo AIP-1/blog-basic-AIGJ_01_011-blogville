@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AdminDeleteButton } from "@/components/admin/AdminDeleteButton";
 import { ViewCount } from "@/components/blog/ViewCount";
 import { CategoryBadge } from "@/components/post/CategoryBadge";
 import { DeletePostButton } from "@/components/post/DeletePostButton";
@@ -94,6 +95,8 @@ export default async function PostPage({ params, searchParams }: PageProps<"/blo
               <DeletePostButton postId={post.id} />
             </div>
           )}
+          {/* 관리자는 남의 공개 글을 이 화면에서 지운다 (AUTH-08, /admin 최근 글에 없는 오래된 글도) */}
+          {!isOwner && member?.role === "admin" && <AdminDeleteButton postId={post.id} title={post.title} leave />}
         </footer>
         <CommentSection postId={post.id} items={thread.items} count={thread.count} signedIn={member !== null} loginHref={loginHref(`${postPath}#comments`)} />
       </article>

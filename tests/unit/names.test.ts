@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { checkSignUp, AUTH_ERRORS } from "@/lib/auth-rules";
-import { isReserved, normalizeName, RESERVED_NAMES } from "@/lib/names";
+import { isReserved, mayUseSlug, normalizeName, NOTICE_SLUG, RESERVED_NAMES } from "@/lib/names";
 
 const ok = { username: "tester1", password: "password1", passwordConfirm: "password1", blogTitle: "tester1의 블로그" };
 
@@ -10,6 +10,14 @@ describe("names", () => {
     expect(RESERVED_NAMES.size).toBe(21);
     expect(isReserved("write")).toBe(true);
     expect(isReserved("tester1")).toBe(false);
+  });
+  it("블로그 주소: 예약어는 못 쓰고, 관리자만 notice를 쓴다", () => {
+    expect(NOTICE_SLUG).toBe("notice");
+    expect(mayUseSlug("tester1", "user")).toBe(true);
+    expect(mayUseSlug("notice", "user")).toBe(false);
+    expect(mayUseSlug("notice", "admin")).toBe(true);
+    expect(mayUseSlug("town", "admin")).toBe(false);
+    expect(mayUseSlug("admin", "admin")).toBe(false);
   });
 });
 

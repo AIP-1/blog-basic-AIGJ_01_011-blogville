@@ -4,7 +4,7 @@ import { db, type Tx } from "@/db";
 import { blogs, posts, profiles } from "@/db/schema";
 import { likePattern } from "@/lib/blog-search";
 import { BLOG_ERRORS } from "@/lib/blog-rules";
-import { isReserved, normalizeName, SLUG_RE } from "@/lib/names";
+import { mayUseSlug, normalizeName, SLUG_RE } from "@/lib/names";
 import { findNameConflict, isUniqueViolation, lockName } from "./names";
 
 /** 주소로 블로그와 주인 닉네임. 주소는 들어온 그대로 비교한다 (대문자 주소는 없음 → 404, BLOG-02). */
@@ -52,15 +52,18 @@ export async function updateBlogInfo(ownerId: string, input: { title: string; in
     .where(eq(blogs.ownerId, ownerId));
 }
 
-/** 블로그 주소 바꾸기 (BLOG-03). 성공하면 { oldSlug, slug }, 아니면 오류 문구. */
-export async function updateBlogSlug(ownerId: string, rawSlug: string) {
+/**
+ * 블로그 주소 바꾸기 (BLOG-03). 성공하면 { oldSlug, slug }, 아니면 오류 문구.
+ * 지금과 같은 주소는 예약어여도 그대로 성공한다 (공지 블로그 `notice`를 가진 관리자가 [주소 바꾸기]를 그대로 눌러도).
+ */
+export async function updateBlogSlug(ownerId: string, rawSlug: string, role: string) {
   const slug = normalizeName(rawSlug);
   if (!SLUG_RE.test(slug)) return { error: BLOG_ERRORS.slugFormat } as const;
-  if (isReserved(slug)) return { error: BLOG_ERRORS.slugReserved } as const;
   try {
     return await db.transaction(async (tx) => {
       const [current] = await tx.select({ slug: blogs.slug }).from(blogs).where(eq(blogs.ownerId, ownerId));
       if (current.slug === slug) return { oldSlug: slug, slug } as const;
+      if (!mayUseSlug(slug, role)) return { error: BLOG_ERRORS.slugReserved } as const;
       await lockName(tx, slug);
       // 주소는 닉네임과 같아도 된다
       if (await findNameConflict(tx, slug, { exceptUserId: ownerId, checkNicknames: false })) {

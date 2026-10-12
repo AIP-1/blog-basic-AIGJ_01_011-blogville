@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { insertPosts, signUpOk } from "./helpers";
 
+// 화면을 열 번 넘게 여는 시험이라 전체를 함께 돌리면 30초를 넘기곤 했다
+test.describe.configure({ timeout: 60_000 });
+
 test.describe("US3 블로그 홈 글 목록", () => {
   test("최신순 8개씩, 페이지 번호, 이상한 ?page는 1페이지", async ({ page, browser }) => {
     const username = await signUpOk(page);
