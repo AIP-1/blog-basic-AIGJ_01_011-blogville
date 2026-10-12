@@ -22,7 +22,11 @@ test.describe("POST-01 에디터 도구", () => {
       .getByRole("button")
       .evaluateAll((els) => els.slice(0, 14).map((el) => el.getAttribute("title")));
     expect(names).toEqual(["큰 제목", "작은 제목", "굵게", "기울임", "밑줄", "취소선", "글머리 목록", "번호 목록", "인용", "코드 블록", "구분선", "링크", "되돌리기", "다시 실행"]);
-    await expect(toolbar(page).getByRole("separator")).toHaveCount(4);
+    // 구분선 자리까지 명세 순서 그대로
+    const sequence = await toolbar(page)
+      .locator(":scope > button, :scope > [role=separator], :scope > * > button")
+      .evaluateAll((els) => els.map((el) => (el.getAttribute("role") === "separator" ? "|" : el.textContent?.trim())));
+    expect(sequence).toEqual(["H2", "H3", "|", "B", "I", "U", "S", "|", "•", "1.", "❝", "</>", "―", "🔗", "|", "↶", "↷", "|", "🖼 사진", "📎 파일"]);
     for (const box of await toolbar(page).getByRole("button").all()) {
       const b = (await box.boundingBox())!;
       expect(Math.min(b.width, b.height)).toBeGreaterThanOrEqual(44);
@@ -34,6 +38,7 @@ test.describe("POST-01 에디터 도구", () => {
     await tool(page, "굵게").click();
     await expect(tool(page, "굵게")).toHaveAttribute("aria-pressed", "true");
     await expect(tool(page, "굵게")).toHaveCSS("background-color", "rgb(35, 32, 27)");
+    await expect(tool(page, "굵게")).toHaveCSS("color", "rgb(255, 255, 255)");
     await expect(tool(page, "기울임")).toHaveAttribute("aria-pressed", "false");
   });
 
@@ -48,6 +53,8 @@ test.describe("POST-01 에디터 도구", () => {
     await page.keyboard.press("Shift+End");
     await tool(page, "밑줄").click();
     await expect(tool(page, "밑줄")).toHaveAttribute("aria-pressed", "true");
+    // 도구를 누르면 에디터가 다음 그리기 때 초점을 되찾는다. 그 전에 친 키는 버튼으로 간다
+    await expect(body(page)).toBeFocused();
     await page.keyboard.press("ControlOrMeta+End");
     await page.keyboard.press("Shift+Home");
     await tool(page, "취소선").click();
@@ -129,6 +136,7 @@ test.describe("POST-01 에디터 도구", () => {
 
     // 저장하면 사라질 주소(tel: 등)는 알리고 넣지 않는다. scheme 없이 넣으면 https://를 붙인다
     answer = "tel:01012345678";
+    await expect(body(page)).toBeFocused();
     await page.keyboard.press("End");
     await page.keyboard.press("Shift+Home");
     await tool(page, "링크").click();
