@@ -8,6 +8,7 @@ import {
   integer,
   pgTable,
   primaryKey,
+  smallint,
   text,
   timestamp,
   unique,
@@ -484,6 +485,7 @@ export const postLikes = pgTable(
 
 // 이웃 (SOC-04). 기본 키가 "같은 이웃은 한 번만"을, CHECK가 "나는 내 이웃이 아님"을 지킨다.
 // is_favorite: 즐겨찾는 이웃 ⭐ (TOWN-08, 최대 10명은 서버가 회원별 잠금으로 지킨다). 이웃을 취소하면 행과 함께 풀린다.
+// town_lot: 그 이웃의 집이 설 내 마을 자리 1~10 (TOWN-18). 즐겨찾기일 때만, 회원마다 자리 하나에 한 이웃. ⭐를 끄면 비운다.
 export const follows = pgTable(
   "follows",
   {
@@ -494,12 +496,15 @@ export const follows = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     isFavorite: boolean("is_favorite").notNull().default(false),
+    townLot: smallint("town_lot"),
     createdAt: createdAt(),
   },
   (t) => [
     primaryKey({ columns: [t.followerId, t.followeeId] }),
     index("follows_followee_idx").on(t.followeeId),
     check("follows_not_self_check", sql`${t.followerId} <> ${t.followeeId}`),
+    check("follows_town_lot_check", sql`${t.townLot} is null or (${t.townLot} between 1 and 10 and ${t.isFavorite})`),
+    uniqueIndex("follows_town_lot_uq").on(t.followerId, t.townLot).where(sql`${t.townLot} is not null`),
   ],
 );
 

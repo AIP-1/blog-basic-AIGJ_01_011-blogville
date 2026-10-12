@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { blogs, follows, posts, profiles } from "@/db/schema";
 import { NOTICE_SLUG } from "@/lib/names";
 import { FAVORITE_MESSAGES, favoriteRefusal } from "@/lib/social";
+import { assignLots, isNeighborLot, LOT_ERRORS, moveToLot } from "@/lib/town/lots";
 
 /** 블로그 홈의 `이웃 N`: 이 블로그 주인을 이웃 추가한 사람 수 (SOC-04) */
 export async function countFollowers(ownerId: string): Promise<number> {
@@ -104,6 +105,7 @@ async function countFavorites(runner: Runner, userId: string): Promise<number> {
 /**
  * 즐겨찾는 이웃 ⭐ 켜기·끄기 (TOWN-08). 같은 회원의 요청은 잠금으로 줄 세워 동시에 눌러도 10명을 넘지 않는다.
  * 이웃 행이 없으면 거절한다. 켤 때만 공지 블로그와 10명 제한을 본다 (이미 켜 둔 ⭐는 언제나 끌 수 있다).
+ * 끄면 골라 둔 집 자리(TOWN-18)도 비운다.
  * 거절하면 보여 줄 문구를, 바꾸면 null을 돌려준다.
  */
 export async function toggleFavorite(followerId: string, followeeId: string): Promise<string | null> {
@@ -120,8 +122,37 @@ export async function toggleFavorite(followerId: string, followeeId: string): Pr
     if (refusal) return refusal;
     await tx
       .update(follows)
-      .set({ isFavorite: turningOn })
+      .set(turningOn ? { isFavorite: true } : { isFavorite: false, townLot: null })
       .where(and(eq(follows.followerId, followerId), eq(follows.followeeId, followeeId)));
+    return null;
+  });
+}
+
+/**
+ * 이웃 집 자리 고르기 (TOWN-18): 내 ⭐ 즐겨찾기 이웃(공지 블로그 제외)을 `lot`번 자리로 옮긴다. 그 자리에 살던 이웃은
+ * 옮긴 이웃의 옛 자리로 가고(맞바꾸기), 다른 이웃은 지금 자리에 그대로 선다(모두의 자리를 적어 둔다). ⭐ 켜기·끄기와 같은 회원별 잠금으로 줄 세운다. 거절하면 문구를, 바꾸면 null을 돌려준다.
+ */
+export async function setTownLot(followerId: string, followeeId: string, lot: unknown): Promise<string | null> {
+  if (!isNeighborLot(lot)) return LOT_ERRORS.lot;
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"fav:" + followerId}))`);
+    const rows = await tx
+      .select({ followeeId: follows.followeeId, townLot: follows.townLot })
+      .from(follows)
+      .innerJoin(blogs, eq(blogs.ownerId, follows.followeeId))
+      .where(and(eq(follows.followerId, followerId), eq(follows.isFavorite, true), sql`${blogs.slug} <> ${NOTICE_SLUG}`))
+      .orderBy(asc(follows.createdAt), asc(blogs.id));
+    if (!rows.some((r) => r.followeeId === followeeId)) return LOT_ERRORS.notFavorite;
+    const placed = assignLots(rows);
+    const old = placed.find((p) => p.followeeId === followeeId)?.lot ?? null;
+    if (old === lot) return null;
+    // 다른 이웃은 지금 선 자리에 그대로 둔다(자리를 적어 둔다). 그 자리에 살던 이웃만 옛 자리로
+    const final = moveToLot(placed.map((p) => ({ id: p.followeeId, lot: p.lot })), followeeId, lot);
+    const changed = final.filter((f) => rows.find((r) => r.followeeId === f.id)?.townLot !== f.lot);
+    const row = (id: string) => and(eq(follows.followerId, followerId), eq(follows.followeeId, id));
+    // 자리 하나에 한 이웃(부분 유일 인덱스)이라 바뀌는 이웃의 자리를 먼저 모두 비운다
+    for (const f of changed) await tx.update(follows).set({ townLot: null }).where(row(f.id));
+    for (const f of changed) if (f.lot !== null) await tx.update(follows).set({ townLot: f.lot }).where(row(f.id));
     return null;
   });
 }

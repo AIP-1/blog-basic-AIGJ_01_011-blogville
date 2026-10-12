@@ -53,6 +53,7 @@
 | `specs/046-fishing/` | 연못 낚시터(하루 한 번 낚시)의 spec·plan·tasks |
 | `specs/047-friend-town/` | 친구 마을 구경(`/town/{주소}`)의 spec·plan·tasks |
 | `specs/048-walk/` | 걷는 방향 그림의 spec·plan·tasks |
+| `specs/049-town-lots/` | 이웃 집 자리 고르기의 spec·plan·tasks |
 | `src/` | Next.js 16 앱 |
 
 ## 실행

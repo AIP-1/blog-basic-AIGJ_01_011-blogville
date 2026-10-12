@@ -5,13 +5,14 @@ import { useEffect, useId, useRef, useState } from "react";
 import { openNotification } from "@/app/notifications/actions";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { FavoriteButton } from "@/components/feed/FavoriteButton";
+import { LotsPanel } from "@/components/town/LotsPanel";
 import { PixelLayers } from "@/components/game/PixelLayers";
 import { formatNumber } from "@/lib/game";
 import { lotFront } from "@/lib/town/layout";
 import type { TownSpot } from "@/lib/town/structures";
 import type { HudMember, TownHouse } from "@/server/town";
 
-type Panel = "menu" | "profile" | "notifications" | "teleport" | "friends" | "mailbox";
+type Panel = "menu" | "profile" | "notifications" | "teleport" | "friends" | "mailbox" | "lots";
 
 const TITLES: Record<Panel, string> = {
   menu: "메뉴",
@@ -20,6 +21,7 @@ const TITLES: Record<Panel, string> = {
   teleport: "✨ 텔레포트",
   friends: "👫 친구 목록",
   mailbox: "📮 우체통",
+  lots: "🏡 이웃 집 자리",
 };
 
 /** 게임 캔버스에 순간 이동을 알린다 (TOWN-02) */
@@ -59,6 +61,8 @@ export function TownHud({
   // 지금 연 우체통의 집 (자리 번호)
   const [mailLot, setMailLot] = useState<number | null>(null);
   const mailHouse = mailLot === null ? undefined : houses.find((h) => h.lot === mailLot);
+  // 🏡 이웃 집 자리에서 고르는 중인 자리 (TOWN-18)
+  const [pickLot, setPickLot] = useState<number | null>(null);
   const opener = useRef<HTMLButtonElement>(null);
   const dialog = useRef<HTMLElement>(null);
   const titleId = useId();
@@ -101,8 +105,18 @@ export function TownHud({
       fromGame.current = true;
       setPanel("mailbox");
     };
+    // 내 마을의 빈 집터 앞 Space·클릭 (TOWN-18): 그 자리 고르기 창
+    const onLots = (event: Event) => {
+      setPickLot((event as CustomEvent<{ lot: number }>).detail.lot);
+      fromGame.current = true;
+      setPanel("lots");
+    };
     window.addEventListener("bv-mailbox", onMailbox);
-    return () => window.removeEventListener("bv-mailbox", onMailbox);
+    window.addEventListener("bv-lots", onLots);
+    return () => {
+      window.removeEventListener("bv-mailbox", onMailbox);
+      window.removeEventListener("bv-lots", onLots);
+    };
   }, [phone]);
 
   const go = (spot: TownSpot) => {
@@ -234,6 +248,19 @@ export function TownHud({
                 {tile("notifications", "🔔 알림", unread ? `안 읽은 알림 ${unread}개` : "새 알림 없음")}
                 {!phone && tile("teleport", "✨ 텔레포트", "상점·이웃집 앞으로")}
                 {tile("friends", "👫 친구 목록", `이웃 ${hud.neighborTotal}명`)}
+                {!phone && !host && (
+                  <button
+                    type="button"
+                    className="flex min-h-20 flex-col items-start justify-center rounded-xl border border-line bg-bg p-3 text-left hover:bg-ink/5"
+                    onClick={() => {
+                      setPickLot(null);
+                      setPanel("lots");
+                    }}
+                  >
+                    <span className="font-bold">🏡 이웃 집 자리</span>
+                    <span className="text-sm text-ink-soft">{`이웃 집 ${houses.filter((h) => h.lot > 0).length}/10채`}</span>
+                  </button>
+                )}
               </div>
               {/* 마을에는 헤더가 없어 바로 가기 링크를 둔다 (걷지 않고, 화면 낭독기로도) */}
               <nav aria-label="바로 가기" className="mt-3 flex flex-wrap gap-1">
@@ -399,6 +426,8 @@ export function TownHud({
               </section>
             </div>
           )}
+
+          {panel === "lots" && hud && !host && <LotsPanel houses={houses} spots={spots.houses} picked={pickLot} onPick={setPickLot} onTeleport={go} />}
 
           {panel === "friends" && hud && (
             <div className="space-y-2">
