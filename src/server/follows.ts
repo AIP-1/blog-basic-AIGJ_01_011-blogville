@@ -1,7 +1,7 @@
 import "server-only";
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, asc, count, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { follows } from "@/db/schema";
+import { blogs, follows, posts, profiles } from "@/db/schema";
 
 /** 블로그 홈의 `이웃 N`: 이 블로그 주인을 이웃 추가한 사람 수 (SOC-04) */
 export async function countFollowers(ownerId: string): Promise<number> {
@@ -39,4 +39,41 @@ export async function toggleFollow(followerId: string, followeeId: string): Prom
     if ((e as { cause?: { code?: string }; code?: string }).cause?.code === "23503" || (e as { code?: string }).code === "23503") return;
     throw e;
   }
+}
+
+/** 내 이웃 목록은 이만큼만 보여 준다 (최근 공개 글 순) */
+export const NEIGHBOR_LIST_LIMIT = 200;
+
+export type Neighbor = { userId: string; slug: string; blogTitle: string; nickname: string; postCount: number; mutual: boolean };
+
+/**
+ * 이웃 새 글 위 `내 이웃 N` (SOC-04 열린 질문의 제안): 내가 이웃 추가한 회원의 블로그.
+ * 최근 공개 글 순(공개 글이 없으면 뒤로, 그다음 닉네임 순). 공개 글 수와 `서로 이웃`(상대도 나를 이웃 추가) 여부를 함께.
+ */
+export async function listMyNeighbors(userId: string): Promise<{ items: Neighbor[]; total: number }> {
+  const lastPublic = sql`(select max(p.created_at) from ${posts} p where p.blog_id = ${blogs.id} and p.is_public)`;
+  const [items, [{ total }]] = await Promise.all([
+    db
+      .select({
+        userId: follows.followeeId,
+        slug: blogs.slug,
+        blogTitle: blogs.title,
+        nickname: profiles.nickname,
+        postCount: sql<number>`(select count(*) from ${posts} p where p.blog_id = ${blogs.id} and p.is_public)::int`,
+        mutual: sql<boolean>`exists (select 1 from ${follows} back where back.follower_id = ${follows.followeeId} and back.followee_id = ${userId})`,
+      })
+      .from(follows)
+      .innerJoin(blogs, eq(blogs.ownerId, follows.followeeId))
+      .innerJoin(profiles, eq(profiles.userId, follows.followeeId))
+      .where(eq(follows.followerId, userId))
+      .orderBy(sql`${lastPublic} desc nulls last`, asc(profiles.nickname), asc(blogs.slug))
+      .limit(NEIGHBOR_LIST_LIMIT),
+    db.select({ total: count() }).from(follows).where(eq(follows.followerId, userId)),
+  ]);
+  return { items, total };
+}
+
+/** 이웃 취소만 한다 (내 이웃 목록의 [✓ 이웃]). 겹쳐 눌러도 다시 추가되지 않는다 */
+export async function unfollow(followerId: string, followeeId: string): Promise<void> {
+  await db.delete(follows).where(and(eq(follows.followerId, followerId), eq(follows.followeeId, followeeId)));
 }

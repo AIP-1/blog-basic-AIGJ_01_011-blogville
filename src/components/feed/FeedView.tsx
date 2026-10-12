@@ -15,6 +15,8 @@ type Props = {
   page: number;
   tags: { name: string; count: number }[];
   empty: ReactNode;
+  /** 탭 아래·글 카드 위 (이웃 새 글의 내 이웃 목록) */
+  top?: ReactNode;
 };
 
 const TABS = [
@@ -23,7 +25,7 @@ const TABS = [
 ] as const;
 
 /** 마을 소식(SOC-05)과 이웃 새 글(SOC-04)이 같이 쓰는 화면: 탭 + 글 카드 + 인기 태그 */
-export function FeedView({ title, tab, showFollowingTab, feed, page, tags, empty }: Props) {
+export function FeedView({ title, tab, showFollowingTab, feed, page, tags, empty, top }: Props) {
   const basePath = tab === "all" ? "/feed" : "/feed/following";
   return (
     <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_260px]">
@@ -37,12 +39,13 @@ export function FeedView({ title, tab, showFollowingTab, feed, page, tags, empty
               key={t.key}
               href={t.href}
               aria-current={t.key === tab ? "page" : undefined}
-              className={`btn ${t.key === tab ? "bg-ink text-surface border-ink" : ""}`}
+              className={`btn ${t.key === tab ? "btn-current" : ""}`}
             >
               {t.label}
             </Link>
           ))}
         </nav>
+        {top}
         {feed.items.length === 0 ? (
           <div className="mt-4 rounded-xl border border-dashed border-line p-8 text-center text-ink-soft">{empty}</div>
         ) : (
