@@ -2,13 +2,14 @@ import "server-only";
 import { randomInt } from "node:crypto";
 import { and, asc, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { db, type Tx } from "@/db";
-import { animalCares, animals, users } from "@/db/schema";
+import { animalCares, animals, items, userItems, users } from "@/db/schema";
 import { withJosa } from "@/lib/josa";
 import { todayKST } from "@/lib/kst";
 import {
   CARE_ACTIONS,
   EGG_PRICE,
   FARM_ERRORS,
+  feedMessage,
   grownMessage,
   isSpecies,
   levelEggs,
@@ -26,6 +27,8 @@ import { addLedgerEntry, getWallet, grantReward, lockUser } from "./points";
 export type FarmEgg = { id: number; source: string };
 export type FarmAnimal = { id: number; species: Species; growth: number; cared: CareAction[] };
 export type GrownAnimal = { id: number; species: Species; grownAt: Date };
+/** 가진 성장 아이템 (SHOP-01에서 산 것, 낚시로 건진 것) */
+export type GrowthItem = { id: number; name: string; art: string; growth: number; quantity: number };
 
 export type Farm = {
   eggs: FarmEgg[];
@@ -33,6 +36,7 @@ export type Farm = {
   grown: GrownAnimal[];
   /** 받을 수 있는 무료 알: 첫 알이면 "first", 레벨 보상 알이면 그 레벨 */
   freeEggs: ("first" | number)[];
+  growthItems: GrowthItem[];
   coins: number;
   level: number;
 };
@@ -40,7 +44,7 @@ export type Farm = {
 /** 내 농장: 알·키우는 동물(오늘 한 돌보기)·다 키운 동물·받을 수 있는 무료 알 */
 export async function getFarm(userId: string): Promise<Farm> {
   const today = todayKST();
-  const [rows, cares, wallet] = await Promise.all([
+  const [rows, cares, wallet, growthItems] = await Promise.all([
     db
       .select({ id: animals.id, species: animals.species, source: animals.source, sourceLevel: animals.sourceLevel, growth: animals.growth, grownAt: animals.grownAt })
       .from(animals)
@@ -52,6 +56,7 @@ export async function getFarm(userId: string): Promise<Farm> {
       .innerJoin(animals, eq(animals.id, animalCares.animalId))
       .where(and(eq(animals.userId, userId), eq(animalCares.date, today))),
     getWallet(userId),
+    listGrowthItems(userId),
   ]);
   const cared = (id: number) => cares.filter((c) => c.animalId === id).map((c) => c.action as CareAction);
   const level = wallet.progress.level;
@@ -69,9 +74,21 @@ export async function getFarm(userId: string): Promise<Farm> {
       .map((r) => ({ id: r.id, species: r.species as Species, grownAt: r.grownAt! }))
       .sort((a, b) => b.grownAt.getTime() - a.grownAt.getTime() || b.id - a.id),
     freeEggs,
+    growthItems,
     coins: wallet.coin,
     level,
   };
+}
+
+/** 가진 성장 아이템, 성장이 작은 것부터 */
+export async function listGrowthItems(userId: string): Promise<GrowthItem[]> {
+  const rows = await db
+    .select({ id: items.id, name: items.name, art: items.art, growth: items.growthValue, quantity: userItems.quantity })
+    .from(userItems)
+    .innerJoin(items, eq(items.id, userItems.itemId))
+    .where(and(eq(userItems.userId, userId), eq(items.type, "growth")))
+    .orderBy(asc(items.growthValue), asc(items.id));
+  return rows.map((r) => ({ ...r, growth: r.growth ?? 0 }));
 }
 
 /** 다 키운 동물 (블로그 도감에서 쓴다): 최근 것 먼저 */
@@ -202,4 +219,28 @@ export async function growForPost(tx: Tx, userId: string): Promise<void> {
     .where(and(eq(animals.userId, userId), isNotNull(animals.species), isNull(animals.grownAt)))
     .orderBy(asc(animals.id));
   for (const r of rows) if (isSpecies(r.species)) await addGrowth(tx, userId, { id: r.id, species: r.species, growth: r.growth }, POST_GROWTH);
+}
+
+/**
+ * 성장 아이템 먹이기: [잠금 → 키우는 내 동물인지 → 가진 성장 아이템 하나를 쓴다(마지막이면 행을 지운다) → 그만큼 성장].
+ * 하루 횟수 제한은 없다.
+ */
+export async function feedGrowthItem(userId: string, animalId: number, itemId: number): Promise<FarmResult> {
+  return db.transaction(async (tx) => {
+    if (!(await lockMember(tx, userId))) return { ok: false, error: FARM_ERRORS.notFeedable };
+    const animal = await findGrowing(tx, userId, animalId);
+    if (!animal) return { ok: false, error: FARM_ERRORS.notFeedable };
+    const [item] = await tx
+      .select({ name: items.name, growth: items.growthValue, quantity: userItems.quantity })
+      .from(userItems)
+      .innerJoin(items, eq(items.id, userItems.itemId))
+      .where(and(eq(userItems.userId, userId), eq(userItems.itemId, itemId), eq(items.type, "growth")))
+      .for("update", { of: userItems });
+    if (!item || item.growth === null) return { ok: false, error: FARM_ERRORS.noItem };
+    const mine = and(eq(userItems.userId, userId), eq(userItems.itemId, itemId));
+    if (item.quantity <= 1) await tx.delete(userItems).where(mine);
+    else await tx.update(userItems).set({ quantity: sql`${userItems.quantity} - 1` }).where(mine);
+    const grown = await addGrowth(tx, userId, animal, item.growth);
+    return { ok: true, message: grown ?? feedMessage(item.name, item.growth) };
+  });
 }

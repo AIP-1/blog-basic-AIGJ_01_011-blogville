@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { farmAction, type FarmState } from "@/app/farm/actions";
 import { PixelLayers } from "@/components/game/PixelLayers";
 import { animalStage, CARE_ACTIONS, CARE_CODES, EGG_PRICE, MAX_ACTIVE_ANIMALS, SPECIES, STAGE_LABEL, type Species } from "@/lib/farm";
-import type { Farm, FarmAnimal } from "@/server/farm";
+import type { Farm, FarmAnimal, GrowthItem } from "@/server/farm";
 
 const STAGE_SIZE = { baby: 56, teen: 72, adult: 88 } as const;
 const dayFormat = new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "long", day: "numeric" });
@@ -53,6 +54,14 @@ export function FarmView({ farm }: { farm: Farm }) {
           </form>
         </div>
         <p className="mt-2 text-sm text-ink-soft">레벨 5, 10, 15…가 될 때마다 무료 알을 하나씩 받아요.</p>
+        {farm.growthItems.length === 0 && (
+          <p className="mt-1 text-sm text-ink-soft">
+            상점의 🌱 성장 아이템(먹이·촉진제)으로 더 빨리 키울 수 있어요.{" "}
+            <Link href="/shop" className="underline">
+              🏪 상점 가기
+            </Link>
+          </p>
+        )}
       </section>
 
       <section aria-labelledby="farm-pen">
@@ -78,7 +87,7 @@ export function FarmView({ farm }: { farm: Farm }) {
               </li>
             ))}
             {farm.animals.map((animal) => (
-              <AnimalCard key={animal.id} animal={animal} action={action} pending={pending} />
+              <AnimalCard key={animal.id} animal={animal} growthItems={farm.growthItems} action={action} pending={pending} />
             ))}
           </ul>
         )}
@@ -106,7 +115,17 @@ export function FarmView({ farm }: { farm: Farm }) {
   );
 }
 
-function AnimalCard({ animal, action, pending }: { animal: FarmAnimal; action: (formData: FormData) => void; pending: boolean }) {
+function AnimalCard({
+  animal,
+  growthItems,
+  action,
+  pending,
+}: {
+  animal: FarmAnimal;
+  growthItems: GrowthItem[];
+  action: (formData: FormData) => void;
+  pending: boolean;
+}) {
   const s = SPECIES[animal.species as Species];
   const stage = animalStage(animal.species, animal.growth);
   return (
@@ -143,6 +162,20 @@ function AnimalCard({ animal, action, pending }: { animal: FarmAnimal; action: (
           );
         })}
       </div>
+      {growthItems.length > 0 && (
+        <div className="mt-1 flex w-full flex-wrap gap-1" aria-label="성장 아이템" role="group">
+          {growthItems.map((item) => (
+            <form key={item.id} action={action} className="flex-1">
+              <input type="hidden" name="intent" value="feed" />
+              <input type="hidden" name="id" value={animal.id} />
+              <input type="hidden" name="item" value={item.id} />
+              <button type="submit" className="btn w-full px-1 text-sm" disabled={pending} title={`성장 +${item.growth}`}>
+                🌱 {item.name} ×{item.quantity}
+              </button>
+            </form>
+          ))}
+        </div>
+      )}
       <p className="mt-2 text-xs text-ink-soft">
         다 키우면 ✨ {s.exp} · 🪙 {s.coin}
       </p>

@@ -72,6 +72,11 @@ export function grownMessage(species: Species): string {
   return `🎉 ${withJosa(s.name, "이/가")} 다 자랐어요! 경험치 +${s.exp}, 🪙 +${s.coin}`;
 }
 
+/** 성장 아이템을 먹였을 때 문구 (다 자라면 `grownMessage`) */
+export function feedMessage(itemName: string, growth: number): string {
+  return `🌱 ${itemName} 먹였어요! 성장 +${growth}`;
+}
+
 export const FARM_ERRORS = {
   full: "한 번에 5마리까지 키울 수 있어요. 다 키운 뒤에 새 알을 받아 주세요",
   claimed: "이미 받은 알이에요",
@@ -79,5 +84,7 @@ export const FARM_ERRORS = {
   coins: (short: number) => `코인이 ${short}개 부족해요`,
   notEgg: "부화시킬 수 있는 알이 아니에요",
   notAnimal: "돌볼 수 있는 동물이 아니에요",
+  notFeedable: "먹일 수 있는 동물이 아니에요",
+  noItem: "가지고 있는 성장 아이템이 없어요",
   cared: (action: CareAction) => `오늘은 이미 ${withJosa(CARE_ACTIONS[action].name, "을/를")} 했어요`,
 } as const;

@@ -3,8 +3,8 @@ import { withJosa } from "./josa";
 
 // 마을 상점 (SHOP-01·02·03, specs/035-shop). 서버와 화면이 같이 쓴다.
 
-export type ItemType = "character" | "hat" | "clothes" | "accessory" | "furniture" | "background";
-export type ShopSection = "avatar" | "furniture" | "background";
+export type ItemType = "character" | "hat" | "clothes" | "accessory" | "furniture" | "background" | "growth";
+export type ShopSection = "avatar" | "furniture" | "background" | "growth";
 
 /** 아바타 꾸미기 종류 (SHOP-06): 마네킹에 입혀 그린다 */
 export const AVATAR_TYPES: readonly ItemType[] = ["hat", "clothes", "accessory"];
@@ -15,7 +15,7 @@ export function isAvatarType(type: string): boolean {
 
 export function sectionOf(type: string): ShopSection | null {
   if (isAvatarType(type)) return "avatar";
-  if (type === "furniture" || type === "background") return type;
+  if (type === "furniture" || type === "background" || type === "growth") return type;
   return null;
 }
 
@@ -24,6 +24,7 @@ export const SHOP_SECTIONS: readonly { key: ShopSection; title: string; hint?: s
   { key: "avatar", title: "👕 아바타 꾸미기" },
   { key: "furniture", title: "🪑 가구", hint: "산 가구는 내 블로그의 ‘우리 집’에 놓을 수 있어요." },
   { key: "background", title: "🖼 배경" },
+  { key: "growth", title: "🌱 성장 아이템", hint: "동물 농장의 친구들을 빨리 키워 주는 먹이예요. 여러 번 살 수 있어요." },
 ];
 
 /** 가입할 때 받아 거는 기본 배경 (SHOP-04) */
@@ -47,15 +48,22 @@ export type ShopItem = {
   price: number;
   requiredLevel: number;
   owned: boolean;
+  /** 가진 개수 (성장 아이템만 2개 이상) */
+  quantity: number;
   /** 가진 회원 수 (인기순) */
   owners: number;
 };
 
 export type ButtonState = { kind: "owned" } | { kind: "level"; level: number } | { kind: "coins" } | { kind: "buy" };
 
-/** 버튼 상태: 보유 → 레벨 부족 → 코인 부족 → 사기 순서로 먼저 맞는 것 */
-export function buttonState(item: Pick<ShopItem, "owned" | "requiredLevel" | "price">, level: number, coins: number): ButtonState {
-  if (item.owned) return { kind: "owned" };
+/** 여러 개 살 수 있는 종류 (성장 아이템) */
+export function isStackable(type: string): boolean {
+  return type === "growth";
+}
+
+/** 버튼 상태: 보유(성장 아이템 제외) → 레벨 부족 → 코인 부족 → 사기 순서로 먼저 맞는 것 */
+export function buttonState(item: Pick<ShopItem, "type" | "owned" | "requiredLevel" | "price">, level: number, coins: number): ButtonState {
+  if (item.owned && !isStackable(item.type)) return { kind: "owned" };
   if (level < item.requiredLevel) return { kind: "level", level: item.requiredLevel };
   if (coins < item.price) return { kind: "coins" };
   return { kind: "buy" };
@@ -107,6 +115,7 @@ export function sortShopItems(list: readonly ShopItem[], sort: ShopSort): ShopIt
 export function purchaseMessage(name: string, type: string): string {
   const bought = `🎉 ${withJosa(name, "을/를")} 샀어요!`;
   if (type === "furniture") return `${bought} 내 블로그의 우리 집에 놓아 보세요.`;
+  if (type === "growth") return `${bought} 동물 농장에서 써 보세요.`;
   return `${bought} 꾸미기에서 장착해 보세요.`;
 }
 

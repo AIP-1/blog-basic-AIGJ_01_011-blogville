@@ -127,9 +127,12 @@ export const items = pgTable(
     requiredLevel: integer("required_level").notNull().default(1),
     isStarter: boolean("is_starter").notNull().default(false),
     isOnSale: boolean("is_on_sale").notNull().default(false),
+    // 성장 아이템이 동물을 키우는 양 (TOWN-09)
+    growthValue: integer("growth_value"),
   },
   (t) => [
-    check("items_type_check", sql`${t.type} in ('character', 'hat', 'clothes', 'accessory', 'furniture', 'background')`),
+    check("items_type_check", sql`${t.type} in ('character', 'hat', 'clothes', 'accessory', 'furniture', 'background', 'growth')`),
+    check("items_growth_check", sql`(${t.type} = 'growth') = (${t.growthValue} is not null) and (${t.growthValue} is null or ${t.growthValue} > 0)`),
     check("items_price_check", sql`${t.price} >= 0`),
     check("items_required_level_check", sql`${t.requiredLevel} between 1 and 99`),
     // 파는 아이템은 값이 있고 기본 아이템이 아니다 (캐릭터는 팔지 않는다, SHOP-01)
@@ -148,8 +151,10 @@ export const userItems = pgTable(
       .notNull()
       .references(() => items.id),
     acquiredAt: timestamp("acquired_at", { withTimezone: true }).notNull().defaultNow(),
+    // 가진 개수. 성장 아이템만 여러 개, 다 쓰면 행을 지운다 (TOWN-09)
+    quantity: integer("quantity").notNull().default(1),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.itemId] }), index("user_items_item_idx").on(t.itemId)],
+  (t) => [primaryKey({ columns: [t.userId, t.itemId] }), index("user_items_item_idx").on(t.itemId), check("user_items_quantity_check", sql`${t.quantity} >= 1`)],
 );
 
 /**
@@ -571,12 +576,12 @@ export const pointLedger = pgTable(
     uniqueIndex("point_ledger_farm_uq").on(t.userId, t.reason, t.refId).where(sql`${t.reason} in ('farm_grown', 'egg_purchase')`),
     check(
       "point_ledger_reason_check",
-      sql`${t.reason} in ('signup', 'attendance', 'post', 'comment', 'like_received', 'purchase', 'farm_care', 'farm_grown', 'egg_purchase')`,
+      sql`${t.reason} in ('signup', 'attendance', 'post', 'comment', 'like_received', 'purchase', 'farm_care', 'farm_grown', 'egg_purchase', 'growth_purchase')`,
     ),
     // 구매(상점·알)만 코인이 줄고, 구매는 경험치가 없다 (SHOP-03, TOWN-09)
     check(
       "point_ledger_purchase_check",
-      sql`(${t.reason} in ('purchase', 'egg_purchase')) = (${t.coinDelta} < 0) and (${t.reason} not in ('purchase', 'egg_purchase') or ${t.expDelta} = 0)`,
+      sql`(${t.reason} in ('purchase', 'egg_purchase', 'growth_purchase')) = (${t.coinDelta} < 0) and (${t.reason} not in ('purchase', 'egg_purchase', 'growth_purchase') or ${t.expDelta} = 0)`,
     ),
     check("point_ledger_exp_check", sql`${t.expDelta} >= 0`),
     check("point_ledger_nonzero_check", sql`${t.expDelta} <> 0 or ${t.coinDelta} <> 0`),

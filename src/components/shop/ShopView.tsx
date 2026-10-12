@@ -5,7 +5,7 @@ import { useActionState, useState } from "react";
 import { buyItem, type BuyState } from "@/app/shop/actions";
 import { PixelLayers } from "@/components/game/PixelLayers";
 import { formatNumber } from "@/lib/game";
-import { buttonState, isAvatarType, isShopSort, sectionOf, SHOP_EMPTY, SHOP_SECTIONS, SHOP_SORTS, sortShopItems, type ShopItem, type ShopSort } from "@/lib/shop";
+import { buttonState, isAvatarType, isShopSort, isStackable, sectionOf, SHOP_EMPTY, SHOP_SECTIONS, SHOP_SORTS, sortShopItems, type ShopItem, type ShopSort } from "@/lib/shop";
 
 /**
  * 상점 화면 (SHOP-01). 정렬은 이 화면에서만 유지한다(새로고침하면 레벨순).
@@ -26,8 +26,8 @@ export function ShopView({ items, level, coins, mySlug }: { items: ShopItem[]; l
         >
           {state.message}
           {state.ok && (
-            <Link href={state.type === "furniture" ? `/@${mySlug}` : "/closet"} className="ml-2 underline">
-              {state.type === "furniture" ? "🏠 우리 집으로" : "🎨 꾸미기로"}
+            <Link href={state.type === "furniture" ? `/@${mySlug}` : state.type === "growth" ? "/farm" : "/closet"} className="ml-2 underline">
+              {state.type === "furniture" ? "🏠 우리 집으로" : state.type === "growth" ? "🐮 동물 농장으로" : "🎨 꾸미기로"}
             </Link>
           )}
         </p>
@@ -85,6 +85,11 @@ function ShopCard({ item, level, coins, action, pending }: { item: ShopItem; lev
       <p className="mt-2 text-sm font-semibold">
         🪙 {formatNumber(item.price)}
         {item.requiredLevel >= 2 && <span className="ml-2 rounded-full bg-accent/10 px-1.5 text-accent">Lv.{item.requiredLevel}+</span>}
+        {isStackable(item.type) && item.quantity > 0 && (
+          <span className="ml-2 text-ink-soft" data-quantity>
+            보유 {item.quantity}개
+          </span>
+        )}
       </p>
       <form action={action} className="mt-2">
         <input type="hidden" name="itemId" value={item.id} />

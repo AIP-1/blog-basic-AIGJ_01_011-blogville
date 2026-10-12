@@ -100,4 +100,35 @@ test.describe("TOWN-09 동물 농장", () => {
     await expect(guest.locator("[data-town-prompt]")).toHaveText("🐮 동물 농장 · Space 로그인하고 이용하기");
     await guest.close();
   });
+
+  test("성장 아이템: 상점에서 두 번 사면 보유 2개, 농장에서 하나씩 먹이고 다 쓰면 버튼이 사라진다", async ({ page }) => {
+    const me = await signUpOk(page);
+    const id = await userId(me);
+    await page.goto("/shop");
+    const feed = page.locator('[data-item="동물 먹이"]');
+    await feed.getByRole("button", { name: "사기" }).click();
+    await expect(page.locator("[data-buy-result]")).toContainText("🎉 동물 먹이를 샀어요! 동물 농장에서 써 보세요.");
+    await expect(page.locator("[data-buy-result]").getByRole("link", { name: "🐮 동물 농장으로" })).toHaveAttribute("href", "/farm");
+    await feed.getByRole("button", { name: "사기" }).click();
+    await expect(feed.locator("[data-quantity]")).toHaveText("보유 2개");
+    await expect(page.locator("[data-shop-wallet]")).toHaveText("Lv.1 🪙 70");
+    // 여러 번 사는 아이템은 사유 growth_purchase (purchase는 아이템마다 한 번)
+    expect(await ledger(me, "growth_purchase")).toEqual([
+      { exp_delta: 0, coin_delta: -20 },
+      { exp_delta: 0, coin_delta: -20 },
+    ]);
+    // 촉진제는 Lv.3부터
+    await expect(page.locator('[data-item="성장 촉진제"]').getByRole("button")).toHaveText("🔒 Lv.3");
+
+    await sql`insert into animals (user_id, source, species, hatched_at) values (${id}, 'first', 'calf', now())`;
+    await page.goto("/farm");
+    const button = animal(page).getByRole("button", { name: "🌱 동물 먹이 ×2" });
+    await button.click();
+    await expect(result(page)).toHaveText("🌱 동물 먹이 먹였어요! 성장 +20");
+    await expect(animal(page).locator("[data-growth]")).toHaveText("20/160");
+    await animal(page).getByRole("button", { name: "🌱 동물 먹이 ×1" }).click();
+    await expect(animal(page).locator("[data-growth]")).toHaveText("40/160");
+    await expect(animal(page).getByRole("group", { name: "성장 아이템" })).toHaveCount(0);
+    expect(await sql`select 1 from user_items ui join items i on i.id = ui.item_id where ui.user_id = ${id} and i.type = 'growth'`).toHaveLength(0);
+  });
 });

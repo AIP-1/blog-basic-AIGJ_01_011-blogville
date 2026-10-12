@@ -10,16 +10,21 @@ const item = (id: number, over: Partial<ShopItem> = {}): ShopItem => ({
   price: 100,
   requiredLevel: 1,
   owned: false,
+  quantity: 0,
   owners: 0,
   ...over,
 });
 
 describe("버튼 상태 (SHOP-01·02·03)", () => {
   it("보유 → 레벨 부족 → 코인 부족 → 사기 순서", () => {
-    expect(buttonState({ owned: true, requiredLevel: 9, price: 999 }, 1, 0)).toEqual({ kind: "owned" });
-    expect(buttonState({ owned: false, requiredLevel: 3, price: 999 }, 2, 0)).toEqual({ kind: "level", level: 3 });
-    expect(buttonState({ owned: false, requiredLevel: 3, price: 120 }, 3, 119)).toEqual({ kind: "coins" });
-    expect(buttonState({ owned: false, requiredLevel: 3, price: 120 }, 3, 120)).toEqual({ kind: "buy" });
+    expect(buttonState({ type: "hat", owned: true, requiredLevel: 9, price: 999 }, 1, 0)).toEqual({ kind: "owned" });
+    expect(buttonState({ type: "hat", owned: false, requiredLevel: 3, price: 999 }, 2, 0)).toEqual({ kind: "level", level: 3 });
+    expect(buttonState({ type: "hat", owned: false, requiredLevel: 3, price: 120 }, 3, 119)).toEqual({ kind: "coins" });
+    expect(buttonState({ type: "hat", owned: false, requiredLevel: 3, price: 120 }, 3, 120)).toEqual({ kind: "buy" });
+  });
+  it("성장 아이템은 가지고 있어도 또 산다", () => {
+    expect(buttonState({ type: "growth", owned: true, requiredLevel: 1, price: 20 }, 1, 20)).toEqual({ kind: "buy" });
+    expect(buttonState({ type: "growth", owned: true, requiredLevel: 3, price: 150 }, 2, 999)).toEqual({ kind: "level", level: 3 });
   });
 });
 
@@ -43,11 +48,12 @@ describe("정렬 (SHOP-01)", () => {
 
 describe("구역·안내", () => {
   it("모자·옷·소품은 아바타, 캐릭터는 어디에도 없다", () => {
-    expect(["hat", "clothes", "accessory", "furniture", "background", "character"].map(sectionOf)).toEqual(["avatar", "avatar", "avatar", "furniture", "background", null]);
+    expect(["hat", "clothes", "accessory", "furniture", "background", "growth", "character"].map(sectionOf)).toEqual(["avatar", "avatar", "avatar", "furniture", "background", "growth", null]);
   });
   it("받침에 맞는 조사와 종류별 안내", () => {
     expect(purchaseMessage("밀짚모자", "hat")).toBe("🎉 밀짚모자를 샀어요! 꾸미기에서 장착해 보세요.");
     expect(purchaseMessage("책장", "furniture")).toBe("🎉 책장을 샀어요! 내 블로그의 우리 집에 놓아 보세요.");
+    expect(purchaseMessage("동물 먹이", "growth")).toBe("🎉 동물 먹이를 샀어요! 동물 농장에서 써 보세요.");
   });
 });
 
