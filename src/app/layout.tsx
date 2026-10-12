@@ -5,14 +5,14 @@ import { SessionKeeper } from "@/components/auth/SessionKeeper";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { AttendanceDayWatcher } from "@/components/game/AttendanceDayWatcher";
 import { LevelUpDialog } from "@/components/game/LevelUpDialog";
-import { PixelCharacter } from "@/components/game/PixelCharacter";
+import { PixelLayers } from "@/components/game/PixelLayers";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { getMyBlog, getSession } from "@/server/dal";
 import { formatNumber } from "@/lib/game";
 import { todayKST } from "@/lib/kst";
 import { countUnreadNotifications, getPendingLevelUp } from "@/server/notifications";
 import { ensureTodayAttendance } from "@/server/attendance";
-import { getCharacter } from "@/server/items";
+import { getAvatar } from "@/server/items";
 import { getWallet } from "@/server/points";
 import "./globals.css";
 
@@ -34,12 +34,12 @@ async function Header() {
   const member = await getSession();
   // 헤더의 코인·레벨이 출석 보상까지 반영되게 먼저 한다
   if (member) await attendToday(member.userId, member.sessionId);
-  const [blog, unread, wallet, character, levelUp] = member
+  const [blog, unread, wallet, avatar, levelUp] = member
     ? await Promise.all([
         getMyBlog(member.userId),
         countUnreadNotifications(member.userId),
         getWallet(member.userId),
-        getCharacter(member.userId),
+        getAvatar(member.userId),
         getPendingLevelUp(member.userId),
       ])
     : [null, 0, null, null, null];
@@ -69,8 +69,8 @@ async function Header() {
                   aria-label={`Lv.${wallet.progress.level}, 코인 ${formatNumber(wallet.coin)}: 경험치·코인 내역`}
                   data-wallet
                 >
-                  {/* 내 캐릭터 (GAME-01) */}
-                  <PixelCharacter art={character?.art} size={28} />
+                  {/* 내 캐릭터 (GAME-01), 입은 모자·옷·소품까지 (SHOP-06) */}
+                  <PixelLayers arts={avatar?.layers ?? []} size={28} />
                   <span className="rounded-full bg-accent/10 px-1.5 font-bold text-accent">Lv.{wallet.progress.level}</span>
                   <span className="whitespace-nowrap">🪙 {formatNumber(wallet.coin)}</span>
                 </Link>

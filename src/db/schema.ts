@@ -152,6 +152,30 @@ export const userItems = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.itemId] }), index("user_items_item_idx").on(t.itemId)],
 );
 
+/**
+ * 입은 아바타 아이템 (SHOP-06): 부위(모자·옷·소품 = 아이템 종류)마다 하나. 가진 것만 (복합 외래 키).
+ * 회원이 지워지면 함께 지운다.
+ */
+export const avatarEquips = pgTable(
+  "avatar_equips",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    slot: text("slot").notNull(),
+    itemId: integer("item_id").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.slot] }),
+    check("avatar_equips_slot_check", sql`${t.slot} in ('hat', 'clothes', 'accessory')`),
+    foreignKey({
+      name: "avatar_equips_owned_fk",
+      columns: [t.userId, t.itemId],
+      foreignColumns: [userItems.userId, userItems.itemId],
+    }).onDelete("cascade"),
+  ],
+);
+
 export const profiles = pgTable(
   "profiles",
   {
@@ -191,11 +215,18 @@ export const blogs = pgTable(
     slug: text("slug").notNull().unique(),
     title: text("title").notNull(),
     intro: text("intro").notNull().default(""),
+    // 미니룸 배경 (SHOP-04): 가진 배경만 (복합 외래 키)
+    backgroundItemId: integer("background_item_id"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     unique("blogs_owner_id_unique").on(t.ownerId),
+    foreignKey({
+      name: "blogs_background_owned_fk",
+      columns: [t.ownerId, t.backgroundItemId],
+      foreignColumns: [userItems.userId, userItems.itemId],
+    }),
     check("blogs_slug_check", sql`${t.slug} ~ '^[a-z0-9_]{3,20}$'`),
     check(
       "blogs_title_check",

@@ -39,7 +39,8 @@ test.describe("SHOP-01·02·03 마을 상점", () => {
     await expect(card(page, "바닷가").getByRole("button")).toHaveText("코인 부족");
 
     await card(page, "밀짚모자").getByRole("button", { name: "사기" }).click();
-    await expect(result(page)).toHaveText("🎉 밀짚모자를 샀어요! 꾸미기에서 장착할 수 있어요.");
+    await expect(result(page)).toContainText("🎉 밀짚모자를 샀어요! 꾸미기에서 장착해 보세요.");
+    await expect(result(page).getByRole("link", { name: "🎨 꾸미기로" })).toHaveAttribute("href", "/closet");
     await expect(card(page, "밀짚모자").getByRole("button")).toHaveText("보유 중");
     await expect(page.locator("[data-shop-wallet]")).toHaveText("Lv.1 🪙 60");
     await expect(page.locator("header [data-wallet]")).toContainText("🪙 60");
@@ -70,7 +71,7 @@ test.describe("SHOP-01·02·03 마을 상점", () => {
     await expect(page.locator('[data-shop-section="background"] [data-item] h3').first()).toHaveText("우주");
 
     await card(page, "바닷가").getByRole("button", { name: "사기" }).click();
-    await expect(result(page)).toHaveText("🎉 바닷가를 샀어요! 꾸미기에서 장착할 수 있어요.");
+    await expect(result(page)).toContainText("🎉 바닷가를 샀어요! 꾸미기에서 장착해 보세요.");
     await expect(page.locator("[data-shop-wallet]")).toHaveText("Lv.1 🪙 0");
     expect(await coins(id)).toBe(0);
     // 보유순은 가진 것 먼저

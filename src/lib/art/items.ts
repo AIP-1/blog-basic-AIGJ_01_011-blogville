@@ -167,6 +167,27 @@ export const ITEM_ART: Readonly<Record<string, PixelArt>> = {
     palette: { K: OUTLINE, P: "#c0617a", L: "#e48aa0" },
   },
   // ── 배경 (칸 전체)
+  "bg.meadow": {
+    rows: [
+      "AAAAAAAAAAAAAAAA",
+      "AAAWWWAAAAAAAAAA",
+      "AAWWWWWAAAAAOOAA",
+      "AAAAAAAAAAAOOOOA",
+      "AAAAAAAAWWAAOOAA",
+      "AAAAAAAWWWWAAAAA",
+      "AAAAAAAAAAAAAAAA",
+      "LLLLAAAAAAAALLLL",
+      "LLLLLLAAAALLLLLL",
+      "GGGGGGGGGGGGGGGG",
+      "GGGFGGGGGGGGGGGG",
+      "GGGGGGGGGGYGGGGG",
+      "GDGGGGGGGGGGGGGG",
+      "GGGGGGFGGGGGGDGG",
+      "GGGGGGGGGGGGGGGG",
+      "GGYGGGGGGGGGFGGG",
+    ],
+    palette: { A: "#bfe6ff", W: "#ffffff", O: "#ffd34d", L: "#7cc47c", G: "#9bd88b", F: "#ff9aa2", Y: "#ffe58a", D: "#6fae5f" },
+  },
   "bg.beach": {
     rows: [
       "AAAAAAAAAAAAAAAA",

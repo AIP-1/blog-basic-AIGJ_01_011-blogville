@@ -2,7 +2,8 @@ import "server-only";
 import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { accounts, blogs, categories, loginAttempts, profiles, userItems, users } from "@/db/schema";
+import { accounts, blogs, categories, items, loginAttempts, profiles, userItems, users } from "@/db/schema";
+import { STARTER_BACKGROUND } from "@/lib/shop";
 import { AUTH_ERRORS } from "@/lib/auth-rules";
 import { findNameConflict, isUniqueViolation, lockName } from "./names";
 import { findStarterCharacter } from "./items";
@@ -47,9 +48,12 @@ export async function createMember(input: { username: string; password: string; 
       // 고른 캐릭터 1종을 받아 장착한다 (GAME-01)
       await tx.insert(userItems).values({ userId, itemId: characterId });
       await tx.insert(profiles).values({ userId, nickname: input.username, characterItemId: characterId });
+      // 기본 배경 초원을 받아 미니룸에 건다 (SHOP-04)
+      const [meadow] = await tx.select({ id: items.id }).from(items).where(eq(items.code, STARTER_BACKGROUND));
+      if (meadow) await tx.insert(userItems).values({ userId, itemId: meadow.id });
       const [blog] = await tx
         .insert(blogs)
-        .values({ ownerId: userId, slug: input.username, title: input.blogTitle.trim(), intro: "" })
+        .values({ ownerId: userId, slug: input.username, title: input.blogTitle.trim(), intro: "", backgroundItemId: meadow?.id ?? null })
         .returning({ id: blogs.id });
       await tx.insert(categories).values({ blogId: blog.id, name: "일상", position: 1 });
       // 가입 축하 🪙 100 (GAME-03·05)
