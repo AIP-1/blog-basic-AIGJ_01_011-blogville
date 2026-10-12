@@ -92,6 +92,7 @@ export function TownGame({
   start,
   startKey,
   mailFlag = false,
+  place = "마을",
 }: {
   houses: TownHouseInput[];
   member: boolean;
@@ -102,6 +103,8 @@ export function TownGame({
   startKey: string;
   /** 안 읽은 알림이 있으면 내 우체통 깃발을 올린다 */
   mailFlag?: boolean;
+  /** 화면 낭독기 지도 이름 (친구 마을이면 `{닉네임}님의 마을`, TOWN-15) */
+  place?: string;
 }) {
   const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -356,7 +359,7 @@ export function TownGame({
       <canvas
         ref={canvasRef}
         className="block h-full w-full touch-none select-none"
-        aria-label="마을 지도. 방향키로 걷고 Space로 들어가요"
+        aria-label={`${place} 지도. 방향키로 걷고 Space로 들어가요`}
         data-feet={`${start.x},${start.y}`}
         // 시험 훅: 집 자리마다 지붕 색 (TOWN-07)
         data-roofs={houses.map((h) => `${h.lot}:${h.roof}`).join(" ")}
