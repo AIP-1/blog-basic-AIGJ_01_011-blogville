@@ -108,9 +108,9 @@ export function LotsPanel({
                 >
                   <input type="hidden" name="followeeId" value={h.userId} />
                   <input type="hidden" name="lot" value={picked} />
-                  <button type="submit" className="btn h-auto min-h-11 w-full flex-col items-start py-1.5 text-left" data-lot-choice={h.nickname}>
-                    <span>{h.nickname}</span>
-                    <span className="text-xs font-normal text-ink-soft">
+                  <button type="submit" className="flex min-h-11 w-full flex-col items-start rounded-xl border border-line bg-bg px-3 py-1.5 text-left hover:bg-ink/5" data-lot-choice={h.nickname}>
+                    <span className="font-semibold">{h.nickname}</span>
+                    <span className="text-xs text-ink-soft">
                       지금 {h.lot}번 자리 → {occupant ? `${occupant.nickname}님과 자리 바꾸기` : "이 자리로 옮기기"}
                     </span>
                   </button>
