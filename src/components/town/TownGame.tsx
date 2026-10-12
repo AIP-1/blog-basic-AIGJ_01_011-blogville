@@ -346,6 +346,8 @@ export function TownGame({
         className="block h-full w-full touch-none select-none"
         aria-label="마을 지도. 방향키로 걷고 Space로 들어가요"
         data-feet={`${start.x},${start.y}`}
+        // 시험 훅: 집 자리마다 지붕 색 (TOWN-07)
+        data-roofs={houses.map((h) => `${h.lot}:${h.roof}`).join(" ")}
       />
       <p
         role="status"

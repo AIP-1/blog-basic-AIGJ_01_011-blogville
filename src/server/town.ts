@@ -2,10 +2,10 @@ import "server-only";
 import { and, asc, desc, eq, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { blogs, follows, pointLedger, profiles } from "@/db/schema";
-import { roofColor } from "@/lib/art/town";
 import { levelFromExp } from "@/lib/game";
 import { houseStage } from "@/lib/house";
 import { NOTICE_SLUG } from "@/lib/names";
+import { currentRoof, ROOF_HEX } from "@/lib/roof";
 import { levelUpText, notificationText, notificationTime } from "@/lib/notifications";
 import { getMyBlog, getNickname } from "./dal";
 import { listMyNeighbors } from "./follows";
@@ -37,6 +37,7 @@ const houseColumns = {
   slug: blogs.slug,
   nickname: profiles.nickname,
   blogTitle: blogs.title,
+  roofColor: blogs.roofColor,
   exp,
 };
 
@@ -45,6 +46,7 @@ type HouseRow = {
   slug: string;
   nickname: string;
   blogTitle: string;
+  roofColor: string | null;
   exp: number;
 };
 
@@ -55,7 +57,7 @@ function toHouse(row: HouseRow, lot: number, mine: boolean): TownHouse {
     nickname: row.nickname,
     blogTitle: row.blogTitle,
     stage: houseStage(levelFromExp(row.exp)),
-    roof: roofColor(row.blogId),
+    roof: ROOF_HEX[currentRoof(row.blogId, row.roofColor)],
     mine,
   };
 }

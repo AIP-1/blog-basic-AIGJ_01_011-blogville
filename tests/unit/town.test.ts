@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { houseArt, HOUSE_ART_WIDTH, ROOF_COLORS, roofColor } from "@/lib/art/town";
+import { houseArt, HOUSE_ART_WIDTH } from "@/lib/art/town";
+import { ROOF_HEX } from "@/lib/roof";
 import { feetRect, HOUSE_LOTS, INTERACT_DISTANCE, lotFront, nearestEntrance, normalize, overlaps, shortName, START_POS, step, WORLD, type Point } from "@/lib/town/layout";
 import { EMPTY_LOT_HINT, entrancePrompt, townLayout, townSpots, type TownHouseInput } from "@/lib/town/structures";
 
-const house = (lot: number, mine = false): TownHouseInput => ({ lot, slug: `blog${lot}`, nickname: `주민${lot}`, blogTitle: `블로그 ${lot}`, stage: 1, roof: ROOF_COLORS[0], mine });
+const house = (lot: number, mine = false): TownHouseInput => ({ lot, slug: `blog${lot}`, nickname: `주민${lot}`, blogTitle: `블로그 ${lot}`, stage: 1, roof: ROOF_HEX.red, mine });
 
 describe("마을 이동 (TOWN-02)", () => {
   it("대각선도 같은 속도", () => {
@@ -95,17 +96,16 @@ describe("마을 배치 (TOWN-03·04)", () => {
 
 describe("집 그림 (TOWN-11)", () => {
   it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])("%i단계 그림은 폭이 같고 모든 글자에 색이 있다", (stage) => {
-    const art = houseArt(stage, ROOF_COLORS[1]);
+    const art = houseArt(stage, ROOF_HEX.blue);
     for (const row of art.rows) {
       expect(row).toHaveLength(HOUSE_ART_WIDTH);
       for (const ch of row) if (ch !== ".") expect(art.palette[ch]).toMatch(/^#[0-9a-f]{6}$/);
     }
     expect(art.rows).toHaveLength(stage >= 6 ? 40 : 30);
   });
-  it("단계가 오르면 그림이 달라진다, 지붕 색은 블로그 번호로 10가지", () => {
-    const drawings = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((s) => houseArt(s, ROOF_COLORS[0]).rows.join("\n")));
+  it("단계가 오르면 그림이 달라진다", () => {
+    const drawings = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((s) => houseArt(s, ROOF_HEX.red).rows.join("\n")));
     expect(drawings.size).toBe(10);
-    expect(new Set(Array.from({ length: 20 }, (_, i) => roofColor(i))).size).toBe(10);
   });
 });
 

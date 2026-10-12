@@ -134,6 +134,13 @@
       "when": 1791807400186,
       "tag": "0018_house",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791820065126,
+      "tag": "0019_roof_color",
+      "breakpoints": true
     }
   ]
 }

@@ -1,11 +1,12 @@
 import "server-only";
 import { and, asc, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
-import { houseFurniture, items, userItems, users } from "@/db/schema";
+import { blogs, houseFurniture, items, userItems, users } from "@/db/schema";
 import { HOUSE_ERRORS, houseInfo, slotOpenLevel } from "@/lib/house";
+import { canChooseRoof, ROOF_ERRORS, type RoofCode } from "@/lib/roof";
 import { getWallet, lockUser } from "./points";
 
-// 우리 집 가구 (SHOP-05, specs/037-house)
+// 우리 집 가구 (SHOP-05, specs/037-house)와 지붕 색 (TOWN-07, specs/041-roof-color)
 
 export type PlacedFurniture = { slot: number; itemId: number; name: string; art: string };
 export type OwnedFurniture = { id: number; name: string; art: string };
@@ -58,6 +59,23 @@ export async function placeFurniture(userId: string, slot: number, itemId: numbe
       .insert(houseFurniture)
       .values({ userId, slot, itemId })
       .onConflictDoUpdate({ target: [houseFurniture.userId, houseFurniture.slot], set: { itemId } });
+    return { ok: true };
+  });
+}
+
+/**
+ * 지붕 색 고르기 (TOWN-07): [회원 행 KEY SHARE → 회원 잠금 → 레벨로 집 단계를 다시 계산해 열린 색인지 확인 → 저장]. 무료.
+ */
+export async function chooseRoof(userId: string, code: RoofCode): Promise<PlaceResult> {
+  return db.transaction(async (tx) => {
+    const [member] = await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("key share");
+    if (!member) return { ok: false, error: ROOF_ERRORS.unknown };
+    await lockUser(tx, userId);
+    const [blog] = await tx.select({ id: blogs.id }).from(blogs).where(eq(blogs.ownerId, userId));
+    if (!blog) return { ok: false, error: ROOF_ERRORS.unknown };
+    const { stage } = houseInfo((await getWallet(userId, tx)).progress.level);
+    if (!canChooseRoof(blog.id, stage, code)) return { ok: false, error: ROOF_ERRORS.locked };
+    await tx.update(blogs).set({ roofColor: code }).where(eq(blogs.id, blog.id));
     return { ok: true };
   });
 }

@@ -46,13 +46,6 @@ const art = (g: Grid, palette: Record<string, string>): PixelArt => ({
   palette,
 });
 
-/** 지붕 색 10가지 (TOWN-07). 지금은 블로그 번호로 정한다 */
-export const ROOF_COLORS = ["#d9534f", "#4a90d9", "#5cb85c", "#f0ad4e", "#9b59b6", "#e67e9a", "#1abc9c", "#8d6e63", "#34495e", "#f4d03f"] as const;
-
-export function roofColor(blogId: number): string {
-  return ROOF_COLORS[((blogId % ROOF_COLORS.length) + ROOF_COLORS.length) % ROOF_COLORS.length];
-}
-
 function darken(hex: string, amount = 0.25): string {
   const n = parseInt(hex.slice(1), 16);
   const ch = (shift: number) => Math.round(((n >> shift) & 255) * (1 - amount));
