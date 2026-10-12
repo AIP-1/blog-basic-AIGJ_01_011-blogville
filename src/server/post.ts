@@ -1,5 +1,5 @@
 import "server-only";
-import { and, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { blogs, categories, posts, postTags, subcategories, tags } from "@/db/schema";
 import { extractFileKeys } from "@/lib/attachments";
@@ -79,6 +79,32 @@ export async function getPostForView(blogId: number, postId: number, viewerIsOwn
     .limit(1);
   if (!row || (!row.post.isPublic && !viewerIsOwner)) return null;
   return row;
+}
+
+/**
+ * 글 상세 아래 이전 글·다음 글 (POST-05). 블로그 홈 목록과 같은 (created_at, id) 순서.
+ * 지금 글의 시각은 DB에서 비교한다(JS Date는 마이크로초를 잃어 자기 자신이 다음 글로 나올 수 있다).
+ * 주인이 아니면 공개 글만.
+ */
+export async function getAdjacentPosts(blogId: number, postId: number, viewerIsOwner: boolean) {
+  const current = sql`(select p.created_at, p.id from ${posts} p where p.id = ${postId})`;
+  const base = and(eq(posts.blogId, blogId), viewerIsOwner ? undefined : eq(posts.isPublic, true));
+  const pick = { id: posts.id, title: posts.title };
+  const [[older], [newer]] = await Promise.all([
+    db
+      .select(pick)
+      .from(posts)
+      .where(and(base, sql`(${posts.createdAt}, ${posts.id}) < ${current}`))
+      .orderBy(desc(posts.createdAt), desc(posts.id))
+      .limit(1),
+    db
+      .select(pick)
+      .from(posts)
+      .where(and(base, sql`(${posts.createdAt}, ${posts.id}) > ${current}`))
+      .orderBy(asc(posts.createdAt), asc(posts.id))
+      .limit(1),
+  ]);
+  return { older: older ?? null, newer: newer ?? null };
 }
 
 /** 수정 화면용: 그 회원의 블로그 글만 */

@@ -20,6 +20,7 @@
 | `specs/013-town-search/` | 마을 검색의 spec·plan·tasks |
 | `specs/014-paste-reupload/` | 내 다른 글 첨부 붙여 넣기의 spec·plan·tasks |
 | `specs/015-settings-visits-password/` | 방문자 그래프·카테고리 글 수·비밀번호 바꾸기의 spec·plan·tasks |
+| `specs/016-post-nav/` | 이전 글·다음 글과 블로그 이름 링크의 spec·plan·tasks |
 | `src/` | Next.js 16 앱 |
 
 ## 실행

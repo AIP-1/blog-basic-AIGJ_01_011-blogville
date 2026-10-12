@@ -96,7 +96,11 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
       )}
 
       <header className="rounded-2xl border border-line bg-surface p-5">
-        <h1 className="text-2xl font-extrabold">{blog.title}</h1>
+        <h1 className="text-2xl font-extrabold">
+          <Link href={`/@${blog.slug}`} className="-ml-1 inline-flex min-h-11 min-w-11 max-w-full items-center px-1 break-words hover:underline">
+            {blog.title}
+          </Link>
+        </h1>
         {blog.intro && <p className="mt-2 text-ink-soft">{blog.intro}</p>}
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-ink-soft" aria-label="블로그 정보">
