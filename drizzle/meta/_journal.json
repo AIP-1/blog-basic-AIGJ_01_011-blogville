@@ -92,6 +92,13 @@
       "when": 1791793455483,
       "tag": "0012_points_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791795348790,
+      "tag": "0013_pixel_characters",
+      "breakpoints": true
     }
   ]
 }

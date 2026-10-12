@@ -3,9 +3,11 @@
 import { useActionState, useState } from "react";
 import { signIn, signUp, type AuthFormState } from "@/app/(auth)/actions";
 import { defaultBlogTitle } from "@/lib/blog-rules";
+import type { StarterCharacter } from "@/server/items";
+import { PixelCharacter } from "../game/PixelCharacter";
 
 /** `next`: 로그인하면 돌아갈 이 사이트 안의 주소 (서버가 safeNext로 거른 값, 로그인 액션이 다시 거른다) */
-export function AuthPanel({ next }: { next: string | null }) {
+export function AuthPanel({ next, characters }: { next: string | null; characters: StarterCharacter[] }) {
   const [tab, setTab] = useState<"signin" | "signup">("signin");
   return (
     <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
@@ -28,7 +30,7 @@ export function AuthPanel({ next }: { next: string | null }) {
           </button>
         ))}
       </div>
-      {tab === "signin" ? <SignInForm next={next} /> : <SignUpForm />}
+      {tab === "signin" ? <SignInForm next={next} /> : <SignUpForm characters={characters} />}
     </div>
   );
 }
@@ -75,8 +77,10 @@ function SignInForm({ next }: { next: string | null }) {
   );
 }
 
-function SignUpForm() {
+function SignUpForm({ characters }: { characters: StarterCharacter[] }) {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(signUp, null);
+  // 처음에는 첫 번째(남자 주민). 다른 칸 오류로 돌아와도 고른 캐릭터는 그대로 (GAME-01)
+  const [characterId, setCharacterId] = useState(state?.values.characterId ?? String(characters[0]?.id ?? ""));
   const [username, setUsername] = useState(state?.values.username ?? "");
   // 회원이 블로그 이름을 고치기 전에는 아이디를 따라간다. 칸을 비우면 다시 따라간다.
   const [customTitle, setCustomTitle] = useState("");
@@ -86,6 +90,7 @@ function SignUpForm() {
     <form
       action={(formData) => {
         formData.set("blogTitle", blogTitle);
+        formData.set("characterId", characterId);
         return action(formData);
       }}
       className="space-y-3"
@@ -129,6 +134,44 @@ function SignUpForm() {
         <p id="signup-blog-title-help" className="mt-1 text-sm text-ink-soft">
           40자까지, 나중에 블로그 관리에서 바꿀 수 있어요
         </p>
+      </div>
+      {/* 고르기는 버튼(role=radio)으로 한다. 폼 액션이 끝나면 React가 폼을 되돌려 진짜 라디오는 처음 값으로 돌아가기 때문 */}
+      <div role="radiogroup" aria-labelledby="signup-character" className="space-y-1">
+        <p id="signup-character" className="text-sm font-semibold">
+          캐릭터 고르기
+        </p>
+        <div
+          className="grid grid-cols-2 gap-2"
+          // 라디오처럼 ←→↑↓로 옮겨 고르고, Tab은 고른 카드에만 멈춘다
+          onKeyDown={(e) => {
+            const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+            if (!step || characters.length === 0) return;
+            e.preventDefault();
+            const at = characters.findIndex((c) => String(c.id) === characterId);
+            const next = (at + step + characters.length) % characters.length;
+            setCharacterId(String(characters[next].id));
+            (e.currentTarget.querySelectorAll<HTMLButtonElement>("[role=radio]")[next])?.focus();
+          }}
+        >
+          {characters.map((c) => {
+            const on = characterId === String(c.id);
+            return (
+              <button
+                key={c.id}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                tabIndex={on ? 0 : -1}
+                onClick={() => setCharacterId(String(c.id))}
+                className={`flex min-h-11 flex-col items-center gap-1 rounded-xl border-2 p-2 text-sm font-semibold ${on ? "border-amber-400 bg-amber-50" : "border-line"}`}
+                data-character-card={on ? "on" : "off"}
+              >
+                <PixelCharacter art={c.art} size={56} />
+                {c.name}
+              </button>
+            );
+          })}
+        </div>
       </div>
       {state?.error && (
         <p role="alert" className="form-error">

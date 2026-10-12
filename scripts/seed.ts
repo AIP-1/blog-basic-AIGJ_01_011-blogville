@@ -17,7 +17,8 @@ async function main() {
   await sql.begin(async (tx) => {
     await tx`insert into users (id, username, display_username, email, name) values (${userId}, 'demo', 'demo', 'demo@users.blogville.invalid', 'demo')`;
     await tx`insert into accounts (id, user_id, account_id, provider_id, password) values (${crypto.randomUUID().replace(/-/g, "")}, ${userId}, ${userId}, 'credential', ${password})`;
-    await tx`insert into profiles (user_id, nickname) values (${userId}, '데모')`;
+    await tx`insert into user_items (user_id, item_id) select ${userId}, id from items where code = 'char_girl'`;
+    await tx`insert into profiles (user_id, nickname, character_item_id) values (${userId}, '데모', (select id from items where code = 'char_girl'))`;
     const [blog] = await tx`insert into blogs (owner_id, slug, title, intro) values (${userId}, 'demo', '데모 블로그', 'Blogville 시드 데이터') returning id`;
     const [daily] = await tx`insert into categories (blog_id, name, position) values (${blog.id}, '일상', 1) returning id`;
     const [travel] = await tx`insert into categories (blog_id, name, position) values (${blog.id}, '여행', 2) returning id`;

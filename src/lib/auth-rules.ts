@@ -11,6 +11,7 @@ export const AUTH_ERRORS = {
   passwordMismatch: "비밀번호가 서로 달라요",
   reserved: "이 아이디는 쓸 수 없어요",
   taken: "이미 있는 아이디예요",
+  character: "고를 수 없는 캐릭터예요",
   signInEmpty: "아이디와 비밀번호를 적어 주세요",
   signInFailed: "아이디 또는 비밀번호가 맞지 않아요",
   locked: "로그인을 너무 많이 시도했어요. 5분 뒤에 다시 시도해 주세요",
