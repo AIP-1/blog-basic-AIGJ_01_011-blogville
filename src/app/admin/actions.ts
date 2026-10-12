@@ -6,6 +6,8 @@ import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { blogs, posts } from "@/db/schema";
 import { parseId } from "@/lib/ids";
+import { makeTempPassword } from "@/lib/temp-password";
+import { RESET_ERRORS, resetMemberPassword, type ResetResult } from "@/server/account";
 import { requireAdmin } from "@/server/dal";
 
 /** 관리자 글 삭제 (AUTH-08): 어느 블로그의 글이든 지운다. 일반 회원이 보내면 404로 끝나고 아무것도 지우지 않는다. */
@@ -30,4 +32,15 @@ export async function adminDeletePostAndLeave(formData: FormData): Promise<void>
   if (!deleted) return;
   const [blog] = await db.select({ slug: blogs.slug }).from(blogs).where(eq(blogs.id, deleted.blogId));
   if (blog) redirect(`/@${blog.slug}`);
+}
+
+/**
+ * 관리자 비밀번호 초기화 (AUTH-07 열린 질문): 임시 비밀번호를 만들어 한 번만 화면에 돌려준다.
+ * 일반 회원이 보내면 404로 끝나고 아무것도 바꾸지 않는다. 관리자 계정은 거절한다.
+ */
+export async function adminResetPassword(formData: FormData): Promise<ResetResult> {
+  await requireAdmin();
+  const userId = formData.get("userId");
+  if (typeof userId !== "string" || userId.length < 1 || userId.length > 64) return { ok: false, error: RESET_ERRORS.notFound };
+  return resetMemberPassword(userId, makeTempPassword());
 }

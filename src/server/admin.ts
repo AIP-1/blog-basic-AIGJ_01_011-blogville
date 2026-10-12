@@ -49,3 +49,21 @@ export async function listRecentPosts() {
     .orderBy(desc(posts.createdAt), desc(posts.id))
     .limit(RECENT_POSTS);
 }
+
+/** 아이디가 정확히 같은 회원 1명 (관리자 회원 찾기, 비밀번호 초기화용) */
+export async function findMemberByUsername(username: string) {
+  const [row] = await db
+    .select({
+      userId: users.id,
+      username: users.username,
+      role: users.role,
+      createdAt: users.createdAt,
+      nickname: profiles.nickname,
+      slug: blogs.slug,
+    })
+    .from(users)
+    .leftJoin(profiles, eq(profiles.userId, users.id))
+    .leftJoin(blogs, eq(blogs.ownerId, users.id))
+    .where(eq(users.username, username));
+  return row ?? null;
+}
