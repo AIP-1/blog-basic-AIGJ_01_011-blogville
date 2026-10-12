@@ -75,8 +75,11 @@ async function Header() {
                   <span className="whitespace-nowrap">🪙 {formatNumber(wallet.coin)}</span>
                 </Link>
               )}
+              <Link href="/shop" className="btn btn-ghost px-2" aria-label="마을 상점">
+                🏪<span className="hidden lg:inline">상점</span>
+              </Link>
               <Link href="/attendance" className="btn btn-ghost px-2" aria-label="출석 체크">
-                📮<span className="hidden sm:inline">출석</span>
+                📮<span className="hidden lg:inline">출석</span>
               </Link>
               <NotificationBell unread={{ count: unread }} />
               <Link href="/settings/account" className="btn btn-ghost px-2" aria-label="내 정보">
@@ -92,7 +95,7 @@ async function Header() {
               {member.rememberMe && <SessionKeeper />}
               <AttendanceDayWatcher day={todayKST()} />
               {/* 안 읽은 레벨업이 있으면 가운데 팝업 (GAME-06) */}
-              <LevelUpDialog pending={{ level: levelUp }} />
+              <LevelUpDialog pending={{ levelUp }} />
             </>
           )}
           {!member && <HeaderLoginLink />}

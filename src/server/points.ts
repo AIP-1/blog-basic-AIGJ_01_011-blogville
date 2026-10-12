@@ -2,7 +2,7 @@ import "server-only";
 import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { db, type Tx } from "@/db";
 import { pointLedger } from "@/db/schema";
-import { LEDGER_PAGE_SIZE, levelProgress, REWARD_RULES, type RewardReason } from "@/lib/game";
+import { LEDGER_PAGE_SIZE, levelProgress, REWARD_RULES, type LedgerReason, type RewardReason } from "@/lib/game";
 import { notifyLevelUps } from "./notifications";
 
 // 경험치·코인 원장 (GAME-02·03·05·07, specs/031-points-levels)
@@ -22,7 +22,7 @@ export async function lockUser(tx: Tx, userId: string): Promise<void> {
  */
 export async function addLedgerEntry(
   tx: Tx,
-  entry: { userId: string; reason: RewardReason; expDelta: number; coinDelta: number; refId: string | null },
+  entry: { userId: string; reason: LedgerReason; expDelta: number; coinDelta: number; refId: string | null },
 ): Promise<boolean> {
   const before = entry.expDelta > 0 ? await sumExp(tx, entry.userId) : 0;
   const added = await tx.insert(pointLedger).values(entry).onConflictDoNothing().returning({ id: pointLedger.id });
@@ -67,8 +67,8 @@ export async function hasLedgerEntry(tx: Tx | typeof db, userId: string, reason:
 export type Wallet = { exp: number; coin: number; progress: ReturnType<typeof levelProgress> };
 
 /** 누적 경험치·코인과 레벨 진행 (헤더·내역 화면) */
-export async function getWallet(userId: string): Promise<Wallet> {
-  const [row] = await db
+export async function getWallet(userId: string, tx: Tx | typeof db = db): Promise<Wallet> {
+  const [row] = await tx
     .select({
       exp: sql<number>`coalesce(sum(${pointLedger.expDelta}), 0)::int`,
       coin: sql<number>`coalesce(sum(${pointLedger.coinDelta}), 0)::int`,
@@ -90,7 +90,7 @@ export async function listLedger(userId: string, page: number) {
       .offset((page - 1) * LEDGER_PAGE_SIZE),
     db.select({ total: count() }).from(pointLedger).where(eq(pointLedger.userId, userId)),
   ]);
-  return { items: items as (typeof items[number] & { reason: RewardReason })[], total };
+  return { items: items as (typeof items[number] & { reason: LedgerReason })[], total };
 }
 
 /** 이 글로 글쓰기 보상을 받았는지 (발행 안내, POST-01) */

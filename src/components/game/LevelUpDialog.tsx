@@ -3,7 +3,9 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { dismissLevelUp } from "@/app/notifications/actions";
-import { levelUpTitle } from "@/lib/notifications";
+import { PixelLayers } from "@/components/game/PixelLayers";
+import { levelUpTitle, type PendingLevelUp } from "@/lib/notifications";
+import { isAvatarType } from "@/lib/shop";
 
 /**
  * 레벨업 팝업 (GAME-06). 처음 값은 서버가 헤더를 그릴 때 준다(`pending`, 그릴 때마다 새 객체).
@@ -11,20 +13,21 @@ import { levelUpTitle } from "@/lib/notifications";
  * (남이 공감해 줘서 오른 레벨은 다음에 여는 화면에서 뜬다).
  * 누르면 서버 응답을 기다리지 않고 바로 닫고, 닫은 레벨 이하는 다시 띄우지 않는다.
  */
-export function LevelUpDialog({ pending }: { pending: { level: number | null } }) {
+export function LevelUpDialog({ pending }: { pending: { levelUp: PendingLevelUp | null } }) {
   const pathname = usePathname();
   const dialog = useRef<HTMLDialogElement>(null);
   const ok = useRef<HTMLButtonElement>(null);
   const dismissed = useRef(0);
-  const [level, setLevel] = useState<number | null>(null);
+  const [shown, setShown] = useState<PendingLevelUp | null>(null);
+  const level = shown?.level ?? null;
   const [, startTransition] = useTransition();
 
-  const offer = (next: number | null) => {
-    if (next !== null && next > dismissed.current) setLevel((cur) => (cur === null || next > cur ? next : cur));
+  const offer = (next: PendingLevelUp | null) => {
+    if (next && next.level > dismissed.current) setShown((cur) => (cur === null || next.level > cur.level ? next : cur));
   };
 
   useEffect(() => {
-    offer(pending.level);
+    offer(pending.levelUp);
   }, [pending]);
 
   const first = useRef(true);
@@ -36,8 +39,8 @@ export function LevelUpDialog({ pending }: { pending: { level: number | null } }
     let alive = true;
     fetch("/api/notifications/unread", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((data: { levelUp?: unknown } | null) => {
-        if (alive && typeof data?.levelUp === "number") offer(data.levelUp);
+      .then((data: { levelUp?: PendingLevelUp | null } | null) => {
+        if (alive && typeof data?.levelUp?.level === "number") offer(data.levelUp);
       })
       .catch(() => {});
     return () => {
@@ -52,11 +55,11 @@ export function LevelUpDialog({ pending }: { pending: { level: number | null } }
     ok.current?.focus();
   }, [level]);
 
-  const close = (go: "stay" | "wallet") => {
+  const close = (go: "stay" | "shop") => {
     if (level === null) return;
     dismissed.current = Math.max(dismissed.current, level);
     dialog.current?.close();
-    setLevel(null);
+    setShown(null);
     const data = new FormData();
     data.set("level", String(level));
     data.set("go", go);
@@ -83,10 +86,23 @@ export function LevelUpDialog({ pending }: { pending: { level: number | null } }
           <h2 id="level-up-title" className="mt-3 text-2xl font-extrabold">
             {levelUpTitle(level)}
           </h2>
-          <p className="mt-2 text-ink-soft">활동하면서 경험치를 모았어요.</p>
+          {shown && shown.items.length > 0 && (
+            <div className="mt-4" data-level-up-items>
+              <p className="font-semibold">이제 이런 친구를 데려올 수 있어요</p>
+              <ul className="mt-2 flex justify-center gap-3">
+                {shown.items.map((item) => (
+                  <li key={item.name} className="flex w-20 flex-col items-center text-sm">
+                    <PixelLayers arts={isAvatarType(item.type) ? ["mannequin", item.art] : [item.art]} size={64} />
+                    <span className="mt-1">{item.name}</span>
+                  </li>
+                ))}
+              </ul>
+              {shown.more > 0 && <p className="mt-1 text-sm text-ink-soft">외 {shown.more}개</p>}
+            </div>
+          )}
           <div className="mt-6 flex justify-center gap-2">
-            <button type="button" className="btn" onClick={() => close("wallet")}>
-              내역 보기
+            <button type="button" className="btn" onClick={() => close("shop")}>
+              상점 가기
             </button>
             <button type="button" ref={ok} className="btn btn-primary" onClick={() => close("stay")}>
               확인

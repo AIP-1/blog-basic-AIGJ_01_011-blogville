@@ -51,7 +51,7 @@ test.describe("GAME-06 레벨업 팝업", () => {
     await page.close();
   });
 
-  test("남의 공감으로 Lv.3: 공감한 사람에게는 안 뜨고, 주인이 다음 화면을 열 때 뜬다. [내역 보기]는 /wallet", async ({ browser }) => {
+  test("남의 공감으로 Lv.3: 공감한 사람에게는 안 뜨고, 주인이 다음 화면을 열 때 뜬다. [상점 가기]는 /shop", async ({ browser }) => {
     const owner = await member(browser);
     await addExp(owner.id, 48); // 출석 10 + 48 = 58 (Lv.2, Lv.3은 60)
     const [{ id: postId }] = await sql`insert into posts (blog_id, title, content_html, content_text, is_public)
@@ -71,8 +71,13 @@ test.describe("GAME-06 레벨업 팝업", () => {
     await owner.page.getByRole("link", { name: "마을 소식" }).click();
     await expect(owner.page).toHaveURL(/\/feed$/);
     await expect(popup(owner.page).getByRole("heading")).toHaveText("Lv.3이 되었어요!");
-    await popup(owner.page).getByRole("button", { name: "내역 보기" }).click();
-    await expect(owner.page).toHaveURL(/\/wallet$/);
+    // Lv.3에 열린 아이템 (필요 레벨 높은 순 → ID 순, 3개 + 외 N개)
+    const unlocked = popup(owner.page).locator("[data-level-up-items]");
+    await expect(unlocked).toContainText("이제 이런 친구를 데려올 수 있어요");
+    await expect(unlocked.getByRole("listitem")).toHaveText(["원피스", "가방", "포근한 침대"]);
+    await expect(unlocked).toContainText("외 1개");
+    await popup(owner.page).getByRole("button", { name: "상점 가기" }).click();
+    await expect(owner.page).toHaveURL(/\/shop$/);
     await expect(popup(owner.page)).toHaveCount(0);
     expect(await levelUps(owner.id)).toEqual([{ level: 3, read: true }]);
     await owner.page.close();
@@ -84,6 +89,9 @@ test.describe("GAME-06 레벨업 팝업", () => {
     await sql`insert into notifications (user_id, kind, level) values (${id}, 'level_up', 3), (${id}, 'level_up', 4)`;
     await page.reload();
     await expect(popup(page).getByRole("heading")).toHaveText("Lv.4가 되었어요!");
+    // 안 읽은 Lv.3~4에 열린 아이템: Lv.4 소파·밤의 도시, Lv.3 원피스 … 외 3개
+    await expect(popup(page).locator("[data-level-up-items] li")).toHaveText(["푹신한 소파", "밤의 도시", "원피스"]);
+    await expect(popup(page).locator("[data-level-up-items]")).toContainText("외 3개");
     await popup(page).getByRole("button", { name: "확인" }).click();
     await expect.poll(() => levelUps(id)).toEqual([
       { level: 3, read: true },
@@ -93,6 +101,7 @@ test.describe("GAME-06 레벨업 팝업", () => {
     await sql`insert into notifications (user_id, kind, level) values (${id}, 'level_up', 99)`;
     await page.reload();
     await expect(popup(page).getByRole("heading")).toHaveText("최고 레벨 Lv.99가 되었어요!");
+    await expect(popup(page).locator("[data-level-up-items]")).toHaveCount(0);
     await page.keyboard.press("Escape");
     await expect(popup(page)).toHaveCount(0);
     await expect.poll(async () => (await levelUps(id)).at(-1)).toEqual({ level: 99, read: true });

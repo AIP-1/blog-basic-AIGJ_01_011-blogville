@@ -121,11 +121,20 @@ export const items = pgTable(
     type: text("type").notNull(),
     name: text("name").notNull(),
     art: text("art").notNull(),
+    description: text("description").notNull().default(""),
     price: integer("price").notNull().default(0),
+    // 살 수 있는 레벨 (SHOP-02)
+    requiredLevel: integer("required_level").notNull().default(1),
     isStarter: boolean("is_starter").notNull().default(false),
     isOnSale: boolean("is_on_sale").notNull().default(false),
   },
-  (t) => [check("items_type_check", sql`${t.type} in ('character')`), check("items_price_check", sql`${t.price} >= 0`)],
+  (t) => [
+    check("items_type_check", sql`${t.type} in ('character', 'hat', 'clothes', 'accessory', 'furniture', 'background')`),
+    check("items_price_check", sql`${t.price} >= 0`),
+    check("items_required_level_check", sql`${t.requiredLevel} between 1 and 99`),
+    // 파는 아이템은 값이 있고 기본 아이템이 아니다 (캐릭터는 팔지 않는다, SHOP-01)
+    check("items_on_sale_check", sql`not ${t.isOnSale} or (${t.price} > 0 and not ${t.isStarter} and ${t.type} <> 'character')`),
+  ],
 );
 
 /** 가진 아이템 (인벤토리). 회원이 지워지면 함께 지운다 */
@@ -494,7 +503,11 @@ export const pointLedger = pgTable(
     uniqueIndex("point_ledger_signup_uq").on(t.userId).where(sql`${t.reason} = 'signup'`),
     // 출석 보상은 하루 한 번 (ref_id = 날짜)
     uniqueIndex("point_ledger_attendance_uq").on(t.userId, t.refId).where(sql`${t.reason} = 'attendance'`),
-    check("point_ledger_reason_check", sql`${t.reason} in ('signup', 'attendance', 'post', 'comment', 'like_received')`),
+    // 같은 아이템은 한 번만 산다 (SHOP-01, ref_id = 아이템 ID)
+    uniqueIndex("point_ledger_purchase_uq").on(t.userId, t.refId).where(sql`${t.reason} = 'purchase'`),
+    check("point_ledger_reason_check", sql`${t.reason} in ('signup', 'attendance', 'post', 'comment', 'like_received', 'purchase')`),
+    // 구매만 코인이 줄고, 구매는 경험치가 없다 (SHOP-03)
+    check("point_ledger_purchase_check", sql`(${t.reason} = 'purchase') = (${t.coinDelta} < 0) and (${t.reason} <> 'purchase' or ${t.expDelta} = 0)`),
     check("point_ledger_exp_check", sql`${t.expDelta} >= 0`),
     check("point_ledger_nonzero_check", sql`${t.expDelta} <> 0 or ${t.coinDelta} <> 0`),
   ],

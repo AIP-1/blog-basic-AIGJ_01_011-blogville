@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { Pagination } from "@/components/blog/Pagination";
 import { formatDateTime } from "@/lib/comment-rules";
@@ -84,7 +85,13 @@ export default async function WalletPage({ searchParams }: PageProps<"/wallet">)
         </ol>
       )}
       <Pagination basePath="/wallet" query={{}} page={page} totalPages={Math.ceil(total / LEDGER_PAGE_SIZE)} />
-      <p className="text-sm text-ink-soft">코인은 상점이 열리면 쓸 수 있어요.</p>
+      <p className="text-sm text-ink-soft">
+        모은 코인은{" "}
+        <Link href="/shop" className="font-semibold text-accent underline">
+          🏪 마을 상점
+        </Link>
+        에서 쓸 수 있어요.
+      </p>
     </div>
   );
 }

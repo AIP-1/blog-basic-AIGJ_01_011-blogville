@@ -1,9 +1,9 @@
 import "server-only";
-import { and, count, desc, eq, isNull, lte, max, or, sql } from "drizzle-orm";
+import { and, asc, between, count, desc, eq, isNull, lte, max, min, or, sql } from "drizzle-orm";
 import { db, type Tx } from "@/db";
-import { blogs, notifications, posts, profiles } from "@/db/schema";
+import { blogs, items, notifications, posts, profiles } from "@/db/schema";
 import { levelsGained } from "@/lib/game";
-import { isActivityKind, NOTIFICATIONS_PAGE_SIZE, UNREAD_COUNT_CAP, type ActivityKind } from "@/lib/notifications";
+import { isActivityKind, LEVEL_UP_ITEMS_SHOWN, NOTIFICATIONS_PAGE_SIZE, UNREAD_COUNT_CAP, type ActivityKind, type PendingLevelUp } from "@/lib/notifications";
 
 // 알림 (GAME-08의 공감·댓글·답글, specs/017-notifications · GAME-06 레벨업, specs/034-level-up)
 
@@ -54,13 +54,27 @@ export async function countUnreadNotifications(userId: string): Promise<number> 
   return row.n;
 }
 
-/** 헤더 팝업 (GAME-06): 안 읽은 레벨업 중 가장 높은 레벨. 없으면 null */
-export async function getPendingLevelUp(userId: string): Promise<number | null> {
+/**
+ * 헤더 팝업 (GAME-06): 안 읽은 레벨업 중 가장 높은 레벨. 없으면 null.
+ * 안 읽은 가장 낮은 ~ 가장 높은 레벨에서 새로 살 수 있게 된 판매 아이템도 3개까지 (필요 레벨 높은 순 → ID 순, SHOP-02).
+ */
+export async function getPendingLevelUp(userId: string): Promise<PendingLevelUp | null> {
   const [row] = await db
-    .select({ level: max(notifications.level) })
+    .select({ high: max(notifications.level), low: min(notifications.level) })
     .from(notifications)
     .where(and(eq(notifications.userId, userId), eq(notifications.kind, "level_up"), isNull(notifications.readAt)));
-  return row?.level ?? null;
+  if (row?.high == null || row.low == null) return null;
+  const unlocked = await db
+    .select({ name: items.name, art: items.art, type: items.type, total: sql<number>`count(*) over ()::int` })
+    .from(items)
+    .where(and(eq(items.isOnSale, true), between(items.requiredLevel, row.low, row.high)))
+    .orderBy(desc(items.requiredLevel), asc(items.id))
+    .limit(LEVEL_UP_ITEMS_SHOWN);
+  return {
+    level: row.high,
+    items: unlocked.map(({ name, art, type }) => ({ name, art, type })),
+    more: Math.max(0, (unlocked[0]?.total ?? 0) - unlocked.length),
+  };
 }
 
 /** 팝업 [확인]: 그 레벨과 그보다 낮은 내 안 읽은 레벨업을 모두 읽음으로 */

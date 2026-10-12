@@ -60,6 +60,11 @@ export function levelUpTitle(level: number): string {
   return level >= MAX_LEVEL ? `최고 레벨 ${text}` : text;
 }
 
+/** 레벨업 팝업에 보여 줄 새 아이템 수 */
+export const LEVEL_UP_ITEMS_SHOWN = 3;
+
+export type PendingLevelUp = { level: number; items: { name: string; art: string; type: string }[]; more: number };
+
 /** 알림함의 레벨업 줄 */
 export function levelUpText(level: number): string {
   return `🎉 ${levelUpTitle(level)}`;
