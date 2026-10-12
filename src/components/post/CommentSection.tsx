@@ -7,10 +7,10 @@ import { COMMENT_MAX, formatDateTime } from "@/lib/comment-rules";
 import { confirmFirst } from "@/lib/confirm-action";
 import type { CommentLine, CommentThreadItem } from "@/server/comments";
 
-type Props = { postId: number; items: CommentThreadItem[]; count: number; signedIn: boolean };
+type Props = { postId: number; items: CommentThreadItem[]; count: number; signedIn: boolean; loginHref: string };
 
-/** 글 상세 아래 댓글 영역 (SOC-01·02). 주소는 `#comments`. */
-export function CommentSection({ postId, items, count, signedIn }: Props) {
+/** 글 상세 아래 댓글 영역 (SOC-01·02). 주소는 `#comments`. `loginHref`는 로그인 뒤 이 자리로 돌아오는 첫 화면 주소. */
+export function CommentSection({ postId, items, count, signedIn, loginHref }: Props) {
   return (
     <section id="comments" aria-labelledby="comments-title" className="mt-8 border-t border-line pt-6">
       <h2 id="comments-title" className="text-lg font-bold">
@@ -32,7 +32,7 @@ export function CommentSection({ postId, items, count, signedIn }: Props) {
           />
         ) : (
           <p className="text-ink-soft">
-            <Link href="/" className="inline-flex min-h-11 items-center font-semibold text-accent underline">
+            <Link href={loginHref} className="inline-flex min-h-11 items-center font-semibold text-accent underline">
               로그인
             </Link>
             하면 댓글을 남길 수 있어요

@@ -134,6 +134,9 @@ test.describe("SOC-04 내 이웃 목록", () => {
     me.page.on("dialog", (dlg) => dlg.accept());
     const input = rows(me.page).locator('input[name="followeeId"]');
     for (const value of ["x".repeat(65), other.userId, x.userId]) {
+      // 앞 액션이 끝나며 폼을 되돌리면(React 폼 액션) 바꾼 값이 원래 값으로 돌아가 진짜 이웃이 지워지므로 새로 연다
+      await me.page.reload();
+      await summary(me.page).click();
       await input.evaluate((el, v) => ((el as HTMLInputElement).value = v), value);
       await Promise.all([
         me.page.waitForResponse((r) => r.request().method() === "POST" && !!r.request().headers()["next-action"]),

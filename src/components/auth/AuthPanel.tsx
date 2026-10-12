@@ -4,7 +4,8 @@ import { useActionState, useState } from "react";
 import { signIn, signUp, type AuthFormState } from "@/app/(auth)/actions";
 import { defaultBlogTitle } from "@/lib/blog-rules";
 
-export function AuthPanel() {
+/** `next`: 로그인하면 돌아갈 이 사이트 안의 주소 (서버가 safeNext로 거른 값, 로그인 액션이 다시 거른다) */
+export function AuthPanel({ next }: { next: string | null }) {
   const [tab, setTab] = useState<"signin" | "signup">("signin");
   return (
     <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
@@ -27,7 +28,7 @@ export function AuthPanel() {
           </button>
         ))}
       </div>
-      {tab === "signin" ? <SignInForm /> : <SignUpForm />}
+      {tab === "signin" ? <SignInForm next={next} /> : <SignUpForm />}
     </div>
   );
 }
@@ -40,10 +41,16 @@ function Label({ htmlFor, children }: { htmlFor: string; children: React.ReactNo
   );
 }
 
-function SignInForm() {
+function SignInForm({ next }: { next: string | null }) {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(signIn, null);
   return (
     <form action={action} className="space-y-3" noValidate>
+      {next && (
+        <>
+          <input type="hidden" name="next" value={next} />
+          <p className="text-sm text-ink-soft">로그인하면 보던 화면으로 돌아가요</p>
+        </>
+      )}
       <div>
         <Label htmlFor="signin-username">아이디</Label>
         <input id="signin-username" name="username" className="field" autoComplete="username" defaultValue={state?.values.username} key={state?.values.username} />

@@ -104,7 +104,8 @@ test.describe("US1 댓글 쓰기·삭제", () => {
     await visitor.goto(`/@${owner.username}/${id}`);
     await expect(section(visitor)).toContainText("로그인하면 댓글을 남길 수 있어요");
     const login = section(visitor).getByRole("link", { name: "로그인" });
-    await expect(login).toHaveAttribute("href", "/");
+    // 로그인하면 이 글의 댓글 자리로 돌아온다 (tests/e2e/login-next.spec.ts)
+    await expect(login).toHaveAttribute("href", `/?next=${encodeURIComponent(`/@${owner.username}/${id}#comments`)}`);
     expect((await login.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     await expect(section(visitor).getByRole("button")).toHaveCount(0);
     await expect(section(visitor).getByRole("textbox")).toHaveCount(0);

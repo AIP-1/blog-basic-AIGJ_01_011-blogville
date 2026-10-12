@@ -9,6 +9,7 @@ import { LikeButton } from "@/components/post/LikeButton";
 import { AdjacentPosts } from "@/components/post/AdjacentPosts";
 import { TagList } from "@/components/post/TagList";
 import { parseId } from "@/lib/ids";
+import { loginHref } from "@/lib/safe-next";
 import { formatDate } from "@/lib/text";
 import { getBlogBySlug } from "@/server/blog";
 import { getSession } from "@/server/dal";
@@ -48,6 +49,8 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]/[post
     ? `/@${blog.slug}?category=${post.categoryId}${post.subcategoryId ? `&sub=${post.subcategoryId}` : ""}`
     : undefined;
   const edited = post.updatedAt.getTime() - post.createdAt.getTime() > 1000;
+  // 방문자의 [로그인]은 로그인 뒤 이 글로 돌아온다 (AUTH-09·SOC-01·SOC-03 열린 질문)
+  const postPath = `/@${blog.slug}/${post.id}`;
   // 조회수 (POST-06): 서버 렌더는 바꾸지 않는다. 오늘 처음 연 브라우저면 +1 한 값으로 시작한다.
   const countsView = !isOwner && post.isPublic;
   const firstToday = countsView && !(await hasViewedToday(post.id, await readVisitorId()));
@@ -69,7 +72,7 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]/[post
       {/* content_html은 저장할 때 허용 태그만 남긴 HTML이다 (NF-03) */}
       <div className="prose-post mt-6" dangerouslySetInnerHTML={{ __html: post.contentHtml }} />
       <TagList tags={await getPostTags(post.id)} />
-      <LikeButton postId={post.id} {...await getLikeState(post.id, member?.userId ?? null)} canLike={member !== null} />
+      <LikeButton postId={post.id} {...await getLikeState(post.id, member?.userId ?? null)} canLike={member !== null} loginHref={loginHref(postPath)} />
       <AdjacentPosts slug={blog.slug} {...adjacent} />
       <footer className={`flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 ${adjacent.older || adjacent.newer ? "" : "mt-8"}`}>
         <Link href={`/@${blog.slug}`} className="btn">
@@ -84,7 +87,7 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]/[post
           </div>
         )}
       </footer>
-      <CommentSection postId={post.id} items={thread.items} count={thread.count} signedIn={member !== null} />
+      <CommentSection postId={post.id} items={thread.items} count={thread.count} signedIn={member !== null} loginHref={loginHref(`${postPath}#comments`)} />
     </article>
   );
 }

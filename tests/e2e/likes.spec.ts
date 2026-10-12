@@ -64,7 +64,7 @@ test.describe("SOC-03 공감", () => {
     const visitor = await browser.newPage();
     await visitor.goto(`/@${owner}/${id}`);
     await expect(like(visitor)).toBeDisabled();
-    await expect(visitor.getByText("로그인하면 공감할 수 있어요")).toBeVisible();
+    await expect(visitor.locator("[data-like-login]")).toHaveText("로그인하면 공감할 수 있어요");
     await expect(like(visitor)).toHaveAttribute("aria-describedby", "like-login");
 
     const g = await browser.newPage();
