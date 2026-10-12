@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { houseArt, HOUSE_ART_WIDTH } from "@/lib/art/town";
+import { CLIFF_FACE, CLIFF_LINES, heightAt, onStairs, stairEnds, STAIRS, TERRAIN_WALLS } from "@/lib/town/terrain";
 import { ROOF_HEX } from "@/lib/roof";
 import { feetRect, HOUSE_LOTS, INTERACT_DISTANCE, lotFront, nearestEntrance, normalize, overlaps, shortName, START_POS, step, WORLD, type Point } from "@/lib/town/layout";
 import { EMPTY_LOT_HINT, entrancePrompt, townLayout, townSpots, type TownHouseInput } from "@/lib/town/structures";
@@ -52,11 +53,11 @@ describe("마을 배치 (TOWN-03·04)", () => {
   });
 
   it("집이 다 차도 모든 입구에 처음 자리(분수 아래)에서 걸어서 갈 수 있다", () => {
-    const { structures, entrances } = townLayout(
+    const { structures, entrances, walls } = townLayout(
       HOUSE_LOTS.map((_, i) => house(i, i === 0)),
       true,
     );
-    const bodies = structures.flatMap((s) => (s.body ? [s.body] : []));
+    const bodies = [...walls, ...structures.flatMap((s) => (s.body ? [s.body] : []))];
     const free = (p: Point) => {
       const f = feetRect(p);
       return f.x >= 0 && f.y >= 0 && f.x + f.width <= WORLD.width && f.y + f.height <= WORLD.height && !bodies.some((b) => overlaps(f, b));
@@ -91,6 +92,17 @@ describe("마을 배치 (TOWN-03·04)", () => {
     }
     // 집 앞(도착 자리)은 몸체에 걸리지 않는다
     for (let i = 0; i < HOUSE_LOTS.length; i++) expect(free(lotFront(i)), `lot ${i}`).toBe(true);
+    // 높낮이 (TOWN-05): 세 단 모두와 계단 양끝에 걸어서 닿는다
+    const reach = (p: Point) => seen.has(key(p));
+    for (const st of STAIRS) {
+      const { top, bottom } = stairEnds(st);
+      expect(reach(top), `${st.id} 위`).toBe(true);
+      expect(reach(bottom), `${st.id} 아래`).toBe(true);
+    }
+    expect([...seen].some((k) => heightAt(Number(k.split(",")[1]) * cell) === 2)).toBe(true);
+    expect([...seen].some((k) => heightAt(Number(k.split(",")[1]) * cell) === 0)).toBe(true);
+    // 계단이 아닌 곳의 절벽 앞면은 걸을 수 없다
+    for (const line of CLIFF_LINES) expect(free({ x: 1000, y: line + CLIFF_FACE / 2 })).toBe(false);
   });
 });
 
@@ -132,5 +144,19 @@ describe("☰ 텔레포트 목록 (TOWN-12)", () => {
       true,
     );
     for (const s of [...spots.places, ...spots.houses]) expect(bodies.some((b) => overlaps(feetRect(s), b)), s.id).toBe(false);
+  });
+});
+
+describe("높낮이 (TOWN-05)", () => {
+  it("계단은 4곳, 길보다 넓고 앞면 조각과 겹치지 않으며 계단 위는 느리게", () => {
+    expect(STAIRS).toHaveLength(4);
+    for (const st of STAIRS) {
+      expect(st.rect.width).toBeGreaterThan(52);
+      const inner = { x: st.rect.x + 8, y: st.rect.y, width: st.rect.width - 16, height: st.rect.height };
+      expect(TERRAIN_WALLS.some((w) => overlaps(w, inner))).toBe(false);
+      expect(onStairs({ x: st.x, y: st.top + 10 })).toBe(true);
+    }
+    expect(onStairs({ x: 1000, y: 800 })).toBe(false);
+    expect([100, 600, 1500].map(heightAt)).toEqual([2, 1, 0]);
   });
 });

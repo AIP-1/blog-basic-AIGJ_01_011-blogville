@@ -309,6 +309,18 @@ export function fountainArt(): PixelArt {
   return art(g, { S: "#c9c2b5", s: "#a39b8c", B: "#6ec6ff", w: "#d6f0ff" });
 }
 
+/** 전망대 나무 의자 (TOWN-05) */
+export function benchArt(): PixelArt {
+  const g = grid(18, 8);
+  fill(g, 0, 0, 18, 2, "W");
+  fill(g, 0, 3, 18, 2, "W");
+  fill(g, 0, 2, 18, 1, "w");
+  fill(g, 0, 5, 18, 1, "w");
+  fill(g, 1, 6, 2, 2, "N");
+  fill(g, 15, 6, 2, 2, "N");
+  return art(g, { W: "#b07a4a", w: "#8a5a34", N: "#5a3d26" });
+}
+
 /** 나무 (두 가지 초록) */
 export function treeArt(variant: number): PixelArt {
   const g = grid(12, 16);

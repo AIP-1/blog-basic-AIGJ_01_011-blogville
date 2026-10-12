@@ -7,6 +7,7 @@ import { pixelRects, type PixelArt } from "@/lib/art/characters";
 import { TOWN_CELL } from "@/lib/art/town";
 import { PLAYER_SIZE, SPEED, WORLD, nearestEntrance, normalize, step, type Point } from "@/lib/town/layout";
 import { artSize, artVisibleHeight, entrancePrompt, townLayout, type TownEntrance, type TownHouseInput } from "@/lib/town/structures";
+import { onStairs, STAIR_SLOW, stairEnds, STAIRS } from "@/lib/town/terrain";
 import { bakeGround, GROUND_CELL } from "./ground";
 
 /** 휴대폰에는 마을이 없다 (TOWN-01): 폭 640px 미만 */
@@ -125,8 +126,8 @@ export function TownGame({
     };
     setTouch(window.matchMedia("(pointer: coarse)").matches);
     const ctx = canvas.getContext("2d")!;
-    const { structures, entrances } = townLayout(houses, member);
-    const bodies = structures.flatMap((s) => (s.body ? [s.body] : []));
+    const { structures, entrances, walls } = townLayout(houses, member);
+    const bodies = [...walls, ...structures.flatMap((s) => (s.body ? [s.body] : []))];
     const sprites = new Map<object, HTMLCanvasElement>();
     for (const s of structures) if (!sprites.has(s.art)) sprites.set(s.art, bake([s.art], TOWN_CELL));
     const playerArts = layers.map(findArt).filter((a): a is PixelArt => a !== undefined);
@@ -236,7 +237,9 @@ export function TownGame({
       const dir = normalize(dx, dy);
       const moving = dir.x !== 0 || dir.y !== 0;
       if (moving) {
-        const next = step(pos, { x: dir.x * SPEED * dt, y: dir.y * SPEED * dt }, bodies);
+        // 계단에서는 조금 느리게 (TOWN-05)
+        const speed = onStairs(pos) ? SPEED * STAIR_SLOW : SPEED;
+        const next = step(pos, { x: dir.x * speed * dt, y: dir.y * speed * dt }, bodies);
         // 클릭 목표로 가다 막히면 멈춘다
         stuck = Math.hypot(next.x - pos.x, next.y - pos.y) < 0.5 ? stuck + dt : 0;
         if (stuck > 0.25) target = null;
@@ -348,6 +351,11 @@ export function TownGame({
         data-feet={`${start.x},${start.y}`}
         // 시험 훅: 집 자리마다 지붕 색 (TOWN-07)
         data-roofs={houses.map((h) => `${h.lot}:${h.roof}`).join(" ")}
+        // 시험 훅: 계단마다 `위x,위y,아래x,아래y` (TOWN-05)
+        data-stairs={STAIRS.map((st) => {
+          const { top, bottom } = stairEnds(st);
+          return `${top.x},${top.y},${bottom.x},${bottom.y}`;
+        }).join(" ")}
       />
       <p
         role="status"

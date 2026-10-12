@@ -18,11 +18,13 @@ export const START_POS = { x: CENTER.x + 50, y: CENTER.y + 160 } as const;
 export type Point = { x: number; y: number };
 export type Rect = { x: number; y: number; width: number; height: number };
 
-/** 서쪽·동쪽 길이 지나는 x, 남쪽 길이 지나는 y */
-const WEST_ROAD = 490;
-const EAST_ROAD = 1510;
+/** 서쪽·동쪽 길이 지나는 x, 남쪽·언덕 길이 지나는 y, 길 너비 */
+export const WEST_ROAD = 490;
+export const EAST_ROAD = 1510;
 const SOUTH_ROAD = 1500;
-const ROAD = 52;
+/** 북쪽 언덕 위 길 (TOWN-05) */
+export const HILL_ROAD = 175;
+export const ROAD = 52;
 
 /** 집 자리 11곳 (집 그림의 발밑). 0번은 내 집(광장 아래), 1~4 서쪽, 5~8 동쪽, 9·10 남쪽 */
 export const HOUSE_LOTS: readonly Point[] = [
@@ -61,6 +63,10 @@ export const ROADS: readonly Rect[] = [
   ...[1, 2, 3, 4].map((i) => band(HOUSE_LOTS[i].x, HOUSE_LOTS[i].y + 40, WEST_ROAD, HOUSE_LOTS[i].y + 40)),
   ...[5, 6, 7, 8].map((i) => band(EAST_ROAD, HOUSE_LOTS[i].y + 40, HOUSE_LOTS[i].x, HOUSE_LOTS[i].y + 40)),
   band(SHOP_POS.x, SHOP_POS.y + 30, SHOP_POS.x, CENTER.y),
+  // 북쪽 언덕 (TOWN-05): 서쪽·동쪽 길이 계단으로 올라가 언덕 위 길로 이어진다
+  band(WEST_ROAD, HILL_ROAD, WEST_ROAD, HOUSE_LOTS[1].y + 40),
+  band(EAST_ROAD, HILL_ROAD, EAST_ROAD, HOUSE_LOTS[5].y + 40),
+  band(WEST_ROAD, HILL_ROAD, EAST_ROAD, HILL_ROAD),
 ];
 
 /** 이름표가 길면 줄인다 (12자) */
