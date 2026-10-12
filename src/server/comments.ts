@@ -1,9 +1,10 @@
 import "server-only";
 import { and, asc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { db, type Tx } from "@/db";
-import { blogs, comments, posts, profiles, replies } from "@/db/schema";
+import { blogs, comments, posts, profiles, replies, users } from "@/db/schema";
 import { COMMENT_ERRORS } from "@/lib/comment-rules";
 import type { Member } from "./dal";
+import { notifyActivity } from "./notifications";
 
 /** 글 목록 카드·상세의 `💬 N`: 삭제되지 않은 댓글 + 답글 (SOC-01·02) */
 export function commentCountSql(postId: SQL | typeof posts.id): SQL<number> {
@@ -82,41 +83,63 @@ export async function getCommentThread(postId: number, blogOwnerId: string, view
   return { items, count };
 }
 
-/** 공개 글이거나 내 글이면 잠그고 true. 댓글을 쓰는 동안 글이 지워지지 않게 한다. */
-/** 공개 글이거나 내 글이면 글 행을 잠그고 true (댓글·공감) */
-export async function lockVisiblePost(tx: Tx, userId: string, postId: number) {
+/**
+ * 회원 행을 FOR KEY SHARE로 잠근다. 없으면(탈퇴) false.
+ * 알림을 받을 회원의 행은 글·원댓글보다 먼저 잠근다. 탈퇴(deleteMember)가 회원 행 → 글·댓글 순서로 잠그므로
+ * 거꾸로 잠그면 알림 외래 키 확인과 엇갈려 교착 상태가 된다 (GAME-08).
+ */
+async function lockMemberRow(tx: Tx, userId: string): Promise<boolean> {
+  const rows = await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("key share");
+  return rows.length > 0;
+}
+
+/**
+ * 공개 글이거나 내 글이면 글 행을 잠그고 글 주인 ID, 아니면 null (댓글·공감).
+ * 댓글을 쓰는 동안 글이 지워지지 않게 한다. 주인 ID는 알림을 받을 사람이라 주인 회원 행을 먼저 잠근다 (GAME-08).
+ */
+export async function lockVisiblePost(tx: Tx, userId: string, postId: number): Promise<string | null> {
+  const [owner] = await tx.select({ ownerId: blogs.ownerId }).from(posts).innerJoin(blogs, eq(blogs.id, posts.blogId)).where(eq(posts.id, postId));
+  if (!owner) return null;
+  if (owner.ownerId !== userId && !(await lockMemberRow(tx, owner.ownerId))) return null;
   const [row] = await tx
-    .select({ id: posts.id })
+    .select({ ownerId: blogs.ownerId })
     .from(posts)
     .innerJoin(blogs, eq(blogs.id, posts.blogId))
     .where(and(eq(posts.id, postId), or(eq(posts.isPublic, true), eq(blogs.ownerId, userId))))
     .for("key share", { of: posts });
-  return row !== undefined;
+  return row?.ownerId ?? null;
 }
 
 type Result = { ok: true } | { ok: false; error: string };
 
 export async function createComment(userId: string, postId: number, content: string): Promise<Result> {
   return db.transaction(async (tx) => {
-    if (!(await lockVisiblePost(tx, userId, postId))) return { ok: false, error: COMMENT_ERRORS.postNotFound };
+    const ownerId = await lockVisiblePost(tx, userId, postId);
+    if (ownerId === null) return { ok: false, error: COMMENT_ERRORS.postNotFound };
     await tx.insert(comments).values({ postId, authorId: userId, content });
-    // 보상(GAME-05)·알림(GAME-08)은 게임 기능이 생기면 이 트랜잭션에 붙인다
+    // 글 주인에게 댓글 알림 (GAME-08). 보상(GAME-05)은 게임 기능이 생기면 이 트랜잭션에 붙인다
+    await notifyActivity(tx, { kind: "comment", recipientId: ownerId, actorId: userId, postId });
     return { ok: true };
   });
 }
 
 export async function createReply(userId: string, postId: number, commentId: number, content: string): Promise<Result> {
   return db.transaction(async (tx) => {
-    if (!(await lockVisiblePost(tx, userId, postId))) return { ok: false, error: COMMENT_ERRORS.postNotFound };
+    if ((await lockVisiblePost(tx, userId, postId)) === null) return { ok: false, error: COMMENT_ERRORS.postNotFound };
+    // 답글 알림을 받을 원댓글 작성자의 회원 행을 원댓글보다 먼저 잠근다. 그새 탈퇴했으면 아래에서 작성자가 비어 알림이 없다
+    const [author] = await tx.select({ authorId: comments.authorId }).from(comments).where(eq(comments.id, commentId));
+    if (author?.authorId && author.authorId !== userId) await lockMemberRow(tx, author.authorId);
     // 원댓글을 잠가 답글 저장과 원댓글 삭제가 겹치지 않게 한다
     const [parent] = await tx
-      .select({ postId: comments.postId, deletedAt: comments.deletedAt })
+      .select({ postId: comments.postId, authorId: comments.authorId, deletedAt: comments.deletedAt })
       .from(comments)
       .where(eq(comments.id, commentId))
       .for("share");
     if (!parent || parent.postId !== postId) return { ok: false, error: COMMENT_ERRORS.parentNotFound };
     if (parent.deletedAt) return { ok: false, error: COMMENT_ERRORS.parentDeleted };
     await tx.insert(replies).values({ commentId, authorId: userId, content });
+    // 원댓글 작성자에게 답글 알림 (글 주인에게는 없음, GAME-08)
+    await notifyActivity(tx, { kind: "reply", recipientId: parent.authorId, actorId: userId, postId });
     return { ok: true };
   });
 }

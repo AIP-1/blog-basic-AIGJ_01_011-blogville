@@ -10,6 +10,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
@@ -384,3 +385,34 @@ export type Post = typeof posts.$inferSelect;
 export type Category = typeof categories.$inferSelect;
 export type Subcategory = typeof subcategories.$inferSelect;
 export type Attachment = typeof attachments.$inferSelect;
+
+// 알림 (GAME-08의 공감·댓글·답글, specs/017-notifications). 레벨업은 게임이 생기면 종류를 더한다.
+// 닉네임·글 제목은 저장하지 않고 보여 줄 때 JOIN한다. 받는 사람·행동한 사람·글이 지워지면 함께 지워진다.
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    actorId: text("actor_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    postId: integer("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("notifications_user_created_idx").on(t.userId, t.createdAt.desc(), t.id.desc()),
+    index("notifications_unread_idx").on(t.userId).where(sql`${t.readAt} is null`),
+    index("notifications_post_idx").on(t.postId),
+    index("notifications_actor_idx").on(t.actorId),
+    // 공감 알림은 같은 사람·같은 글에 한 번만 (껐다 켜도, 동시에 눌러도)
+    uniqueIndex("notifications_like_uq").on(t.userId, t.actorId, t.postId).where(sql`${t.kind} = 'like'`),
+    check("notifications_kind_check", sql`${t.kind} in ('like', 'comment', 'reply')`),
+    check("notifications_not_self_check", sql`${t.userId} <> ${t.actorId}`),
+  ],
+);

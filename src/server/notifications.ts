@@ -1,0 +1,109 @@
+import "server-only";
+import { and, count, desc, eq, isNull, or, sql } from "drizzle-orm";
+import { db, type Tx } from "@/db";
+import { blogs, notifications, posts, profiles } from "@/db/schema";
+import { isNotificationKind, NOTIFICATIONS_PAGE_SIZE, UNREAD_COUNT_CAP, type NotificationKind } from "@/lib/notifications";
+
+// 알림 (GAME-08의 공감·댓글·답글, specs/017-notifications)
+
+/**
+ * 공감·댓글·답글을 저장하는 트랜잭션 안에서 부른다.
+ * 받는 사람이 없거나(원댓글 작성자가 탈퇴) 나 자신이면 넣지 않는다.
+ * 공감은 같은 사람·같은 글에 한 번만(부분 고유 인덱스 notifications_like_uq).
+ */
+export async function notifyActivity(
+  tx: Tx,
+  n: { kind: NotificationKind; recipientId: string | null; actorId: string; postId: number },
+): Promise<void> {
+  if (!n.recipientId || n.recipientId === n.actorId) return;
+  await tx
+    .insert(notifications)
+    .values({ userId: n.recipientId, kind: n.kind, actorId: n.actorId, postId: n.postId })
+    .onConflictDoNothing();
+}
+
+/** 받는 사람이 지금 볼 수 있는 글의 알림만 (답글 알림의 글이 나중에 비공개가 되면 숨긴다) */
+const visibleTo = (userId: string) => and(eq(notifications.userId, userId), or(eq(posts.isPublic, true), eq(blogs.ownerId, userId)));
+
+/** 헤더 🔔: 안 읽은 알림 수. UNREAD_COUNT_CAP에서 멈춘다 (`9+`) */
+export async function countUnreadNotifications(userId: string): Promise<number> {
+  const unread = db
+    .select({ one: sql`1` })
+    .from(notifications)
+    .innerJoin(posts, eq(posts.id, notifications.postId))
+    .innerJoin(blogs, eq(blogs.id, posts.blogId))
+    .where(and(visibleTo(userId), isNull(notifications.readAt)))
+    .limit(UNREAD_COUNT_CAP)
+    .as("unread");
+  const [row] = await db.select({ n: count() }).from(unread);
+  return row.n;
+}
+
+export type NotificationItem = {
+  id: number;
+  kind: NotificationKind;
+  nickname: string;
+  postId: number;
+  postTitle: string;
+  blogSlug: string;
+  createdAt: Date;
+  read: boolean;
+};
+
+/** 알림함: 최신순 20개씩, 닉네임·글 제목·블로그 주소는 지금 값으로 */
+export async function listNotifications(userId: string, page: number): Promise<{ items: NotificationItem[]; total: number }> {
+  const where = visibleTo(userId);
+  const [rows, [{ total }]] = await Promise.all([
+    db
+      .select({
+        id: notifications.id,
+        kind: notifications.kind,
+        nickname: profiles.nickname,
+        postId: posts.id,
+        postTitle: posts.title,
+        blogSlug: blogs.slug,
+        createdAt: notifications.createdAt,
+        readAt: notifications.readAt,
+      })
+      .from(notifications)
+      .innerJoin(posts, eq(posts.id, notifications.postId))
+      .innerJoin(blogs, eq(blogs.id, posts.blogId))
+      .innerJoin(profiles, eq(profiles.userId, notifications.actorId))
+      .where(where)
+      .orderBy(desc(notifications.createdAt), desc(notifications.id))
+      .limit(NOTIFICATIONS_PAGE_SIZE)
+      .offset((page - 1) * NOTIFICATIONS_PAGE_SIZE),
+    db
+      .select({ total: count() })
+      .from(notifications)
+      .innerJoin(posts, eq(posts.id, notifications.postId))
+      .innerJoin(blogs, eq(blogs.id, posts.blogId))
+      .where(where),
+  ]);
+  const items = rows.flatMap(({ readAt, kind, ...r }) => (isNotificationKind(kind) ? [{ ...r, kind, read: readAt !== null }] : []));
+  return { items, total };
+}
+
+/** 내 알림 하나를 읽음으로 하고 갈 곳을 돌려준다. 남의 알림·없는 알림·볼 수 없는 글이면 null (아무것도 바꾸지 않음) */
+export async function readNotification(userId: string, id: number): Promise<{ kind: NotificationKind; blogSlug: string; postId: number } | null> {
+  const [row] = await db
+    .select({ kind: notifications.kind, blogSlug: blogs.slug, postId: posts.id })
+    .from(notifications)
+    .innerJoin(posts, eq(posts.id, notifications.postId))
+    .innerJoin(blogs, eq(blogs.id, posts.blogId))
+    .where(and(eq(notifications.id, id), visibleTo(userId)));
+  if (!row || !isNotificationKind(row.kind)) return null;
+  await db
+    .update(notifications)
+    .set({ readAt: sql`now()` })
+    .where(and(eq(notifications.id, id), eq(notifications.userId, userId), isNull(notifications.readAt)));
+  return { kind: row.kind, blogSlug: row.blogSlug, postId: row.postId };
+}
+
+/** [모두 읽음]: 내 안 읽은 알림 전부 */
+export async function markAllNotificationsRead(userId: string): Promise<void> {
+  await db
+    .update(notifications)
+    .set({ readAt: sql`now()` })
+    .where(and(eq(notifications.userId, userId), isNull(notifications.readAt)));
+}
