@@ -17,14 +17,14 @@ export function UnfollowButton({ followeeId, describedBy }: { followeeId: string
         if (!confirm("이웃을 취소할까요?")) return;
         const row = form.current?.closest("li");
         const nextFocus =
-          (row?.nextElementSibling ?? row?.previousElementSibling)?.querySelector<HTMLElement>("button") ??
+          (row?.nextElementSibling ?? row?.previousElementSibling)?.querySelector<HTMLElement>("button[data-unfollow]") ??
           row?.closest("details")?.querySelector<HTMLElement>("summary");
         await removeNeighbor(formData);
         nextFocus?.focus();
       }}
     >
       <input type="hidden" name="followeeId" value={followeeId} />
-      <button type="submit" className="btn whitespace-nowrap" aria-pressed="true" aria-describedby={describedBy}>
+      <button type="submit" data-unfollow className="btn whitespace-nowrap" aria-pressed="true" aria-describedby={describedBy}>
         ✓ 이웃
       </button>
     </form>

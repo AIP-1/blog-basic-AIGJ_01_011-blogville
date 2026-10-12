@@ -30,6 +30,7 @@
 | `specs/023-admin-post-delete/` | 관리자 글 화면 삭제·공지 블로그 주소의 spec·plan·tasks |
 | `specs/024-comment-manage/` | 댓글 관리의 spec·plan·tasks |
 | `specs/025-blog-browse/` | 마을 소식 블로그 둘러보기의 spec·plan·tasks |
+| `specs/026-favorite-neighbors/` | 즐겨찾는 이웃 ⭐(내 이웃 목록, 이웃 새 글 맨 위)의 spec·plan·tasks |
 | `src/` | Next.js 16 앱 |
 
 ## 실행

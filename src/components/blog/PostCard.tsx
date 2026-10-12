@@ -16,9 +16,11 @@ type Props = {
   likeCount?: number;
   /** 마을 소식·이웃 새 글: 카드 위 작성자 줄 (누르면 그 블로그 홈) */
   author?: { nickname: string; blogTitle: string };
+  /** 이웃 새 글 맨 위로 올라온 즐겨찾는 이웃의 글 (TOWN-08) */
+  pinned?: boolean;
 };
 
-export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle, commentCount = 0, likeCount = 0, author }: Props) {
+export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle, commentCount = 0, likeCount = 0, author, pinned = false }: Props) {
   return (
     <article>
       {author && (
@@ -29,6 +31,7 @@ export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle,
       )}
       <Link href={`/@${slug}/${post.id}`} className="block rounded-xl border border-line bg-surface p-4 hover:border-accent">
         <div className="flex flex-wrap items-center gap-2">
+          {pinned && <span className="notice-yellow rounded-full px-2 py-0.5 text-sm font-semibold">⭐ 즐겨찾는 이웃</span>}
           <CategoryBadge categoryName={categoryName} subcategoryName={subcategoryName} />
           {!post.isPublic && <span className="text-sm font-semibold text-ink-soft">🔒 비공개</span>}
         </div>
