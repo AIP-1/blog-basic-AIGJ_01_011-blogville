@@ -76,10 +76,10 @@ async function Header() {
                 </Link>
               )}
               <Link href="/shop" className="btn btn-ghost px-2" aria-label="마을 상점">
-                🏪<span className="hidden lg:inline">상점</span>
+                🏪<span className="hidden xl:inline">상점</span>
               </Link>
               <Link href="/attendance" className="btn btn-ghost px-2" aria-label="출석 체크">
-                📮<span className="hidden lg:inline">출석</span>
+                📮<span className="hidden xl:inline">출석</span>
               </Link>
               <NotificationBell unread={{ count: unread }} />
               <Link href="/settings/account" className="btn btn-ghost px-2" aria-label="내 정보">

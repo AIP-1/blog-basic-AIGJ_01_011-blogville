@@ -41,6 +41,7 @@
 | `specs/034-level-up/` | 레벨업 알림·가운데 팝업·알림함 레벨업 줄의 spec·plan·tasks |
 | `specs/035-shop/` | 마을 상점(아바타·가구·배경 도트 아이템, 정렬, 사기)의 spec·plan·tasks |
 | `specs/036-closet/` | 꾸미기(배경 걸기·모자·옷·소품 입기, 블로그 미니룸)의 spec·plan·tasks |
+| `specs/037-house/` | 우리 집(집 단계, 블로그 홈 가구 칸에 놓기·옮기기·비우기)의 spec·plan·tasks |
 | `src/` | Next.js 16 앱 |
 
 ## 실행

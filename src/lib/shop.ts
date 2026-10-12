@@ -106,7 +106,7 @@ export function sortShopItems(list: readonly ShopItem[], sort: ShopSort): ShopIt
 /** 산 뒤 안내 (`{이름}을/를`은 받침에 맞춘다) */
 export function purchaseMessage(name: string, type: string): string {
   const bought = `🎉 ${withJosa(name, "을/를")} 샀어요!`;
-  if (type === "furniture") return `${bought} 내 블로그의 우리 집에 놓을 수 있어요.`;
+  if (type === "furniture") return `${bought} 내 블로그의 우리 집에 놓아 보세요.`;
   return `${bought} 꾸미기에서 장착해 보세요.`;
 }
 

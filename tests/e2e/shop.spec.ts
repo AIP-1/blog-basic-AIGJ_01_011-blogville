@@ -48,7 +48,8 @@ test.describe("SHOP-01·02·03 마을 상점", () => {
 
     // 가구는 우리 집 안내, 받침 없는 이름은 `를`
     await card(page, "알록달록 러그").getByRole("button", { name: "사기" }).click();
-    await expect(result(page)).toHaveText("🎉 알록달록 러그를 샀어요! 내 블로그의 우리 집에 놓을 수 있어요.");
+    await expect(result(page)).toContainText("🎉 알록달록 러그를 샀어요! 내 블로그의 우리 집에 놓아 보세요.");
+    await expect(result(page).getByRole("link", { name: "🏠 우리 집으로" })).toHaveAttribute("href", /^\/@/);
     await expect(page.locator("[data-shop-wallet]")).toHaveText("Lv.1 🪙 10");
 
     await page.goto("/wallet");

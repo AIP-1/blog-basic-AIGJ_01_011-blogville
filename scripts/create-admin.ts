@@ -54,6 +54,8 @@ async function main() {
       if (owned) return;
       const [notice] = await tx`select 1 from blogs where slug = ${NOTICE.slug}`;
       if (notice) fail("공지 블로그 주소(/@notice)를 다른 회원이 쓰고 있어요.");
+      await tx`insert into user_items (user_id, item_id) select ${user.id}, id from items where code in ('furn_plant', 'furn_chair') on conflict do nothing`;
+      await tx`insert into house_furniture (user_id, slot, item_id) select ${user.id}, case code when 'furn_plant' then 0 else 1 end, id from items where code in ('furn_plant', 'furn_chair') on conflict do nothing`;
       await tx`insert into user_items (user_id, item_id) select ${user.id}, id from items where code = 'bg_meadow' on conflict do nothing`;
       const [blog] = await tx`insert into blogs (owner_id, slug, title, intro, background_item_id)
         values (${user.id}, ${NOTICE.slug}, ${NOTICE.title}, ${NOTICE.intro}, (select id from items where code = 'bg_meadow')) returning id`;

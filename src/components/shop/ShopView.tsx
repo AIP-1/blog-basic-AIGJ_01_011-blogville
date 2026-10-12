@@ -11,7 +11,7 @@ import { buttonState, isAvatarType, isShopSort, sectionOf, SHOP_EMPTY, SHOP_SECT
  * 상점 화면 (SHOP-01). 정렬은 이 화면에서만 유지한다(새로고침하면 레벨순).
  * 사는 동안에는 모든 [사기]를 잠가 두 번 눌러도 한 번만 보낸다.
  */
-export function ShopView({ items, level, coins }: { items: ShopItem[]; level: number; coins: number }) {
+export function ShopView({ items, level, coins, mySlug }: { items: ShopItem[]; level: number; coins: number; mySlug: string }) {
   const [sort, setSort] = useState<ShopSort>("level");
   const [state, action, pending] = useActionState<BuyState, FormData>(buyItem, null);
   const sorted = sortShopItems(items, sort);
@@ -25,9 +25,9 @@ export function ShopView({ items, level, coins }: { items: ShopItem[]; level: nu
           data-buy-result={state.ok ? "ok" : "error"}
         >
           {state.message}
-          {state.ok && state.type !== "furniture" && (
-            <Link href="/closet" className="ml-2 underline">
-              🎨 꾸미기로
+          {state.ok && (
+            <Link href={state.type === "furniture" ? `/@${mySlug}` : "/closet"} className="ml-2 underline">
+              {state.type === "furniture" ? "🏠 우리 집으로" : "🎨 꾸미기로"}
             </Link>
           )}
         </p>
