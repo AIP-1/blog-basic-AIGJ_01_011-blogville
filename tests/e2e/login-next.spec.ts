@@ -14,9 +14,9 @@ async function signedOut(browser: Browser) {
 }
 
 /** 다른 시험의 최신 글 목록을 건드리지 않게 아주 옛 날짜의 공개 글을 넣는다 */
-async function oldPost(username: string, title: string) {
+async function oldPost(username: string, title: string, html = "<p>본문</p>") {
   const [{ id }] = await sql`insert into posts (blog_id, title, content_html, content_text, is_public, created_at)
-    select b.id, ${title}, '<p>본문</p>', '본문', true, '2001-01-01' from blogs b join users u on u.id = b.owner_id
+    select b.id, ${title}, ${html}, '본문', true, '2001-01-01' from blogs b join users u on u.id = b.owner_id
     where u.username = ${username} returning posts.id`;
   return id as number;
 }
@@ -35,7 +35,8 @@ const hint = (page: Page) => page.getByText("로그인하면 보던 화면으로
 test.describe("로그인 뒤 보던 글로", () => {
   test("댓글 칸의 [로그인]으로 로그인하면 그 글의 댓글 자리로 돌아온다 (틀린 비밀번호 뒤에도)", async ({ browser }) => {
     const owner = await signUpOk(await browser.newPage());
-    const id = await oldPost(owner, "돌아올 글");
+    // 본문이 길어 댓글 자리는 첫 화면 아래에 있다
+    const id = await oldPost(owner, "돌아올 글", "<p>긴 본문</p>".repeat(60));
     const { page, username } = await signedOut(browser);
 
     await page.goto(`/@${owner}/${id}`);
@@ -52,6 +53,7 @@ test.describe("로그인 뒤 보던 글로", () => {
     await expect(page).toHaveURL(`/@${owner}/${id}#comments`);
     await expect(comments(page).getByRole("button", { name: "댓글 등록" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "💬 댓글 0" })).toBeInViewport();
+    expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
     await expect(menu(page).getByRole("button", { name: "로그아웃" })).toBeVisible();
   });
 
@@ -87,12 +89,12 @@ test.describe("로그인 뒤 보던 글로", () => {
     await expect(page.getByRole("button", { name: /공감 0/ })).toBeEnabled();
   });
 
-  test("다른 사이트 주소·이상한 값·조작한 값이면 내 블로그로, 로그인한 채 열면 바로 그 화면으로", async ({ browser }) => {
+  test("다른 사이트 주소·점 경로·이상한 값·조작한 값이면 내 블로그로, 로그인한 채 열면 바로 그 화면으로", async ({ browser }) => {
     const owner = await signUpOk(await browser.newPage());
     const id = await oldPost(owner, "바로 갈 글");
     const { page, username } = await signedOut(browser);
 
-    for (const next of ["//evil.com", "https://evil.com", "/\\evil.com", "/\t/evil.com", "javascript:alert(1)"]) {
+    for (const next of ["//evil.com", "https://evil.com", "/\\evil.com", "/\t/evil.com", "javascript:alert(1)", "/..//evil.com", "/.//evil.com"]) {
       await page.goto(`/?next=${encodeURIComponent(next)}`);
       await expect(hint(page)).toHaveCount(0);
       await expect(page.locator('input[name="next"]')).toHaveCount(0);
@@ -110,7 +112,15 @@ test.describe("로그인 뒤 보던 글로", () => {
     // 이미 로그인했으면 첫 화면을 거치지 않고 돌아갈 화면(다른 사이트면 내 블로그)으로
     await page.goto(`/?next=${encodeURIComponent(`/@${owner}/${id}#comments`)}`);
     await expect(page).toHaveURL(`/@${owner}/${id}#comments`);
-    await page.goto(`/?next=${encodeURIComponent("//evil.com")}`);
+    for (const next of ["//evil.com", "/..//evil.com", "/%2e%2e//evil.com"]) {
+      await page.goto(`/?next=${encodeURIComponent(next)}`);
+      await expect(page).toHaveURL(`/@${username}`);
+    }
+
+    // 돌아갈 주소 안에 다시 넣은 next도 결국 걸러진다
+    await page.context().clearCookies();
+    await page.goto(`/?next=${encodeURIComponent("/?next=/..//evil.com")}`);
+    await logIn(page, username);
     await expect(page).toHaveURL(`/@${username}`);
   });
 

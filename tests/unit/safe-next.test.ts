@@ -23,12 +23,27 @@ describe("safeNext (로그인 뒤 돌아갈 주소)", () => {
       "/\r\n/evil.com",
       " /@demo",
       `/${"a".repeat(NEXT_MAX)}`,
+      // 점 경로를 풀면 //evil.com
+      "/..//evil.com",
+      "/.//evil.com",
+      "/%2e%2e//evil.com",
+      "/%2e//evil.com",
+      "/a/..//evil.com",
+      "/@demo/../..//evil.com",
+      "/.//evil.com/x?y#z",
       undefined,
       null,
       ["/@demo"],
       42,
     ];
     for (const v of bad) expect(safeNext(v), JSON.stringify(v)).toBeNull();
+  });
+  it("한 번 거른 값을 다시 걸러도 같다", () => {
+    for (const v of ["/@demo/12#comments", "/a/../@demo", "/?next=/..//evil.com", "/tags/%ED%9A%8C%EA%B3%A0"]) {
+      const once = safeNext(v);
+      expect(once).not.toBeNull();
+      expect(safeNext(once)).toBe(once);
+    }
   });
   it("점 경로는 정리된 주소로", () => {
     expect(safeNext("/a/../@demo")).toBe("/@demo");
