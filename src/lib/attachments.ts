@@ -149,13 +149,13 @@ export function extractFileKeys(html: string): string[] {
 
 /**
  * 누가 여나 (FR-007): 공개 글은 누구나, 비공개 글은 블로그 주인만, 붙지 않은 첨부는 올린 사람만.
- * 관리자도 예외가 아니다.
+ * 지금 누군가의 프로필 사진인 첨부(글에는 붙지 않는다)는 누구나 본다 (BLOG-04). 관리자도 예외가 아니다.
  */
 export function attachmentAccess(
-  a: { uploaderId: string; postId: number | null; postIsPublic: boolean | null; blogOwnerId: string | null },
+  a: { uploaderId: string; postId: number | null; postIsPublic: boolean | null; blogOwnerId: string | null; isProfilePhoto: boolean },
   viewerId: string | null,
 ): boolean {
-  if (a.postId === null) return viewerId !== null && viewerId === a.uploaderId;
+  if (a.postId === null) return a.isProfilePhoto || (viewerId !== null && viewerId === a.uploaderId);
   if (a.postIsPublic) return true;
   return viewerId !== null && viewerId === a.blogOwnerId;
 }
@@ -167,15 +167,16 @@ export type PasteAction = "keep" | "reupload" | "drop";
 export const PASTE_KEYS_MAX = 50;
 
 /**
- * 내 것이고 안 붙었거나 이 글 것이면 keep, 내 것인데 다른 글에 붙었으면 reupload,
+ * 내 것이고 안 붙었거나 이 글 것이면 keep, 내 것인데 다른 글에 붙었거나 내 프로필 사진이면 reupload,
  * 남의 것·없는 키는 drop. `editingPostId`는 수정 중인 글(새 글이면 null).
  */
 export function pasteAction(
-  a: { uploaderId: string; postId: number | null } | undefined,
+  a: { uploaderId: string; postId: number | null; isProfilePhoto?: boolean } | undefined,
   viewerId: string,
   editingPostId: number | null,
 ): PasteAction {
   if (!a || a.uploaderId !== viewerId) return "drop";
+  if (a.isProfilePhoto) return "reupload";
   if (a.postId === null || a.postId === editingPostId) return "keep";
   return "reupload";
 }

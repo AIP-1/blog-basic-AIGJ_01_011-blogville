@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { blogs, categories, posts, postTags, subcategories, tags } from "@/db/schema";
+import { blogs, categories, posts, postTags, profiles, subcategories, tags } from "@/db/schema";
 import { extractFileKeys } from "@/lib/attachments";
 import { likePattern } from "@/lib/blog-search";
 import { POST_ERRORS, type PostInput } from "@/lib/post-rules";
@@ -32,6 +32,8 @@ export async function savePost(blogId: number, ownerId: string, input: PostInput
         .for("update");
       if (!mine) throw new Error("내 글이 아닌 글을 고치려 함");
     }
+    // 프로필 → 첨부 순서로 잠근다 (setProfilePhoto와 같은 순서). 그 사이 프로필 사진이 된 첨부를 본문에 남기지 않는다
+    await tx.select({ id: profiles.userId }).from(profiles).where(eq(profiles.userId, ownerId)).for("share");
     const known = await lockLinkable(tx, ownerId, input.postId, extractFileKeys(input.contentHtml));
     const contentHtml = sanitizePostHtml(input.contentHtml, known);
     const contentText = htmlToText(contentHtml);

@@ -88,7 +88,7 @@ describe("keyFromUrl·extractFileKeys", () => {
 });
 
 describe("attachmentAccess (FR-007)", () => {
-  const base = { uploaderId: "u1", postId: 1, postIsPublic: true, blogOwnerId: "u1" };
+  const base = { uploaderId: "u1", postId: 1, postIsPublic: true, blogOwnerId: "u1", isProfilePhoto: false };
   it("공개 글은 누구나", () => expect(attachmentAccess(base, null)).toBe(true));
   it("비공개 글은 블로그 주인만", () => {
     const a = { ...base, postIsPublic: false };
@@ -97,10 +97,15 @@ describe("attachmentAccess (FR-007)", () => {
     expect(attachmentAccess(a, null)).toBe(false);
   });
   it("붙지 않은 첨부는 올린 사람만", () => {
-    const a = { uploaderId: "u1", postId: null, postIsPublic: null, blogOwnerId: null };
+    const a = { uploaderId: "u1", postId: null, postIsPublic: null, blogOwnerId: null, isProfilePhoto: false };
     expect(attachmentAccess(a, "u1")).toBe(true);
     expect(attachmentAccess(a, "u2")).toBe(false);
     expect(attachmentAccess(a, null)).toBe(false);
+  });
+  it("프로필 사진은 누구나 (BLOG-04)", () => {
+    const a = { uploaderId: "u1", postId: null, postIsPublic: null, blogOwnerId: null, isProfilePhoto: true };
+    expect(attachmentAccess(a, null)).toBe(true);
+    expect(attachmentAccess(a, "u2")).toBe(true);
   });
 });
 
@@ -119,5 +124,9 @@ describe("pasteAction (POST-07 흐름 7)", () => {
   it("내 다른 글 것이면 다시 올린다 (새 글에서도)", () => {
     expect(pasteAction(mine(3), "me", 7)).toBe("reupload");
     expect(pasteAction(mine(3), "me", null)).toBe("reupload");
+  });
+  it("내 프로필 사진은 다시 올리고, 남의 프로필 사진은 넣지 않는다", () => {
+    expect(pasteAction({ uploaderId: "me", postId: null, isProfilePhoto: true }, "me", null)).toBe("reupload");
+    expect(pasteAction({ uploaderId: "you", postId: null, isProfilePhoto: true }, "me", null)).toBe("drop");
   });
 });

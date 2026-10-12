@@ -115,6 +115,10 @@ export const profiles = pgTable(
       .primaryKey()
       .references(() => users.id, { onDelete: "cascade" }),
     nickname: text("nickname").notNull().unique(),
+    // 프로필 사진 (BLOG-03·04): 내가 올린 첨부(사진) 하나. 첨부가 지워지면 비운다. 한 첨부는 한 프로필에만
+    photoKey: text("photo_key")
+      .unique()
+      .references((): AnyPgColumn => attachments.key, { onDelete: "set null" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
