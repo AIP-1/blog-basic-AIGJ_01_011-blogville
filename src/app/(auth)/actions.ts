@@ -1,7 +1,7 @@
 "use server";
 
 import { eq, sql } from "drizzle-orm";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
@@ -38,7 +38,19 @@ async function startSession(username: string, password: string, rememberMe: bool
     .update(sessions)
     .set(rememberMe ? { rememberMe: true } : { rememberMe: false, expiresAt: sql`now() + interval '2 hours'` })
     .where(eq(sessions.token, token));
+  if (rememberMe) await clearDontRememberCookie();
   return true;
+}
+
+/**
+ * 전에 [로그인 상태 유지] 없이 로그인했던 브라우저에 남은 `dont_remember` 쿠키를 지운다 (AUTH-09).
+ * 남아 있으면 라이브러리가 유지 세션도 연장하지 않고, 갱신할 때 세션 쿠키를 브라우저를 닫으면 사라지는 쿠키로 바꾼다.
+ */
+async function clearDontRememberCookie() {
+  const { name, attributes } = (await auth.$context).authCookies.dontRememberToken;
+  const store = await cookies();
+  // __Secure- 접두사 쿠키는 같은 secure·경로로 지워야 한다
+  if (store.has(name)) store.set(name, "", { path: attributes.path ?? "/", secure: attributes.secure, httpOnly: true, maxAge: 0 });
 }
 
 async function goToMyBlog(userId: string, query = ""): Promise<never> {

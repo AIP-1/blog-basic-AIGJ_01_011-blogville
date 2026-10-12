@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { HeaderLoginLink } from "@/components/auth/HeaderLoginLink";
+import { SessionKeeper } from "@/components/auth/SessionKeeper";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { getMyBlog, getSession } from "@/server/dal";
@@ -44,6 +45,7 @@ async function Header() {
                 ✏️ 글쓰기
               </Link>
               <SignOutButton userId={member.userId} />
+              {member.rememberMe && <SessionKeeper />}
             </>
           )}
           {!member && <HeaderLoginLink />}

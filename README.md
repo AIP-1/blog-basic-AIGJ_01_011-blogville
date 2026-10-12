@@ -31,6 +31,7 @@
 | `specs/024-comment-manage/` | 댓글 관리의 spec·plan·tasks |
 | `specs/025-blog-browse/` | 마을 소식 블로그 둘러보기의 spec·plan·tasks |
 | `specs/026-favorite-neighbors/` | 즐겨찾는 이웃 ⭐(내 이웃 목록, 이웃 새 글 맨 위)의 spec·plan·tasks |
+| `specs/027-session-keep/` | 로그인 유지 7일 연장(SessionKeeper)·만료 세션과 로그인 실패 기록 정리의 spec·plan·tasks |
 | `src/` | Next.js 16 앱 |
 
 ## 실행
@@ -63,7 +64,7 @@ E2E는 `.env.local`의 DB에 고유한 아이디로 회원을 만들어 시험�
 ## 첨부 파일
 
 올린 사진·파일은 `storage/uploads/`(git 제외, `UPLOAD_DIR`로 바꿈)에 저장됩니다.
-어느 글에도 붙지 않은 지 하루 지난 첨부는 정리 작업이 지웁니다. 자동 실행 설정은 없어서 하루에 한 번 손으로 돌립니다.
+어느 글에도 붙지 않은 지 하루 지난 첨부는 정리 작업이 지웁니다. 같은 작업이 어제보다 오래된 조회 기록, 만료된 로그인 세션, 하루 넘게 지난 로그인 실패 기록(잠금 중인 것은 남김)도 지웁니다. 자동 실행 설정은 없어서 하루에 한 번 손으로 돌립니다.
 
 ```bash
 npm run posts:cleanup -- --dry-run   # 지울 개수만

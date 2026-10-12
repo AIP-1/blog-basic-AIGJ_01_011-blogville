@@ -12,11 +12,20 @@ const IDLE_LIMIT_MS = 2 * 60 * 60 * 1000;
 /** 마지막 사용 시각은 5분에 한 번만 기록한다 */
 const TOUCH_EVERY_MS = 5 * 60 * 1000;
 
-export type Member = { userId: string; username: string; role: string; sessionId: string };
+export type Member = {
+  userId: string;
+  username: string;
+  role: string;
+  sessionId: string;
+  /** [로그인 상태 유지] 세션 (7일, SessionKeeper가 연장) */
+  rememberMe: boolean;
+};
 
 /** 지금 요청의 로그인 회원. 없거나 만료면 null. 한 요청 안에서는 한 번만 묻는다. */
 export const getSession = cache(async (): Promise<Member | null> => {
-  const result = await auth.api.getSession({ headers: await headers() });
+  // 서버 화면·액션에서는 늘리지 않는다: 화면을 그릴 때는 쿠키를 못 바꿔 DB만 늘고 쿠키는 그대로 남는다.
+  // 유지 세션은 SessionKeeper의 세션 조회(라우트 핸들러)가 DB와 쿠키를 함께 늘린다 (AUTH-09)
+  const result = await auth.api.getSession({ headers: await headers(), query: { disableRefresh: true } });
   if (!result) return null;
   const { session, user } = result;
   const row = await db.query.sessions.findFirst({ where: eq(sessions.id, session.id) });
@@ -36,7 +45,7 @@ export const getSession = cache(async (): Promise<Member | null> => {
     }
   }
   const u = user as typeof user & { username?: string; role?: string };
-  return { userId: user.id, username: u.username ?? "", role: u.role ?? "user", sessionId: session.id };
+  return { userId: user.id, username: u.username ?? "", role: u.role ?? "user", sessionId: session.id, rememberMe: row.rememberMe };
 });
 
 /** 회원 전용 화면·Server Action의 첫 줄. 비로그인이면 첫 화면으로 보낸다 (NF-02). */
