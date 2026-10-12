@@ -5,6 +5,7 @@ import { blogs, follows, pointLedger, posts, profiles } from "@/db/schema";
 import { levelFromExp } from "@/lib/game";
 import { houseStage } from "@/lib/house";
 import { NOTICE_SLUG } from "@/lib/names";
+import { assignLots } from "@/lib/town/lots";
 import { currentRoof, ROOF_HEX } from "@/lib/roof";
 import { levelUpText, notificationText, notificationTime } from "@/lib/notifications";
 import { getMyBlog, getNickname } from "./dal";
@@ -16,6 +17,8 @@ import { getWallet } from "./points";
 /** 마을 길가의 집 하나 (TOWN-04). `lot`은 집 자리 번호(0은 내 집) */
 export type TownHouse = {
   lot: number;
+  /** 집 주인 회원 (이웃 집 자리 고르기, TOWN-18) */
+  userId: string;
   slug: string;
   nickname: string;
   blogTitle: string;
@@ -76,6 +79,7 @@ function toHouse(row: HouseRow, lot: number, mine: boolean): TownHouse & { blogI
   return {
     blogId: row.blogId,
     lot,
+    userId: row.ownerId,
     slug: row.slug,
     nickname: row.nickname,
     blogTitle: row.blogTitle,
@@ -107,14 +111,15 @@ function houseQuery(where: SQL | undefined) {
 
 /**
  * 회원의 마을 (TOWN-04): 0번은 그 회원의 집(공지 블로그 주인에게도 내 집), 1번부터 그 회원이 즐겨찾는 이웃의 집.
- * 먼저 이웃이 된 순서로 10채까지, 공지 블로그는 빼고 공개 글이 없어도 선다.
+ * 먼저 이웃이 된 순서로 10채까지, 공지 블로그는 빼고 공개 글이 없어도 선다. 자리는 그 회원이 고른 자리(TOWN-18)가 먼저,
+ * 안 고른 이웃은 남은 자리를 작은 번호부터 (`assignLots`).
  * 친구 마을 구경(TOWN-15)이면 `viewerId`가 보는 사람: 그 사람의 집만 `mine`(내 집·내 우체통)이다.
  */
 export async function getMemberHouses(userId: string, viewerId = userId): Promise<TownHouse[]> {
   const [mine, neighbors] = await Promise.all([
     houseQuery(eq(blogs.ownerId, userId)),
     db
-      .select(houseColumns)
+      .select({ ...houseColumns, townLot: follows.townLot })
       .from(follows)
       .innerJoin(blogs, eq(blogs.ownerId, follows.followeeId))
       .innerJoin(profiles, eq(profiles.userId, follows.followeeId))
@@ -122,7 +127,8 @@ export async function getMemberHouses(userId: string, viewerId = userId): Promis
       .orderBy(asc(follows.createdAt), asc(blogs.id))
       .limit(NEIGHBOR_HOUSES),
   ]);
-  return withRecentPosts([...mine.map((r) => toHouse(r, 0, r.ownerId === viewerId)), ...neighbors.map((r, i) => toHouse(r, i + 1, r.ownerId === viewerId))]);
+  const placed = assignLots(neighbors).sort((a, b) => a.lot - b.lot);
+  return withRecentPosts([...mine.map((r) => toHouse(r, 0, r.ownerId === viewerId)), ...placed.map((r) => toHouse(r, r.lot, r.ownerId === viewerId))]);
 }
 
 /**

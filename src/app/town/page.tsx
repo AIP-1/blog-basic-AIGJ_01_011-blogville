@@ -30,7 +30,7 @@ export default async function TownPage({ searchParams }: PageProps<"/town">) {
     <div className="relative flex min-h-0 flex-1 flex-col">
       <h1 className="sr-only">중앙 광장</h1>
       <div className="relative min-h-0 flex-1 max-sm:hidden" data-town>
-        <TownGame mailFlag={(hud?.unread ?? 0) > 0} houses={houses} member={member !== null} layers={hud?.layers ?? ["char.visitor"]} name={hud?.nickname ?? "구경하는 중"} start={start} startKey={typeof at === "string" ? at : ""} />
+        <TownGame mailFlag={(hud?.unread ?? 0) > 0} chooseLots={member !== null} houses={houses} member={member !== null} layers={hud?.layers ?? ["char.visitor"]} name={hud?.nickname ?? "구경하는 중"} start={start} startKey={typeof at === "string" ? at : ""} />
         <TownHud hud={hud} admin={member?.role === "admin"} userId={member?.userId ?? null} unread={unreadBadge(hud?.unread ?? 0)} spots={townSpots(houses, member !== null)} houses={houses} />
         {/* 환영을 주소에서 지운 뒤 화면을 다시 그려도(⭐·레벨업) 닫을 때까지 남는다 */}
         {hud && <TownWelcome nickname={hud.nickname} show={greet} />}

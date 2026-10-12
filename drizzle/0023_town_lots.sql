@@ -1,0 +1,3 @@
+ALTER TABLE "follows" ADD COLUMN "town_lot" smallint;--> statement-breakpoint
+CREATE UNIQUE INDEX "follows_town_lot_uq" ON "follows" USING btree ("follower_id","town_lot") WHERE "follows"."town_lot" is not null;--> statement-breakpoint
+ALTER TABLE "follows" ADD CONSTRAINT "follows_town_lot_check" CHECK ("follows"."town_lot" is null or ("follows"."town_lot" between 1 and 10 and "follows"."is_favorite"));

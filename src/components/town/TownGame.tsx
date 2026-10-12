@@ -7,7 +7,7 @@ import { pixelRects, type PixelArt } from "@/lib/art/characters";
 import { walkDir, walkFrame, WALK_DIRS, WALK_FPS, WALK_FRAMES, type ColorGrid, type WalkDir } from "@/lib/art/walk";
 import { TOWN_CELL } from "@/lib/art/town";
 import { PLAYER_SIZE, SPEED, WORLD, nearestEntrance, normalize, step, type Point } from "@/lib/town/layout";
-import { artSize, artVisibleHeight, entrancePrompt, mailboxLot, townLayout, type TownEntrance, type TownHouseInput } from "@/lib/town/structures";
+import { artSize, artVisibleHeight, entrancePrompt, lotChoice, mailboxLot, townLayout, type TownEntrance, type TownHouseInput } from "@/lib/town/structures";
 import { onStairs, STAIR_SLOW, stairEnds, STAIRS } from "@/lib/town/terrain";
 import { bakeGround, GROUND_CELL } from "./ground";
 
@@ -100,6 +100,7 @@ function drawTag(ctx: CanvasRenderingContext2D, text: string, x: number, y: numb
  * 방향키·WASD·클릭으로 걷고, 입구 앞에서 Space·Enter(또는 건물 클릭)로 들어간다.
  * 시험용으로 캔버스에 발 위치 `data-feet`를 적고, `bv-teleport` 이벤트(`{x, y}`)로 옮길 수 있다.
  * 우체통 입구는 페이지를 옮기지 않고 창 밖(window)에 `bv-mailbox` 이벤트(`{lot}`)를 보낸다 (TOWN-13, `TownHud`가 연다).
+ * 내 마을(`chooseLots`)의 빈 집터는 `bv-lots` 이벤트(`{lot}`)로 자리 고르기 창을 연다 (TOWN-18).
  */
 export function TownGame({
   houses,
@@ -109,6 +110,7 @@ export function TownGame({
   start,
   startKey,
   mailFlag = false,
+  chooseLots = false,
   place = "마을",
 }: {
   houses: TownHouseInput[];
@@ -120,6 +122,8 @@ export function TownGame({
   startKey: string;
   /** 안 읽은 알림이 있으면 내 우체통 깃발을 올린다 */
   mailFlag?: boolean;
+  /** 내 마을이면 빈 집터에서 이웃 집 자리를 고른다 (TOWN-18) */
+  chooseLots?: boolean;
   /** 화면 낭독기 지도 이름 (친구 마을이면 `{닉네임}님의 마을`, TOWN-15) */
   place?: string;
 }) {
@@ -129,7 +133,7 @@ export function TownGame({
   const lastPos = useRef<{ from: string; pos: Point } | null>(null);
   const [prompt, setPrompt] = useState<string | null>(null);
   const [touch, setTouch] = useState(false);
-  const data = JSON.stringify({ houses, member, layers, name, start, startKey, mailFlag });
+  const data = JSON.stringify({ houses, member, layers, name, start, startKey, mailFlag, chooseLots });
   // 창 폭이 휴대폰 조건을 넘나들면 게임을 끄고 다시 만든다
   const phone = useSyncExternalStore(
     subscribePhone,
@@ -140,8 +144,9 @@ export function TownGame({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || phone) return;
-    const { houses, member, layers, name, start, startKey, mailFlag } = JSON.parse(data) as {
+    const { houses, member, layers, name, start, startKey, mailFlag, chooseLots } = JSON.parse(data) as {
       mailFlag: boolean;
+      chooseLots: boolean;
       houses: TownHouseInput[];
       member: boolean;
       layers: string[];
@@ -151,7 +156,7 @@ export function TownGame({
     };
     setTouch(window.matchMedia("(pointer: coarse)").matches);
     const ctx = canvas.getContext("2d")!;
-    const { structures, entrances, walls } = townLayout(houses, member, mailFlag);
+    const { structures, entrances, walls } = townLayout(houses, member, mailFlag, chooseLots);
     const bodies = [...walls, ...structures.flatMap((s) => (s.body ? [s.body] : []))];
     const sprites = new Map<object, HTMLCanvasElement>();
     for (const s of structures) if (!sprites.has(s.art)) sprites.set(s.art, bake([s.art], TOWN_CELL));
@@ -178,7 +183,9 @@ export function TownGame({
 
     const go = (e: TownEntrance) => {
       const lot = mailboxLot(e.href);
+      const choice = lotChoice(e.href);
       if (lot !== null) window.dispatchEvent(new CustomEvent("bv-mailbox", { detail: { lot } }));
+      else if (choice !== null) window.dispatchEvent(new CustomEvent("bv-lots", { detail: { lot: choice } }));
       else router.push(e.href === "login" ? "/" : e.href);
     };
 

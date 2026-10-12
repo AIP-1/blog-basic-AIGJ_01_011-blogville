@@ -43,12 +43,18 @@ export type Structure = {
   sub?: string;
 };
 
-/** 들어갈 곳. `href`가 `login`이면 로그인이 필요한 곳(방문자), `mailbox:{자리}`면 우체통 창 (TOWN-13) */
+/** 들어갈 곳. `href`가 `login`이면 로그인이 필요한 곳(방문자), `mailbox:{자리}`면 우체통 창 (TOWN-13), `lots:{자리}`면 자리 고르기 창 (TOWN-18) */
 export type TownEntrance = Entrance & { label: string; href: string };
 
 /** 우체통 입구의 집 자리 번호 (우체통이 아니면 null) */
 export function mailboxLot(href: string): number | null {
   const m = /^mailbox:(\d+)$/.exec(href);
+  return m ? Number(m[1]) : null;
+}
+
+/** 빈 집터 입구의 자리 번호 (자리 고르기가 아니면 null, TOWN-18) */
+export function lotChoice(href: string): number | null {
+  const m = /^lots:(\d+)$/.exec(href);
   return m ? Number(m[1]) : null;
 }
 
@@ -85,14 +91,16 @@ function seeded(seed: number) {
 
 /** 입구에 붙는 안내: `🏪 상점 · Space 들어가기`, 방문자가 회원 전용 곳에 가면 `· Space 로그인하고 이용하기` */
 export function entrancePrompt(e: TownEntrance): string {
-  return `${e.label} · Space ${e.href === "login" ? "로그인하고 이용하기" : mailboxLot(e.href) !== null ? "소식 보기" : "들어가기"}`;
+  const action = e.href === "login" ? "로그인하고 이용하기" : mailboxLot(e.href) !== null ? "소식 보기" : lotChoice(e.href) !== null ? "이웃 자리 고르기" : "들어가기";
+  return `${e.label} · Space ${action}`;
 }
 
 /**
  * 마을 배치를 만든다: 게시판(마을 소식·출석 체크 입구 둘)·상점·분수·가로등, 집 자리 11곳(집이 없으면 빈 집터), 나무.
  * 방문자(`member = false`)에게 출석 체크·상점은 로그인 안내다. 집마다 오른쪽 앞에 우체통(TOWN-13), 내 우체통은 안 읽은 알림이 있으면(`mailFlag`) 깃발을 올린다.
+ * 내 마을(`chooseLots`)이면 1~10번 빈 집터 앞이 자리 고르기 입구다 (TOWN-18).
  */
-export function townLayout(houses: readonly TownHouseInput[], member: boolean, mailFlag = false): TownLayout {
+export function townLayout(houses: readonly TownHouseInput[], member: boolean, mailFlag = false, chooseLots = false): TownLayout {
   const lotArt = emptyLotArt();
   const lamp = lampArt();
   const structures: Structure[] = [];
@@ -253,6 +261,10 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean, m
         body: null,
         label: i === 0 ? "내 집 자리" : "빈 집터",
       });
+      if (chooseLots && i > 0) {
+        const front = lotFront(i);
+        entrances.push({ id: `lot:${i}`, x: front.x, y: front.y, label: `🏡 빈 집터 ${i}번`, href: `lots:${i}` });
+      }
     }
   });
 
