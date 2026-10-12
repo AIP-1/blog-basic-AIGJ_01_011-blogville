@@ -574,9 +574,11 @@ export const pointLedger = pgTable(
     uniqueIndex("point_ledger_purchase_uq").on(t.userId, t.refId).where(sql`${t.reason} = 'purchase'`),
     // 다 키운 동물 보상·산 알은 동물마다 한 번 (TOWN-09, ref_id = 동물 ID)
     uniqueIndex("point_ledger_farm_uq").on(t.userId, t.reason, t.refId).where(sql`${t.reason} in ('farm_grown', 'egg_purchase')`),
+    // 낚시는 하루 한 번 (TOWN-14, ref_id = 날짜)
+    uniqueIndex("point_ledger_fishing_uq").on(t.userId, t.refId).where(sql`${t.reason} = 'fishing'`),
     check(
       "point_ledger_reason_check",
-      sql`${t.reason} in ('signup', 'attendance', 'post', 'comment', 'like_received', 'purchase', 'farm_care', 'farm_grown', 'egg_purchase', 'growth_purchase')`,
+      sql`${t.reason} in ('signup', 'attendance', 'post', 'comment', 'like_received', 'purchase', 'farm_care', 'farm_grown', 'egg_purchase', 'growth_purchase', 'fishing')`,
     ),
     // 구매(상점·알)만 코인이 줄고, 구매는 경험치가 없다 (SHOP-03, TOWN-09)
     check(
@@ -666,4 +668,21 @@ export const animalCares = pgTable(
     date: date("date").notNull(),
   },
   (t) => [primaryKey({ columns: [t.animalId, t.action, t.date] }), check("animal_cares_action_check", sql`${t.action} in ('feed', 'water', 'pet')`)],
+);
+
+/** 낚시 기록 (TOWN-14): 회원·한국 날짜마다 한 번 */
+export const fishingCatches = pgTable(
+  "fishing_catches",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    date: date("date").notNull(),
+    catch: text("catch").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.date] }),
+    check("fishing_catches_catch_check", sql`${t.catch} in ('minnow', 'crucian', 'carp', 'golden_carp', 'feed', 'boot')`),
+  ],
 );

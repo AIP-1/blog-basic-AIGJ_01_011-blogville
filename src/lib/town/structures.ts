@@ -1,6 +1,6 @@
 // 마을에 놓을 것과 입구 (TOWN-03·04, specs/038-town). 그림은 `src/lib/art/town.ts`, 좌표는 `layout.ts`.
 import type { PixelArt } from "@/lib/art/characters";
-import { benchArt, boardArt, emptyLotArt, farmArt, fountainArt, houseArt, lampArt, mailboxArt, shopArt, TOWN_CELL, treeArt } from "@/lib/art/town";
+import { benchArt, boardArt, emptyLotArt, farmArt, pondArt, fountainArt, houseArt, lampArt, mailboxArt, shopArt, TOWN_CELL, treeArt } from "@/lib/art/town";
 import {
   BOARD_POS,
   CENTER,
@@ -11,6 +11,7 @@ import {
   PLAZA_RADIUS,
   ROADS,
   FARM_POS,
+  POND_POS,
   SHOP_POS,
   START_POS,
   WORLD,
@@ -150,6 +151,22 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean, m
     y: FARM_POS.y + 30,
     label: "🐮 동물 농장",
     href: member ? "/farm" : "login",
+  });
+
+  structures.push({
+    id: "pond",
+    art: pondArt(),
+    x: POND_POS.x,
+    y: POND_POS.y,
+    body: { x: POND_POS.x - 100, y: POND_POS.y - 110, width: 200, height: 70 },
+    label: "연못 낚시터",
+  });
+  entrances.push({
+    id: "pond",
+    x: POND_POS.x,
+    y: POND_POS.y + 30,
+    label: "🎣 낚시터",
+    href: member ? "/fishing" : "login",
   });
 
   structures.push({
@@ -300,7 +317,7 @@ export type TownSpot = { id: string; label: string; sub: string | null; x: numbe
 export const EMPTY_LOT_HINT = "친구 목록에서 ⭐를 누르면 집이 생겨요";
 
 /**
- * 텔레포트 목록: `마을` 4곳(분수·게시판·상점·농장) + 집 11자리. 게임과 같은 좌표(입구 앞)를 쓴다.
+ * 텔레포트 목록: `마을` 5곳(분수·게시판·상점·농장·낚시터) + 집 11자리. 게임과 같은 좌표(입구 앞)를 쓴다.
  * 빈 집터의 부제(⭐ 안내)는 회원에게만, 0번 자리는 없다.
  */
 export function townSpots(houses: readonly TownHouseInput[], member: boolean): { places: TownSpot[]; houses: TownSpot[] } {
@@ -309,6 +326,7 @@ export function townSpots(houses: readonly TownHouseInput[], member: boolean): {
     { id: "board", label: "📋 마을 게시판", sub: null, x: BOARD_POS.x, y: BOARD_POS.y + 30, enabled: true, slug: null },
     { id: "shop", label: "🏪 상점", sub: null, x: SHOP_POS.x + 40, y: SHOP_POS.y + 30, enabled: true, slug: null },
     { id: "farm", label: "🐮 동물 농장", sub: null, x: FARM_POS.x, y: FARM_POS.y + 30, enabled: true, slug: null },
+    { id: "pond", label: "🎣 낚시터", sub: null, x: POND_POS.x, y: POND_POS.y + 30, enabled: true, slug: null },
   ];
   const lots = HOUSE_LOTS.map((_, i): TownSpot => {
     const house = houses.find((h) => h.lot === i);

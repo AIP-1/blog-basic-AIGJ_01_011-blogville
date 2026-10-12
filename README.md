@@ -50,6 +50,7 @@
 | `specs/043-mailbox/` | 집 앞 우체통(내 알림·이웃 새 글)의 spec·plan·tasks |
 | `specs/044-farm/` | 동물 농장(알·부화·돌보기·다 키운 카드)의 spec·plan·tasks |
 | `specs/045-growth-items/` | 상점 성장 아이템과 농장에서 먹이기의 spec·plan·tasks |
+| `specs/046-fishing/` | 연못 낚시터(하루 한 번 낚시)의 spec·plan·tasks |
 | `src/` | Next.js 16 앱 |
 
 ## 실행
