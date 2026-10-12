@@ -15,10 +15,10 @@ export const metadata: Metadata = { title: "마을 | Blogville" };
 /**
  * 마을 (TOWN-01~04·12, specs/038-town·039-town-menu): 회원은 내 집과 즐겨찾는 이웃의 집, 방문자는 인기 블로그 무작위 10채.
  * `?welcome=1`(가입 직후 🚪 밖으로)이면 내 집 앞에서 첫 마을 환영을, `?at={블로그 주소}`면 그 집 앞에서, 아니면 분수 아래에서 시작한다.
- * 헤더 막대 대신 ☰ 메뉴(`TownHud`). 휴대폰에는 게임 대신 `PhoneTown`.
+ * 헤더 막대 대신 ☰ 메뉴(`TownHud`). 휴대폰에는 게임 대신 `PhoneTown`, 회원이 아래 탭 ☰ 메뉴로 오면(`?menu=1`) 펼친 메뉴 화면.
  */
 export default async function TownPage({ searchParams }: PageProps<"/town">) {
-  const { at, welcome } = await searchParams;
+  const { at, welcome, menu } = await searchParams;
   const member = await getSession();
   // 헤더가 없는 마을에서도 그날 첫 화면이면 자동 출석이 ☰ 내 프로필 코인에 들어가게 먼저 한다 (GAME-04)
   if (member) await ensureTodayAttendance(member.userId, member.sessionId).catch((error) => console.error("자동 출석 실패", error));
@@ -36,7 +36,11 @@ export default async function TownPage({ searchParams }: PageProps<"/town">) {
         {hud && <TownWelcome nickname={hud.nickname} show={greet} />}
       </div>
       <div className="sm:hidden">
-        <PhoneTown mySlug={hud?.blog.slug ?? null} />
+        {hud && menu === "1" ? (
+          <TownHud phone hud={hud} admin={member?.role === "admin"} userId={member?.userId ?? null} unread={unreadBadge(hud.unread)} spots={townSpots(houses, true)} />
+        ) : (
+          <PhoneTown mySlug={hud?.blog.slug ?? null} />
+        )}
       </div>
     </div>
   );

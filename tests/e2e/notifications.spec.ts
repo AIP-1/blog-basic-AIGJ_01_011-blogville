@@ -222,7 +222,7 @@ test.describe("GAME-08 알림", () => {
     expect(await kindsFor(owner.userId)).toEqual([]);
   });
 
-  test("375px: 헤더 🔔은 아이콘과 숫자, 44px, 알림함에 긴 제목이 있어도 가로 스크롤이 없다", async ({ browser }) => {
+  test("375px: 🔔은 헤더 대신 아래 탭에 숫자와 함께, 44px, 알림함에 긴 제목이 있어도 가로 스크롤이 없다", async ({ browser }) => {
     const owner = await member(browser, { width: 375, height: 800 });
     const actor = await member(browser);
     const long = "아주긴제목".repeat(19);
@@ -230,9 +230,11 @@ test.describe("GAME-08 알림", () => {
     await sql`insert into notifications (user_id, kind, actor_id, post_id) values (${owner.userId}, 'like', ${actor.userId}, ${postId})`;
     await owner.page.goto("/notifications");
     await expect(rows(owner.page)).toHaveCount(1);
-    await expect(badge(owner.page)).toHaveText("1");
-    await expect(bell(owner.page).getByText("알림", { exact: true })).toBeHidden();
-    expect((await bell(owner.page).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    // 휴대폰 회원의 🔔은 아래 탭에 있다 (TOWN-11, specs/040-phone-tabs)
+    await expect(bell(owner.page)).toBeHidden();
+    const tab = owner.page.getByRole("navigation", { name: "아래 탭" }).getByRole("link", { name: "알림, 안 읽은 알림 1개" });
+    await expect(tab.locator("[data-unread]")).toHaveText("1");
+    expect((await tab.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     expect(await owner.page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
   });
 });

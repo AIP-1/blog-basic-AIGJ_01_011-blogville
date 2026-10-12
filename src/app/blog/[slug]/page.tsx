@@ -107,6 +107,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
             여기는 {nickname}님의 블로그이자 집 안이에요. 첫 글을 써 보세요.
             {/* 휴대폰에는 마을이 없다 (TOWN-01) */}
             <span className="max-sm:hidden"> 아래 우리 집의 🚪 밖으로를 눌러 마을을 구경해 보세요.</span>
+            <span className="sm:hidden"> 화면 아래 탭으로 마을 소식·상점·알림을 오가고, ☰ 메뉴에서 출석·내 프로필·친구 목록을 볼 수 있어요.</span>
           </p>
         </section>
       )}
