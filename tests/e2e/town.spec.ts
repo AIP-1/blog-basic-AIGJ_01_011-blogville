@@ -67,6 +67,25 @@ test.describe("TOWN 마을", () => {
     await expect.poll(async () => (await feet(page))[0], { timeout: 5000 }).toBeGreaterThan(before[0] + 60);
   });
 
+  test("걷는 그림: 걷는 방향의 걷기 칸, 멈추면 그 방향으로 서 있고, 벽에 막혀 제자리면 걷지 않는다 (TOWN-17)", async ({ page }) => {
+    await openTown(page);
+    await expect(canvas(page)).toHaveAttribute("data-walk", "idle-down");
+    await page.keyboard.down("ArrowLeft");
+    await expect(canvas(page)).toHaveAttribute("data-walk", "walk-left");
+    await page.keyboard.up("ArrowLeft");
+    await expect(canvas(page)).toHaveAttribute("data-walk", "idle-left");
+    await page.keyboard.down("ArrowDown");
+    await expect(canvas(page)).toHaveAttribute("data-walk", "walk-down");
+    await page.keyboard.up("ArrowDown");
+    await expect(canvas(page)).toHaveAttribute("data-walk", "idle-down");
+    // 분수 바로 아래에서 위로 밀면 막혀 서 있는 그림(뒷모습)
+    await teleport(page, 1000, 857);
+    await page.keyboard.down("ArrowUp");
+    await page.waitForTimeout(400);
+    await expect(canvas(page)).toHaveAttribute("data-walk", "idle-up");
+    await page.keyboard.up("ArrowUp");
+  });
+
   test("높낮이: 절벽 앞면은 막히고 계단 4곳으로만 오르내린다 (TOWN-05)", async ({ page }) => {
     await openTown(page);
     const stairs = (await canvas(page).getAttribute("data-stairs"))!.split(" ").map((s) => s.split(",").map(Number));

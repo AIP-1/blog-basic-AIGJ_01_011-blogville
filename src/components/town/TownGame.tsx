@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { findArt } from "@/lib/art";
 import { pixelRects, type PixelArt } from "@/lib/art/characters";
+import { walkDir, walkFrame, WALK_DIRS, WALK_FPS, WALK_FRAMES, type ColorGrid, type WalkDir } from "@/lib/art/walk";
 import { TOWN_CELL } from "@/lib/art/town";
 import { PLAYER_SIZE, SPEED, WORLD, nearestEntrance, normalize, step, type Point } from "@/lib/town/layout";
 import { artSize, artVisibleHeight, entrancePrompt, mailboxLot, townLayout, type TownEntrance, type TownHouseInput } from "@/lib/town/structures";
@@ -42,6 +43,22 @@ function bake(arts: readonly PixelArt[], scale: number): HTMLCanvasElement {
       ctx.fillRect(r.x * scale, r.y * scale, r.width * scale, scale);
     }
   }
+  return canvas;
+}
+
+/** 색 칸(걷는 그림 한 칸)을 칸 `scale`px짜리 캔버스로 굽는다 */
+function bakeGrid(grid: ColorGrid, scale: number): HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
+  canvas.width = grid[0].length * scale;
+  canvas.height = grid.length * scale;
+  const ctx = canvas.getContext("2d")!;
+  grid.forEach((row, y) =>
+    row.forEach((color, x) => {
+      if (!color) return;
+      ctx.fillStyle = color;
+      ctx.fillRect(x * scale, y * scale, scale, scale);
+    }),
+  );
   return canvas;
 }
 
@@ -139,7 +156,11 @@ export function TownGame({
     const sprites = new Map<object, HTMLCanvasElement>();
     for (const s of structures) if (!sprites.has(s.art)) sprites.set(s.art, bake([s.art], TOWN_CELL));
     const playerArts = layers.map(findArt).filter((a): a is PixelArt => a !== undefined);
-    const player = playerArts.length > 0 ? bake(playerArts, PLAYER_SIZE / 16) : null;
+    // 걷는 그림 (TOWN-17): 방향마다 서 있기 + 걷기 4칸
+    const walkSheet = new Map<string, HTMLCanvasElement>();
+    if (playerArts.length > 0) {
+      for (const d of WALK_DIRS) for (let f = 0; f <= WALK_FRAMES; f++) walkSheet.set(`${d}:${f}`, bakeGrid(walkFrame(playerArts, d, f), PLAYER_SIZE / 16));
+    }
     const ground = bakeGround();
 
     // 시작 자리(?at)가 바뀌었으면 새 자리에서. 환영(?welcome)을 주소에서 지운 뒤 다시 그려도 자리는 그대로
@@ -147,7 +168,8 @@ export function TownGame({
     let pos: Point = lastPos.current?.from === from ? lastPos.current.pos : { ...start };
     let target: Point | null = null;
     let enterNext = false;
-    let facingLeft = false;
+    let facing: WalkDir = "down";
+    let walking = false;
     let walkTime = 0;
     let shown: string | null = null;
     let stuck = 0;
@@ -255,10 +277,17 @@ export function TownGame({
         // 클릭 목표로 가다 막히면 멈춘다
         stuck = Math.hypot(next.x - pos.x, next.y - pos.y) < 0.5 ? stuck + dt : 0;
         if (stuck > 0.25) target = null;
-        if (dir.x !== 0) facingLeft = dir.x < 0;
+        facing = walkDir(dir.x, dir.y, facing);
+        // 벽에 막혀 제자리면 걷지 않는다
+        walking = Math.hypot(next.x - pos.x, next.y - pos.y) > 0.01;
         pos = next;
-        walkTime += dt;
+        if (walking) walkTime += dt;
+      } else {
+        walking = false;
+        walkTime = 0;
       }
+      const pose = `${walking ? "walk" : "idle"}-${facing}`;
+      if (canvas.dataset.walk !== pose) canvas.dataset.walk = pose;
 
       // 입구 안내, 그리고 Space·Enter (멀리서 누른 것은 버린다)
       const near = nearestEntrance(pos, entrances);
@@ -305,7 +334,8 @@ export function TownGame({
           },
         });
       }
-      const bob = moving ? Math.round(Math.abs(Math.sin(walkTime * 12)) * 3) : 0;
+      const walkStep = walking ? 1 + (Math.floor(walkTime * WALK_FPS) % WALK_FRAMES) : 0;
+      const sprite = walkSheet.get(`${facing}:${walkStep}`);
       items.push({
         y: pos.y + 8,
         draw: () => {
@@ -315,13 +345,7 @@ export function TownGame({
           ctx.beginPath();
           ctx.ellipse(px, py, 16, 6, 0, 0, Math.PI * 2);
           ctx.fill();
-          if (player) {
-            ctx.save();
-            ctx.translate(px, py - PLAYER_SIZE - bob + 4);
-            if (facingLeft) ctx.scale(-1, 1);
-            ctx.drawImage(player, -PLAYER_SIZE / 2, 0);
-            ctx.restore();
-          }
+          if (sprite) ctx.drawImage(sprite, px - PLAYER_SIZE / 2, py - PLAYER_SIZE + 4);
         },
       });
       items.sort((a, b) => a.y - b.y);
@@ -335,7 +359,7 @@ export function TownGame({
         if (x < -150 || x > vw + 150 || y < -20 || y > vh + 60) continue;
         drawTag(ctx, s.label, x, y, s.id === "house:0", s.sub);
       }
-      drawTag(ctx, name, pos.x - camera.x, pos.y - camera.y - PLAYER_SIZE - bob, true);
+      drawTag(ctx, name, pos.x - camera.x, pos.y - camera.y - PLAYER_SIZE, true);
       lastPos.current = { from, pos };
       if (frame++ % 3 === 0) canvas.dataset.feet = `${Math.round(pos.x)},${Math.round(pos.y)}`;
       raf = requestAnimationFrame(tick);
