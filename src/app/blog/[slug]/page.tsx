@@ -6,10 +6,12 @@ import { CategoryNav } from "@/components/blog/CategoryNav";
 import { FollowButton } from "@/components/blog/FollowButton";
 import { Pagination } from "@/components/blog/Pagination";
 import { PostCard } from "@/components/blog/PostCard";
+import { Miniroom } from "@/components/game/Miniroom";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { parseSearchQuery, parseTagFilter, SEARCH_EMPTY, TOWN_SEARCH_EMPTY, TOWN_SEARCH_NONE } from "@/lib/blog-search";
 import { parseId, parsePage } from "@/lib/ids";
 import { getBlogBySlug, searchBlogs } from "@/server/blog";
+import { getAvatar } from "@/server/items";
 import { getCategoryTree } from "@/server/category";
 import { getSession } from "@/server/dal";
 import { listFeed } from "@/server/feed";
@@ -28,7 +30,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
   const query = await searchParams;
   const found = await getBlogBySlug(slug);
   if (!found) notFound();
-  const { blog, nickname, photoKey, characterArt } = found;
+  const { blog, nickname, photoKey, backgroundArt } = found;
 
   const member = await getSession();
   const isOwner = member?.userId === blog.ownerId;
@@ -53,7 +55,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
   const tag = search || searchParam === "empty" ? null : parseTagFilter(query.tag);
   const filtered = townMode || search !== null || tag !== null || searchParam === "empty";
 
-  const [{ items, total }, townFeed, townBlogs, { total: allTotal }, sidebar, visits, myPostCount, followers, following] = await Promise.all([
+  const [{ items, total }, townFeed, townBlogs, { total: allTotal }, sidebar, visits, myPostCount, followers, following, avatar] = await Promise.all([
     townMode || searchParam === "empty"
       ? { items: [], total: 0 }
       : listBlogPosts(blog.id, { viewerIsOwner: isOwner, categoryId, subcategoryId: subId, search, tag, page }),
@@ -68,6 +70,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
     countFollowers(blog.ownerId),
     // 이웃 버튼은 회원이 남의 블로그를 볼 때만 (SOC-04)
     member && !isOwner ? isFollowing(member.userId, blog.ownerId) : false,
+    getAvatar(blog.ownerId),
   ]);
   const filterQuery: Record<string, string> = {};
   if (town) filterQuery.q = town;
@@ -97,21 +100,29 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
       )}
 
       <header className="rounded-2xl border border-line bg-surface p-5">
-        <div className="flex items-center gap-3">
-          {/* 주인 프로필 사진 (BLOG-04, 없으면 캐릭터 얼굴) */}
-          <ProfileAvatar photoKey={photoKey} nickname={nickname} character={characterArt} />
-          <h1 className="min-w-0 text-2xl font-extrabold">
-            <Link href={`/@${blog.slug}`} className="-ml-1 inline-flex min-h-11 min-w-11 max-w-full items-center px-1 hover:underline">
-              {blog.title}
-            </Link>
-          </h1>
-        </div>
-        {blog.intro && <p className="mt-2 text-ink-soft">{blog.intro}</p>}
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-ink-soft" aria-label="블로그 정보">
-            by {nickname} · @{blog.slug} · 글 {allTotal} · <span data-followers>이웃 {followers}</span>
-          </p>
-          {member && !isOwner && <FollowButton ownerId={blog.ownerId} following={following} />}
+        <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-start">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-3">
+              {/* 주인 프로필 사진 (BLOG-04, 없으면 캐릭터) */}
+              <ProfileAvatar photoKey={photoKey} nickname={nickname} character={avatar.layers} />
+              <h1 className="min-w-0 text-2xl font-extrabold">
+                <Link href={`/@${blog.slug}`} className="-ml-1 inline-flex min-h-11 min-w-11 max-w-full items-center px-1 hover:underline">
+                  {blog.title}
+                </Link>
+              </h1>
+            </div>
+            {blog.intro && <p className="mt-2 text-ink-soft">{blog.intro}</p>}
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm text-ink-soft" aria-label="블로그 정보">
+                by {nickname} · @{blog.slug} · 글 {allTotal} · <span data-followers>이웃 {followers}</span>
+              </p>
+              {member && !isOwner && <FollowButton ownerId={blog.ownerId} following={following} />}
+            </div>
+          </div>
+          {/* 미니룸 (BLOG-04): 건 배경과 입은 캐릭터 */}
+          <div className="w-full sm:w-56">
+            <Miniroom background={backgroundArt} avatar={avatar.layers} nickname={nickname} height={150} />
+          </div>
         </div>
         {isOwner && (
           // 주인 도구 막대 (BLOG-08)
@@ -127,6 +138,9 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
             </Link>
             <Link href="/settings/blog#categories" className="btn">
               🗂 카테고리 관리
+            </Link>
+            <Link href="/closet" className="btn">
+              🎨 꾸미기
             </Link>
             <Link href="/settings/blog" className="btn">
               ⚙️ 블로그 설정

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { buyItem, type BuyState } from "@/app/shop/actions";
 import { PixelLayers } from "@/components/game/PixelLayers";
@@ -24,6 +25,11 @@ export function ShopView({ items, level, coins }: { items: ShopItem[]; level: nu
           data-buy-result={state.ok ? "ok" : "error"}
         >
           {state.message}
+          {state.ok && state.type !== "furniture" && (
+            <Link href="/closet" className="ml-2 underline">
+              🎨 꾸미기로
+            </Link>
+          )}
         </p>
       )}
 

@@ -18,7 +18,7 @@ test.describe("BLOG-03·04 프로필 사진", () => {
   test("올리면 블로그 홈 이름 옆 48px 사진, 방문자도 볼 수 있고, 바꾸면 전 사진은 떨어지고, 지우면 캐릭터 얼굴과 404", async ({ page, browser }) => {
     const username = await signUpOk(page);
     // 처음에는 캐릭터 얼굴 (GAME-01)
-    await expect(page.locator("header [data-avatar-character] svg").first()).toHaveAttribute("data-character", "char.boy");
+    await expect(page.locator("header [data-avatar-character] svg").first()).toHaveAttribute("data-art", "char.boy");
 
     await page.goto("/settings/account");
     await expect(page.getByRole("heading", { name: "프로필 사진" })).toBeVisible();

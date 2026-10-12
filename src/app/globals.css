@@ -182,3 +182,14 @@ body {
   height: 0;
   pointer-events: none;
 }
+
+/* 미니룸 캐릭터가 통통 튄다 (BLOG-04) */
+@keyframes hop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}

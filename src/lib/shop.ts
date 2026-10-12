@@ -26,6 +26,9 @@ export const SHOP_SECTIONS: readonly { key: ShopSection; title: string; hint?: s
   { key: "background", title: "🖼 배경" },
 ];
 
+/** 가입할 때 받아 거는 기본 배경 (SHOP-04) */
+export const STARTER_BACKGROUND = "bg_meadow";
+
 export const SHOP_EMPTY = "지금은 파는 아이템이 없어요.";
 
 export const SHOP_ERRORS = {
@@ -104,5 +107,30 @@ export function sortShopItems(list: readonly ShopItem[], sort: ShopSort): ShopIt
 export function purchaseMessage(name: string, type: string): string {
   const bought = `🎉 ${withJosa(name, "을/를")} 샀어요!`;
   if (type === "furniture") return `${bought} 내 블로그의 우리 집에 놓을 수 있어요.`;
-  return `${bought} 꾸미기에서 장착할 수 있어요.`;
+  return `${bought} 꾸미기에서 장착해 보세요.`;
+}
+
+/** 겹쳐 그리는 순서: 캐릭터 → 옷 → 소품 → 모자 (SHOP-06) */
+export const AVATAR_SLOTS = ["clothes", "accessory", "hat"] as const;
+export type AvatarSlot = (typeof AVATAR_SLOTS)[number];
+
+export function isAvatarSlot(value: unknown): value is AvatarSlot {
+  return typeof value === "string" && (AVATAR_SLOTS as readonly string[]).includes(value);
+}
+
+/** 캐릭터 그림과 입은 아이템 그림을 그릴 순서대로 */
+export function avatarLayers(character: string | null | undefined, equips: Partial<Record<AvatarSlot, string>>): string[] {
+  if (!character) return [];
+  return [character, ...AVATAR_SLOTS.flatMap((slot) => (equips[slot] ? [equips[slot]] : []))];
+}
+
+export const CLOSET_ERRORS = {
+  notOwned: "가지고 있지 않은 아이템이에요",
+  wrongType: "아직 장착할 수 없는 종류예요",
+  failed: "장착하지 못했어요. 잠시 뒤 다시 시도해 주세요",
+} as const;
+
+/** 장착·벗기 확인 문구 (2초 뒤 사라짐) */
+export function equipMessage(name: string, removed = false): string {
+  return removed ? `${withJosa(name, "을/를")} 벗었어요 ✓` : `${name} 장착을 저장했어요 ✓`;
 }
