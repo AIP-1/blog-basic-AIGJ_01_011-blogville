@@ -2,7 +2,8 @@
 
 import { useActionState } from "react";
 import { changePassword, deleteAccount, updateNickname, type PasswordState, type WithdrawState } from "@/app/settings/account/actions";
-import { updateBlogAccent, updateBlogInfo, updateBlogSlug, type SettingsState } from "@/app/settings/blog/actions";
+import { updateBlogAccent, updateBlogInfo, updateBlogListStyle, updateBlogSlug, type SettingsState } from "@/app/settings/blog/actions";
+import { LIST_STYLES } from "@/lib/list-style";
 import { BLOG_ACCENTS } from "@/lib/blog-accent";
 
 function Status({ state }: { state: SettingsState }) {
@@ -67,6 +68,34 @@ export function AccentForm({ accent }: { accent: string }) {
         <Status state={state} />
         <button type="submit" className="btn btn-primary" disabled={pending}>
           색 바꾸기
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** 글 목록 모양 (블로그 꾸미기): 카드형·목록형·앨범형 */
+export function ListStyleForm({ listStyle }: { listStyle: string }) {
+  const [state, action, pending] = useActionState<SettingsState, FormData>(updateBlogListStyle, null);
+  const current = state?.values?.listStyle ?? listStyle;
+  return (
+    <form action={action} className="space-y-3" key={JSON.stringify(state)}>
+      <fieldset>
+        <legend className="mb-2 text-sm font-semibold">내 블로그 홈의 글 목록</legend>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {LIST_STYLES.map((s) => (
+            <label key={s.key} className="btn btn-choice flex-col items-start gap-0 has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-accent">
+              <input type="radio" name="listStyle" value={s.key} defaultChecked={current === s.key} className="sr-only" />
+              <span className="font-bold">{s.label}</span>
+              <span className="text-sm font-normal text-ink-soft">{s.hint}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <div className="flex items-center justify-end gap-3">
+        <Status state={state} />
+        <button type="submit" className="btn btn-primary" disabled={pending}>
+          모양 바꾸기
         </button>
       </div>
     </form>
