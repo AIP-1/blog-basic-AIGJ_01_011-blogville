@@ -3,6 +3,7 @@
 #             DB_ADDRESS, DB_PORT, DB_NAME, DB_SCHEMA, DB_USERNAME, DB_PASSWORD
 #             APP_URL (선택, 없으면 http://SSH_ADDRESS:8400)
 #             ADMIN_USERNAME, ADMIN_PASSWORD (선택, 있으면 관리자 계정·공지 블로그를 만들거나 비밀번호 갱신)
+#             KAKAO_/NAVER_/GOOGLE_CLIENT_ID·_CLIENT_SECRET (선택, 둘 다 있는 서비스만 소셜 로그인 버튼이 켜짐)
 name: deploy
 
 on:
@@ -109,11 +110,17 @@ jobs:
           IMAGE: ${{ env.IMAGE }}
           ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          KAKAO_CLIENT_ID: ${{ secrets.KAKAO_CLIENT_ID }}
+          KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
+          NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         with:
           host: ${{ env.SSH_HOST }}
           port: ${{ env.SSH_PORT }}
           username: ${{ secrets.SSH_ID }}
           password: ${{ secrets.SSH_PASSWORD }}
-          envs: DATABASE_URL,APP_URL,IMAGE,ADMIN_USERNAME,ADMIN_PASSWORD
+          envs: DATABASE_URL,APP_URL,IMAGE,ADMIN_USERNAME,ADMIN_PASSWORD,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET
           command_timeout: 10m
           script: bash ~/blogville/run.sh

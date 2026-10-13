@@ -6,11 +6,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { sessions } from "@/db/schema";
-import { auth } from "@/lib/auth";
+import { auth, SOCIAL_REMEMBER_COOKIE } from "@/lib/auth";
 import { AUTH_ERRORS, checkSignUp, PASSWORD_MAX } from "@/lib/auth-rules";
 import { parseId } from "@/lib/ids";
 import { normalizeName } from "@/lib/names";
 import { safeNext } from "@/lib/safe-next";
+import { enabledProviders, isSocialProvider } from "@/lib/social-login";
 import { getMyBlog, getSession } from "@/server/dal";
 import { clearLoginAttempts, reserveLoginAttempt } from "@/server/login-attempts";
 import { createMember, SignUpError } from "@/server/signup";
@@ -114,4 +115,25 @@ export async function signOut() {
   await auth.api.signOut({ headers: await headers() });
   revalidatePath("/", "layout");
   redirect("/");
+}
+
+/**
+ * 소셜 로그인 시작 (AUTH-01). 키가 없는 서비스면 첫 화면으로 돌려보낸다.
+ * [로그인 상태 유지]는 서비스에 다녀오는 동안 쿠키(10분)에 담아 두고, 돌아와 세션을 만들 때 읽는다 (auth.ts).
+ * 연동해 둔 계정이 아니면 라이브러리가 `/?error=signup_disabled` 등으로 돌려보낸다.
+ */
+export async function startSocialSignIn(provider: unknown, formData: FormData) {
+  if (!isSocialProvider(provider) || !enabledProviders(process.env).some((p) => p.id === provider)) redirect("/?error=not_ready");
+  const store = await cookies();
+  if (formData.get("rememberMe") === "on") {
+    store.set(SOCIAL_REMEMBER_COOKIE, "1", { path: "/", httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 600 });
+  } else if (store.has(SOCIAL_REMEMBER_COOKIE)) {
+    store.delete(SOCIAL_REMEMBER_COOKIE);
+  }
+  const result = await auth.api.signInSocial({
+    body: { provider, callbackURL: "/town", errorCallbackURL: "/" },
+    headers: await headers(),
+  });
+  if (!result?.url) redirect("/?error=not_ready");
+  redirect(result.url);
 }
