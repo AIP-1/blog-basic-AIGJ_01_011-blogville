@@ -8,10 +8,11 @@ import { DeletePostButton } from "@/components/post/DeletePostButton";
 import { CommentSection } from "@/components/post/CommentSection";
 import { LikeButton } from "@/components/post/LikeButton";
 import { PublishNotice } from "@/components/post/PublishNotice";
+import { PostJsonLd } from "@/components/post/PostJsonLd";
 import { AdjacentPosts } from "@/components/post/AdjacentPosts";
 import { CategoryPosts } from "@/components/post/CategoryPosts";
 import { TagList } from "@/components/post/TagList";
-import { excerpt, firstImageKey } from "@/lib/feed";
+import { excerpt, firstImageKey, siteUrl } from "@/lib/feed";
 import { parseId } from "@/lib/ids";
 import { hasPostReward } from "@/server/points";
 import { showsPublishNotice } from "@/lib/post-rules";
@@ -93,6 +94,18 @@ export default async function PostPage({ params, searchParams }: PageProps<"/blo
 
   return (
     <>
+      {post.isPublic && (
+        <PostJsonLd
+          siteUrl={siteUrl()}
+          blog={blog}
+          post={post}
+          nickname={nickname}
+          description={excerpt(post.contentText)}
+          imageKey={firstImageKey(post.contentHtml)}
+          categoryName={categoryName}
+          categoryHref={categoryHref ?? null}
+        />
+      )}
       {notice && <PublishNotice rewarded={await hasPostReward(blog.ownerId, post.id)} />}
       <article className="mx-auto max-w-3xl rounded-2xl border border-line bg-surface p-5 md:p-8">
         <Link href={`/@${blog.slug}`} className="-ml-1 flex min-h-11 w-fit max-w-full items-center px-1 font-semibold text-ink-soft hover:text-ink" data-blog-link>

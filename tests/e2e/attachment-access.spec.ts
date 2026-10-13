@@ -52,7 +52,8 @@ test.describe("US3 누가 여나", () => {
     expect(res.headers()).toMatchObject({
       "content-type": "image/png",
       "x-content-type-options": "nosniff",
-      "cache-control": "private, no-cache",
+      // 공개 글의 첨부는 브라우저가 하루 동안 다시 묻지 않는다
+      "cache-control": "public, max-age=86400",
       etag: `"${url.split("/").pop()}"`,
       "content-disposition": "inline",
     });
@@ -68,7 +69,9 @@ test.describe("US3 누가 여나", () => {
     expect(await status(visitor, url)).toBe(404);
     expect(await status(visitor, url, { "if-none-match": etag })).toBe(404);
     expect(await status(b.page, url)).toBe(404);
-    expect(await status(a.page, url)).toBe(200);
+    const own = await a.page.request.get(url);
+    expect(own.status()).toBe(200);
+    expect(own.headers()["cache-control"]).toBe("private, no-cache");
 
     expect(await status(visitor, "/files/not-a-key")).toBe(404);
     expect(await status(visitor, `/files/${"0".repeat(32)}`)).toBe(404);
