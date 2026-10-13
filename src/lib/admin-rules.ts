@@ -298,6 +298,7 @@ export const AUDIT_ACTIONS = {
   notice: "공지 띠 변경",
   banned_words: "금지어 변경",
   feedback: "문의 답변",
+  dismiss_reports: "신고 기각",
 } as const;
 export type AuditAction = keyof typeof AUDIT_ACTIONS;
 
