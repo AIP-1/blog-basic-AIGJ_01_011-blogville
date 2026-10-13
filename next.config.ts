@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       { source: "/@:slug", destination: "/blog/:slug" },
+      // 블로그 구독 RSS. 글 번호 주소보다 먼저 둔다
+      { source: "/@:slug/rss", destination: "/blog/:slug/rss" },
       { source: "/@:slug/:postId", destination: "/blog/:slug/:postId" },
     ];
   },
