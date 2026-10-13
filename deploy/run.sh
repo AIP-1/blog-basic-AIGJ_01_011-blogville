@@ -2,10 +2,11 @@
 # 서버에서 Blogville 도커 이미지를 불러와 8400번 포트로 **무중단(블루·그린)** 배포한다.
 # GitHub Actions(.github/workflows/deploy.yml)가 이미지 파일과 이 스크립트를 올린 뒤 SSH로 부른다.
 #
+# 이 서버의 도커는 다른 사람도 같이 쓴다. 컨테이너·이미지 이름은 모두 bv8400- 로 시작해 겹치지 않게 한다.
 # 구성 (모두 --network host)
-#   blogville-proxy  8400번 포트. state/active-port에 적힌 포트의 앱으로 요청을 넘긴다 (scripts/proxy.mjs)
-#   blogville-blue   8401번 포트의 앱
-#   blogville-green  8402번 포트의 앱
+#   bv8400-proxy  8400번 포트. state/active-port에 적힌 포트의 앱으로 요청을 넘긴다 (scripts/proxy.mjs)
+#   bv8400-blue   8401번 포트의 앱
+#   bv8400-green  8402번 포트의 앱
 # 순서: 쉬고 있는 색에 새 버전을 띄움 → 그 포트에서 응답 확인 → active-port를 바꿔 프록시가 넘김
 #       → 이전 색은 하던 요청을 마칠 시간(DRAIN초)을 준 뒤 멈춘다. 새 버전이 뜨지 않으면 이전 버전이 그대로 서비스한다.
 #
@@ -24,8 +25,9 @@ set -euo pipefail
 
 PORT=8400
 DRAIN=15
-PROXY=blogville-proxy
-LEGACY=blogville   # 무중단 배포 전에 8400을 직접 쓰던 컨테이너
+APP=bv8400
+PROXY=$APP-proxy
+REPO=$APP-blogville   # 이미지 이름 (deploy.yml과 같게)
 DEPLOY_DIR="${DEPLOY_DIR:-$HOME/blogville}"
 TAR="$DEPLOY_DIR/blogville-image.tar.gz"
 
@@ -82,11 +84,22 @@ fi
 # 지금 서비스 중인 색과 이번에 띄울 색
 ACTIVE=$(cat "$DEPLOY_DIR/state/active" 2>/dev/null || true)
 if [ "$ACTIVE" = "blue" ]; then NEXT=green; NEXT_PORT=8402; else NEXT=blue; NEXT_PORT=8401; fi
-NEXT_NAME="blogville-$NEXT"
+NEXT_NAME="$APP-$NEXT"
+
+# 우리가 만든 컨테이너인지 이미지 이름으로 확인한 뒤에만 지운다 (다른 사람 컨테이너는 건드리지 않음)
+ours() { case "$("${DOCKER[@]}" inspect -f '{{.Config.Image}}' "$1" 2>/dev/null)" in blogville:*|"$REPO":*) return 0 ;; *) return 1 ;; esac; }
+# 무중단 배포 전·첫 시도 때 쓰던 이름 (blogville = 8400 직접, blogville-blue = 8401)
+for old in blogville-blue blogville-green; do ours "$old" && "${DOCKER[@]}" rm -f "$old" >/dev/null 2>&1 || true; done
+
+# 띄울 포트를 다른 프로그램이 쓰고 있으면 멈춘다
+if ! ours "$NEXT_NAME" && (ss -ltn 2>/dev/null || netstat -ltn 2>/dev/null) | grep -qE "[:.]$NEXT_PORT\b"; then
+  echo "$NEXT_PORT 포트를 이미 다른 프로그램이 쓰고 있어요. 지금 서비스는 그대로예요." >&2
+  exit 1
+fi
 
 # 도커 기본 네트워크(bridge)에서는 이 서버의 공인 IP(DB)로 가는 길이 막혀 있어서(EHOSTUNREACH) 서버 네트워크를 그대로 쓴다
 echo "새 버전을 $NEXT($NEXT_PORT)에 띄워요 (지금 서비스: ${ACTIVE:-없음})"
-"${DOCKER[@]}" rm -f "$NEXT_NAME" >/dev/null 2>&1 || true
+ours "$NEXT_NAME" && "${DOCKER[@]}" rm -f "$NEXT_NAME" >/dev/null 2>&1 || true
 "${DOCKER[@]}" run -d \
   --name "$NEXT_NAME" \
   --restart unless-stopped \
@@ -121,9 +134,10 @@ printf '%s\n' "$NEXT_PORT" > "$DEPLOY_DIR/state/active-port.tmp"
 mv -f "$DEPLOY_DIR/state/active-port.tmp" "$DEPLOY_DIR/state/active-port"
 chmod 644 "$DEPLOY_DIR/state/active-port"
 
-# 프록시가 없으면 띄운다. 무중단 배포 전 컨테이너(8400 직접 사용)가 있으면 이번 한 번만 바꾸며 잠깐 끊긴다
+# 프록시가 없으면 띄운다. 무중단 배포 전 컨테이너(blogville, 8400 직접 사용)가 있으면 이번 한 번만 바꾸며 잠깐 끊긴다
 if [ "$("${DOCKER[@]}" inspect -f '{{.State.Running}}' "$PROXY" 2>/dev/null)" != "true" ]; then
-  "${DOCKER[@]}" rm -f "$LEGACY" "$PROXY" >/dev/null 2>&1 || true
+  ours blogville && "${DOCKER[@]}" rm -f blogville >/dev/null 2>&1 || true
+  ours "$PROXY" && "${DOCKER[@]}" rm -f "$PROXY" >/dev/null 2>&1 || true
   echo "프록시를 띄워요 (포트 $PORT)"
   "${DOCKER[@]}" run -d \
     --name "$PROXY" \
@@ -155,12 +169,12 @@ echo "배포 완료: $APP_URL ($NEXT, 포트 $NEXT_PORT)"
 # 이전 색은 하던 요청을 마칠 시간을 주고 멈춘다
 if [ -n "$ACTIVE" ] && [ "$ACTIVE" != "$NEXT" ]; then
   sleep "$DRAIN"
-  "${DOCKER[@]}" stop -t 20 "blogville-$ACTIVE" >/dev/null 2>&1 || true
-  "${DOCKER[@]}" rm -f "blogville-$ACTIVE" >/dev/null 2>&1 || true
+  "${DOCKER[@]}" stop -t 20 "$APP-$ACTIVE" >/dev/null 2>&1 || true
+  "${DOCKER[@]}" rm -f "$APP-$ACTIVE" >/dev/null 2>&1 || true
   echo "이전 버전($ACTIVE) 정리"
 fi
 
 rm -f "$TAR"
-# 돌고 있는 컨테이너(프록시 포함)가 쓰지 않는 blogville 이미지는 지운다
+# 우리 이미지($REPO) 중 돌고 있는 컨테이너(프록시 포함)가 쓰지 않는 것은 지운다
 in_use=$("${DOCKER[@]}" ps --format '{{.Image}}' | sort -u)
-"${DOCKER[@]}" images blogville --format '{{.Repository}}:{{.Tag}}' | grep -vxF "$in_use" | xargs -r "${DOCKER[@]}" rmi >/dev/null 2>&1 || true
+"${DOCKER[@]}" images "$REPO" --format '{{.Repository}}:{{.Tag}}' | grep -vxF "$in_use" | xargs -r "${DOCKER[@]}" rmi >/dev/null 2>&1 || true

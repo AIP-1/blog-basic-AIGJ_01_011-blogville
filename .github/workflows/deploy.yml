@@ -21,7 +21,7 @@ jobs:
 
       - name: 도커 이미지 만들기
         run: |
-          IMAGE="blogville:${GITHUB_SHA::7}"
+          IMAGE="bv8400-blogville:${GITHUB_SHA::7}"  # 서버 도커를 같이 쓰므로 이름이 겹치지 않게
           echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
           docker build -t "$IMAGE" .
           mkdir -p out
