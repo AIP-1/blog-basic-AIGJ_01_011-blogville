@@ -29,7 +29,7 @@ jobs:
           docker build -t "$IMAGE" .
           mkdir -p out
           docker save "$IMAGE" | gzip > out/blogville-image.tar.gz
-          cp deploy/run.sh out/run.sh
+          cp deploy/run.sh deploy/rollback.sh deploy/backup.sh out/
           ls -lh out
 
       - name: DB 접속 주소 만들기
@@ -99,7 +99,7 @@ jobs:
           port: ${{ env.SSH_PORT }}
           username: ${{ secrets.SSH_ID }}
           password: ${{ secrets.SSH_PASSWORD }}
-          source: out/blogville-image.tar.gz,out/run.sh
+          source: out/blogville-image.tar.gz,out/run.sh,out/rollback.sh,out/backup.sh
           target: blogville
           strip_components: 1
 

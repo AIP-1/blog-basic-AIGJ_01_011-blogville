@@ -187,15 +187,16 @@ fi
 echo "$NEXT" > "$DEPLOY_DIR/state/active"
 echo "배포 완료: $APP_URL ($NEXT, 포트 $NEXT_PORT)"
 
-# 이전 색은 하던 요청을 마칠 시간을 주고 멈춘다
+# 이전 색은 하던 요청을 마칠 시간을 주고 멈춘다. 지우지 않고 멈춰 두어서 rollback.sh로 바로 되돌릴 수 있다
 if [ -n "$ACTIVE" ] && [ "$ACTIVE" != "$NEXT" ]; then
   sleep "$DRAIN"
+  "${DOCKER[@]}" update --restart no "$APP-$ACTIVE" >/dev/null 2>&1 || true
   "${DOCKER[@]}" stop -t 20 "$APP-$ACTIVE" >/dev/null 2>&1 || true
-  "${DOCKER[@]}" rm -f "$APP-$ACTIVE" >/dev/null 2>&1 || true
-  echo "이전 버전($ACTIVE) 정리"
+  echo "이전 버전($ACTIVE)은 멈춰 두었어요 (되돌리기: Actions → rollback)"
 fi
 
 rm -f "$TAR"
-# 우리 이미지($REPO) 중 돌고 있는 컨테이너(프록시 포함)가 쓰지 않는 것은 지운다
-in_use=$("${DOCKER[@]}" ps --format '{{.Image}}' | sort -u)
+# 우리 이미지($REPO) 중 우리 컨테이너(프록시·멈춘 이전 버전 포함)가 쓰지 않는 것은 지운다
+# 멈춰 둔 이전 버전(되돌리기용)의 이미지도 남긴다
+in_use=$("${DOCKER[@]}" ps -a --filter "name=$APP-" --format '{{.Image}}' | sort -u)
 "${DOCKER[@]}" images "$REPO" --format '{{.Repository}}:{{.Tag}}' | grep -vxF "$in_use" | xargs -r "${DOCKER[@]}" rmi >/dev/null 2>&1 || true
