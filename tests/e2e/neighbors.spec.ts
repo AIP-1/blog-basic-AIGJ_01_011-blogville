@@ -79,7 +79,7 @@ test.describe("SOC-04 이웃", () => {
     await expect(g.getByRole("heading", { name: "비밀 글" })).toHaveCount(0);
     await expect(g.getByRole("heading", { name: "남의 글" })).toHaveCount(0);
     // 작성자 줄을 누르면 그 블로그 홈
-    await expect(g.getByRole("link", { name: new RegExp(`^${a}의 블로그`) })).toHaveAttribute("href", `/@${a}`);
+    await expect(g.getByRole("link", { name: new RegExp(`^${a} · `) })).toHaveAttribute("href", `/@${a}`);
 
     // 마지막보다 큰 페이지는 빈 화면 문구
     await g.goto("/feed/following?page=999");
@@ -161,7 +161,7 @@ test.describe("SOC-05 마을 소식", () => {
       await expect(cards.first().getByRole("heading")).toHaveText("글 9");
       await expect(page.getByRole("heading", { name: "숨은 글" })).toHaveCount(0);
       await expect(page.getByText("🔒 비공개")).toHaveCount(0);
-      await expect(cards.first().getByRole("link", { name: new RegExp(`^${a}의 블로그`) })).toHaveAttribute("href", `/@${a}`);
+      await expect(cards.first().getByRole("link", { name: new RegExp(`^${a} · `) })).toHaveAttribute("href", `/@${a}`);
       await expect(page.getByRole("heading", { name: "🏷 인기 태그" })).toBeVisible();
 
       for (const bad of ["abc", "0", "2.5", "1e300"]) {
@@ -173,7 +173,7 @@ test.describe("SOC-05 마을 소식", () => {
       await expect(page).toHaveURL(/\/feed\?page=2$/);
       // 2페이지 맨 앞은 이 블로그의 9번째 글(가장 오래된 글 1)
       await expect(cards.first().getByRole("heading")).toHaveText("글 1");
-      await expect(cards.first().getByRole("link", { name: new RegExp(`^${a}의 블로그`) })).toBeVisible();
+      await expect(cards.first().getByRole("link", { name: new RegExp(`^${a} · `) })).toBeVisible();
     } finally {
       // 미래로 옮긴 글은 다른 시험(관리자 최근 글 등)의 순서를 흔들므로 지운다
       await sql`delete from posts where blog_id = (select b.id from blogs b join users u on u.id = b.owner_id where u.username = ${a})`;

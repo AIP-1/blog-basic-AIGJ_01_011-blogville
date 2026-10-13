@@ -26,8 +26,8 @@ export async function savePost(_prev: PostFormState, formData: FormData): Promis
   }
   // 헤더의 Lv·🪙도 바뀔 수 있어 전체를 다시 그린다 (GAME-05)
   revalidatePath("/", "layout");
-  // 새 글이면 글 상세 맨 위에 발행 안내를 한 번 보인다 (POST-01). 수정은 안내 없이 돌아간다
-  redirect(`/@${blog.slug}/${postId}${checked.value.postId === null ? "?new=1" : ""}`);
+  // 새 글이면 글 상세 맨 위에 발행 안내를 한 번 보인다 (POST-01). 수정·예약은 안내 없이 돌아간다
+  redirect(`/@${blog.slug}/${postId}${checked.value.postId === null && !checked.value.publishAt ? "?new=1" : ""}`);
 }
 
 export async function deletePost(formData: FormData) {

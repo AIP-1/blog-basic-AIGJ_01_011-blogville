@@ -1,17 +1,20 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { checkComment, COMMENT_ERRORS } from "@/lib/comment-rules";
 import { parseId } from "@/lib/ids";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { blogs, posts } from "@/db/schema";
 import { createComment, createReply, editComment, editReply, removeComment, removeReply } from "@/server/comments";
+import { checkBannedWords } from "@/server/banned-words";
 import { getSession, requireMember } from "@/server/dal";
 import { toggleFavorite, toggleFollow as storeFollow, unfollow } from "@/server/follows";
 import { FAVORITE_MESSAGES } from "@/lib/social";
 import { toggleLike as storeLike } from "@/server/likes";
-import { getBlogVisitStats, recordView, recordVisit, type VisitStats } from "@/server/stats";
+import { getBlogVisitStats, recordReferrer, recordView, recordVisit, type VisitStats } from "@/server/stats";
+import { referrerSource } from "@/lib/referrer";
 import { ensureVisitorId } from "@/server/visitor";
 
 // 댓글·답글 (SOC-01·02, specs/004-comments). 실패하면 문구만 돌려주고 입력은 화면에 남는다.
@@ -32,6 +35,8 @@ export async function addComment(formData: FormData): Promise<CommentResult> {
   if (postId === null) return { ok: false, error: COMMENT_ERRORS.invalid };
   const checked = checkComment(text(formData, "content"));
   if (!checked.ok) return checked;
+  const banned = await checkBannedWords(checked.content);
+  if (banned) return { ok: false, error: banned };
   const result = await createComment(member.userId, postId, checked.content, secret(formData));
   if (result.ok) revalidatePath("/", "layout");
   return result;
@@ -44,6 +49,8 @@ export async function addReply(formData: FormData): Promise<CommentResult> {
   if (postId === null || commentId === null) return { ok: false, error: COMMENT_ERRORS.invalid };
   const checked = checkComment(text(formData, "content"));
   if (!checked.ok) return checked;
+  const banned = await checkBannedWords(checked.content);
+  if (banned) return { ok: false, error: banned };
   const result = await createReply(member, postId, commentId, checked.content, secret(formData));
   if (result.ok) revalidatePath("/", "layout");
   return result;
@@ -67,6 +74,8 @@ async function update(formData: FormData, store: typeof editComment): Promise<Co
   if (id === null) return { ok: false, error: COMMENT_ERRORS.invalid };
   const checked = checkComment(text(formData, "content"));
   if (!checked.ok) return checked;
+  const banned = await checkBannedWords(checked.content);
+  if (banned) return { ok: false, error: banned };
   const result = await store(member.userId, id, checked.content, secret(formData));
   if (result.ok) revalidatePath("/", "layout");
   return result;
@@ -92,7 +101,7 @@ export async function deleteReply(formData: FormData): Promise<void> {
 // revalidatePath는 부르지 않는다: 돌려준 숫자로 그 자리만 바꾼다.
 
 /** 글 상세: 조회수 +1(오늘 처음이면)과 그 블로그 방문 기록. 지금 조회수, 셀 수 없는 글이면 null. */
-export async function recordPostView(rawPostId: unknown): Promise<number | null> {
+export async function recordPostView(rawPostId: unknown, rawReferrer: unknown = ""): Promise<number | null> {
   const postId = parseId(rawPostId);
   if (postId === null) return null;
   const [row] = await db
@@ -105,7 +114,15 @@ export async function recordPostView(rawPostId: unknown): Promise<number | null>
   if (member?.userId === row.ownerId) return row.viewCount;
   const visitorId = await ensureVisitorId();
   await recordVisit(row.blogId, visitorId);
-  return recordView(postId, visitorId);
+  const { viewCount, counted } = await recordView(postId, visitorId);
+  // 그날 처음 센 조회만 어디서 왔는지 남긴다 (통계 상세). 우리 사이트인지는 이 요청의 호스트로 본다
+  if (counted) {
+    const h = await headers();
+    const host = (h.get("x-forwarded-host") ?? h.get("host") ?? "").split(",")[0].trim().replace(/:\d+$/, "");
+    const referrer = typeof rawReferrer === "string" ? rawReferrer.slice(0, 2000) : "";
+    await recordReferrer(row.blogId, referrerSource(referrer, host)).catch((error) => console.error("유입 경로 기록 실패", error));
+  }
+  return viewCount;
 }
 
 /** 블로그 홈: 오늘 처음 온 브라우저면 1번 기록하고 지금 숫자. 없는 블로그면 null. */

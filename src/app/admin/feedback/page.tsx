@@ -25,9 +25,6 @@ export default async function AdminFeedbackPage({ searchParams }: PageProps<"/ad
 
   return (
     <div className="space-y-4">
-      <Link href="/admin" className="-ml-1 flex min-h-11 w-fit items-center px-1 font-semibold text-ink-soft hover:text-ink">
-        ‹ 관리자
-      </Link>
       <h1 className="text-2xl font-extrabold">🐞 버그·문의</h1>
 
       <nav aria-label="상태로 거르기" className="flex flex-wrap gap-1">

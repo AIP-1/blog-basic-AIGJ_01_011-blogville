@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
+import { BlindNotice } from "@/components/post/BlindNotice";
 import { PostForm } from "@/components/post/PostForm";
 import { parseId } from "@/lib/ids";
 import { getCategoryOptions } from "@/server/category";
+import { getSeriesOptions } from "@/server/series";
 import { getMyBlog, requireMember } from "@/server/dal";
 import { getPostForEdit } from "@/server/post";
 import { getPostTags } from "@/server/tags";
@@ -17,8 +19,10 @@ export default async function EditPage({ params }: PageProps<"/write/[postId]">)
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="sr-only">글 수정</h1>
+      {post.blindedAt && <BlindNotice reason={post.blindReason} />}
       <PostForm
         categories={await getCategoryOptions(blog.id)}
+        seriesOptions={await getSeriesOptions(blog.id)}
         initial={{
           postId: post.id,
           title: post.title,
@@ -26,6 +30,8 @@ export default async function EditPage({ params }: PageProps<"/write/[postId]">)
           categoryId: post.categoryId,
           subcategoryId: post.subcategoryId,
           isPublic: post.isPublic,
+          publishAt: post.publishAt,
+          seriesId: post.seriesId,
           tags: await getPostTags(post.id),
         }}
       />

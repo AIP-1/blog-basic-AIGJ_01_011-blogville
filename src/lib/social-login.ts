@@ -41,6 +41,7 @@ export function socialEmail(id: SocialProviderId, accountId: string | number): s
 }
 
 export const SOCIAL_MESSAGES = {
+  suspended: "이용이 정지된 계정이에요. 문의는 공지 블로그로 해 주세요.",
   notReady: "아직 연결 준비 중이에요",
   notLinked: "연동된 계정이 없어요. 아이디로 로그인한 뒤 내 정보에서 연동해 주세요",
   linkedToOther: "이미 다른 회원에게 연동된 계정이에요",
@@ -55,6 +56,7 @@ export const SOCIAL_MESSAGES = {
 export function signInErrorMessage(code: unknown): string | null {
   if (code === "signup_disabled" || code === "account_not_linked" || code === "email_not_found") return SOCIAL_MESSAGES.notLinked;
   if (code === "not_ready") return SOCIAL_MESSAGES.notReady;
+  if (code === "account_suspended" || code === "ACCOUNT_SUSPENDED") return SOCIAL_MESSAGES.suspended;
   return null;
 }
 

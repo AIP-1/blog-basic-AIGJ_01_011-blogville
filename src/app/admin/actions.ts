@@ -4,20 +4,21 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { blogs, posts } from "@/db/schema";
+import { blogs, users } from "@/db/schema";
 import { parseId } from "@/lib/ids";
 import { makeTempPassword } from "@/lib/temp-password";
 import { RESET_ERRORS, resetMemberPassword, type ResetResult } from "@/server/account";
-import { checkReply, FEEDBACK_ERRORS, isFeedbackStatus } from "@/lib/support-rules";
+import { checkReply, FEEDBACK_ERRORS, FEEDBACK_STATUS_LABELS, isFeedbackStatus } from "@/lib/support-rules";
+import { adminRemovePost, auditFeedback, writeAudit } from "@/server/admin-tools";
 import { requireAdmin } from "@/server/dal";
 import { updateFeedback } from "@/server/feedback";
 
 /** 관리자 글 삭제 (AUTH-08): 어느 블로그의 글이든 지운다. 일반 회원이 보내면 404로 끝나고 아무것도 지우지 않는다. */
 export async function adminDeletePost(formData: FormData): Promise<void> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const postId = parseId(formData.get("postId"));
   if (postId === null) return;
-  await db.delete(posts).where(eq(posts.id, postId));
+  await adminRemovePost(admin.userId, postId);
   revalidatePath("/", "layout");
 }
 
@@ -26,13 +27,13 @@ export async function adminDeletePost(formData: FormData): Promise<void> {
  * 지운 글 화면은 404라 그 블로그 홈으로 보낸다. 이미 지워진 글이면 다시 그리기만 한다.
  */
 export async function adminDeletePostAndLeave(formData: FormData): Promise<void> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const postId = parseId(formData.get("postId"));
   if (postId === null) return;
-  const [deleted] = await db.delete(posts).where(eq(posts.id, postId)).returning({ blogId: posts.blogId });
+  const blogId = await adminRemovePost(admin.userId, postId);
   revalidatePath("/", "layout");
-  if (!deleted) return;
-  const [blog] = await db.select({ slug: blogs.slug }).from(blogs).where(eq(blogs.id, deleted.blogId));
+  if (blogId === null) return;
+  const [blog] = await db.select({ slug: blogs.slug }).from(blogs).where(eq(blogs.id, blogId));
   if (blog) redirect(`/@${blog.slug}`);
 }
 
@@ -41,10 +42,16 @@ export async function adminDeletePostAndLeave(formData: FormData): Promise<void>
  * 일반 회원이 보내면 404로 끝나고 아무것도 바꾸지 않는다. 관리자 계정은 거절한다.
  */
 export async function adminResetPassword(formData: FormData): Promise<ResetResult> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const userId = formData.get("userId");
   if (typeof userId !== "string" || userId.length < 1 || userId.length > 64) return { ok: false, error: RESET_ERRORS.notFound };
-  return resetMemberPassword(userId, makeTempPassword());
+  const result = await resetMemberPassword(userId, makeTempPassword());
+  if (result.ok) {
+    const [user] = await db.select({ username: users.username }).from(users).where(eq(users.id, userId));
+    // 관리 기록에는 임시 비밀번호를 남기지 않는다
+    await writeAudit(db, admin.userId, "reset_password", { type: "member", id: userId, label: user?.username ?? userId });
+  }
+  return result;
 }
 
 export type FeedbackAdminResult = { ok: true; message: string } | { ok: false; error: string };
@@ -55,7 +62,7 @@ export type FeedbackAdminResult = { ok: true; message: string } | { ok: false; e
  * 새 답변이 달리거나 `답변 완료`·`고침`이 되면 쓴 사람에게 알림이 간다. 일반 회원이 보내면 404로 끝나고 아무것도 바꾸지 않는다.
  */
 export async function adminUpdateFeedback(_prev: FeedbackAdminResult | null, formData: FormData): Promise<FeedbackAdminResult> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const id = parseId(formData.get("id"));
   const status = formData.get("status");
   const rawReply = formData.get("reply");
@@ -67,6 +74,7 @@ export async function adminUpdateFeedback(_prev: FeedbackAdminResult | null, for
   const picked = status === formData.get("prevStatus") ? undefined : status;
   const updated = await updateFeedback(id, { status: picked, reply: reply.reply }, "admin");
   if (!updated) return { ok: false, error: FEEDBACK_ERRORS.notFound };
+  await auditFeedback(admin.userId, id, FEEDBACK_STATUS_LABELS[updated.status], updated.reply);
   revalidatePath("/", "layout");
   return { ok: true, message: updated.notified ? "저장했어요. 쓴 사람에게 알림을 보냈어요" : "저장했어요" };
 }

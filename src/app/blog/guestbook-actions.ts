@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { checkComment } from "@/lib/comment-rules";
 import { GUESTBOOK_ERRORS } from "@/lib/guestbook-rules";
 import { parseId } from "@/lib/ids";
+import { checkBannedWords } from "@/server/banned-words";
 import { requireMember } from "@/server/dal";
 import { createEntry, editEntry, removeEntry, removeReply, setReply } from "@/server/guestbook";
 
@@ -27,6 +28,8 @@ export async function addGuestbookEntry(formData: FormData): Promise<GuestbookRe
   if (blogId === null) return { ok: false, error: GUESTBOOK_ERRORS.invalid };
   const checked = checkComment(text(formData, "content"));
   if (!checked.ok) return checked;
+  const banned = await checkBannedWords(checked.content);
+  if (banned) return { ok: false, error: banned };
   const result = await createEntry(member.userId, blogId, checked.content, secret(formData));
   if (result.ok) revalidatePath("/", "layout");
   return result;
@@ -39,6 +42,8 @@ export async function updateGuestbookEntry(formData: FormData): Promise<Guestboo
   if (id === null) return { ok: false, error: GUESTBOOK_ERRORS.invalid };
   const checked = checkComment(text(formData, "content"));
   if (!checked.ok) return checked;
+  const banned = await checkBannedWords(checked.content);
+  if (banned) return { ok: false, error: banned };
   const result = await editEntry(member.userId, id, checked.content, secret(formData));
   if (result.ok) revalidatePath("/", "layout");
   return result;
@@ -51,6 +56,8 @@ export async function replyGuestbookEntry(formData: FormData): Promise<Guestbook
   if (id === null) return { ok: false, error: GUESTBOOK_ERRORS.invalid };
   const checked = checkComment(text(formData, "content"));
   if (!checked.ok) return checked;
+  const banned = await checkBannedWords(checked.content);
+  if (banned) return { ok: false, error: banned };
   const result = await setReply(member.userId, id, checked.content);
   if (result.ok) revalidatePath("/", "layout");
   return result;

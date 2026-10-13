@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Post } from "@/db/schema";
 import { firstImageUrl } from "@/lib/attachments";
+import { scheduleLabel } from "@/lib/schedule";
 import { excerpt, formatDate } from "@/lib/text";
 import { CategoryBadge } from "../post/CategoryBadge";
 
@@ -27,8 +28,9 @@ export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle,
   return (
     <article>
       {author && (
-        <Link href={`/@${slug}`} className="flex min-h-11 min-w-0 items-center gap-1 px-1 text-sm" aria-label={`${author.nickname}의 블로그 ${author.blogTitle}`}>
-          <span className="shrink-0 font-bold">{author.nickname}</span>
+        // 읽는 이름 = 보이는 글자 (Lighthouse label-content-name-mismatch). 사이 공백은 flex라 화면에 안 보인다
+        <Link href={`/@${slug}`} className="flex min-h-11 min-w-0 items-center gap-1 px-1 text-sm">
+          <span className="shrink-0 font-bold">{author.nickname}</span>{" "}
           <span className="min-w-0 truncate text-ink-soft">· {author.blogTitle}</span>
         </Link>
       )}
@@ -37,7 +39,9 @@ export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle,
           <div className="flex flex-wrap items-center gap-2">
             {pinned && <span className="notice-yellow rounded-full px-2 py-0.5 text-sm font-semibold">⭐ 즐겨찾는 이웃</span>}
             <CategoryBadge categoryName={categoryName} subcategoryName={subcategoryName} />
-            {!post.isPublic && <span className="text-sm font-semibold text-ink-soft">🔒 비공개</span>}
+            {!post.isPublic && (
+              <span className="text-sm font-semibold text-ink-soft">{post.publishAt ? `⏰ ${scheduleLabel(post.publishAt)} 공개 예약` : "🔒 비공개"}</span>
+            )}
           </div>
           <h2 className="mt-2 text-lg font-bold">{post.title}</h2>
           <p className="mt-1 line-clamp-2 text-ink-soft">{excerpt(post.contentText)}</p>
