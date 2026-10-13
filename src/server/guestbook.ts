@@ -39,6 +39,8 @@ export type GuestbookEntry = {
   canReply: boolean;
   /** 답글 삭제: 블로그 주인, 관리자 */
   canDeleteReply: boolean;
+  /** 🚨 신고: 볼 수 있는 남의 방명록이고 로그인한 회원일 때 (specs/059-report-bookmarks) */
+  canReport: boolean;
 };
 
 /** 옆 칸·주인 도구의 `📖 방명록 N`: 비밀 방명록도 센다 */
@@ -90,6 +92,7 @@ export async function getGuestbook(
       canDelete: isAuthor || isOwner || isAdmin,
       canReply: isOwner,
       canDeleteReply: e.reply !== null && (isOwner || isAdmin),
+      canReport: viewer !== null && !hidden && !isAuthor,
     };
   });
   return { items, total };

@@ -9,6 +9,7 @@ import { countNewFeedback } from "@/server/feedback";
 import { DailyBarChart } from "@/components/admin/DailyBarChart";
 import { parseStatRange, STAT_RANGES } from "@/lib/admin-rules";
 import { getDailyStats, getModerationCounts, getTopBlogs } from "@/server/admin-tools";
+import { countOpenReports } from "@/server/reports";
 
 export const metadata = { title: "관리자 | Blogville" };
 
@@ -23,7 +24,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   const range = parseStatRange(params.range);
   const query = typeof raw === "string" ? normalizeName(raw) : "";
   const searched = query.length > 0 && query.length <= 64;
-  const [stats, members, recent, found, newFeedback, daily, topBlogs, moderation] = await Promise.all([
+  const [stats, members, recent, found, newFeedback, daily, topBlogs, moderation, openReports] = await Promise.all([
     getAdminStats(),
     listRecentMembers(),
     listRecentPosts(),
@@ -32,6 +33,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
     getDailyStats(range),
     getTopBlogs(),
     getModerationCounts(),
+    countOpenReports(),
   ]);
   const cards = [
     ["가입 계정", stats.members],
@@ -101,6 +103,20 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
             ))}
           </ol>
         )}
+      </section>
+
+      {/* 🚨 신고 (specs/059-report-bookmarks): 처리하지 않은 신고 수 */}
+      <section aria-labelledby="admin-reports" className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-surface p-4">
+        <h2 id="admin-reports" className="font-bold">
+          🚨 신고{" "}
+          <span className={openReports.reports > 0 ? "text-danger" : "text-ink-soft"} data-reports-open={openReports.reports}>
+            처리 대기 {openReports.reports.toLocaleString("ko-KR")}건
+          </span>
+          {openReports.reports > 0 && <span className="text-sm font-normal text-ink-soft"> (대상 {openReports.targets.toLocaleString("ko-KR")}개)</span>}
+        </h2>
+        <Link href="/admin/reports" className="btn">
+          신고 보기
+        </Link>
       </section>
 
       {/* 버그·문의 (SUP-03): 새로 들어온(접수) 문의 수 */}

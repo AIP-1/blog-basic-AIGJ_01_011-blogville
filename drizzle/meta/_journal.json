@@ -239,6 +239,13 @@
       "when": 1791891393654,
       "tag": "0033_blog_referrers",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1791893289937,
+      "tag": "0034_report_bookmarks",
+      "breakpoints": true
     }
   ]
 }

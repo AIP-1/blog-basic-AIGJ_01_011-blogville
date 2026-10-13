@@ -33,6 +33,8 @@ export type CommentLine = {
   canDelete: boolean;
   /** 고칠 수 있는 사람은 작성자 본인뿐 (블로그 주인·관리자도 남의 댓글은 못 고친다) */
   canEdit: boolean;
+  /** 🚨 신고: 볼 수 있는 남의 댓글이고 로그인한 회원일 때 (specs/059-report-bookmarks) */
+  canReport: boolean;
 };
 export type CommentThreadItem = CommentLine & { canReply: boolean; replies: CommentLine[] };
 
@@ -87,6 +89,7 @@ export async function getCommentThread(postId: number, blogOwnerId: string, view
       editedAt: deleted || hidden ? null : x.editedAt,
       canDelete: canDelete(x.authorId, deleted),
       canEdit: !deleted && viewer !== null && x.authorId === viewer.userId,
+      canReport: !deleted && !hidden && viewer !== null && x.authorId !== viewer.userId,
     };
   };
 
