@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { HeaderLoginLink } from "@/components/auth/HeaderLoginLink";
@@ -38,6 +38,14 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: { siteName: "Blogville", locale: "ko_KR", type: "website" },
   };
 }
+
+// 휴대폰 브라우저 주소창 색: 밝은 화면·어두운 화면(theme-dark.css)의 바탕색
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fbfaf7" },
+    { media: "(prefers-color-scheme: dark)", color: "#15171a" },
+  ],
+};
 
 /** 그날 처음 그리는 헤더가 자동 출석을 기록한다 (GAME-04). 실패해도 화면은 그대로 열린다 */
 async function attendToday(userId: string, sessionId: string) {
