@@ -28,6 +28,8 @@ test.describe("054 RSS·공유 미리보기", () => {
     await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", "둘째 공개 글");
     await expect(page.locator('meta[property="og:description"]')).toHaveAttribute("content", "공개 본문 둘");
     await expect(page.locator('meta[property="og:type"]')).toHaveAttribute("content", "article");
+    // 사진이 없는 글은 사이트 기본 그림
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", /\/opengraph-image$/);
   });
 
   test("비공개 글은 주인이 봐도 미리보기를 내놓지 않고 검색엔진에 막는다, 없는 블로그 RSS는 404", async ({ page, request }) => {

@@ -36,7 +36,7 @@ export async function generateMetadata({ params }: PageProps<"/blog/[slug]">): P
     description,
     // 구독 (RSS): 브라우저·RSS 리더가 블로그 주소만으로 구독 주소를 찾는다
     alternates: { canonical: `/@${blog.slug}`, types: { "application/rss+xml": [{ url: `/@${blog.slug}/rss`, title: blog.title }] } },
-    openGraph: { type: "website", title: blog.title, description, url: `/@${blog.slug}` },
+    openGraph: { type: "website", title: blog.title, description, url: `/@${blog.slug}`, images: [{ url: "/opengraph-image" }] },
   };
 }
 

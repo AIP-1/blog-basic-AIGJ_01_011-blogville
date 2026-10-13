@@ -65,7 +65,8 @@ export async function generateMetadata({ params }: PageProps<"/blog/[slug]/[post
       publishedTime: post.createdAt.toISOString(),
       modifiedTime: post.updatedAt.toISOString(),
       authors: [nickname],
-      ...(image ? { images: [{ url: `/files/${image}` }] } : {}),
+      // 사진이 없는 글은 사이트 기본 그림 (opengraph-image.tsx)
+      images: [{ url: image ? `/files/${image}` : "/opengraph-image" }],
     },
     twitter: { card: image ? "summary_large_image" : "summary", title: post.title, description },
   };
