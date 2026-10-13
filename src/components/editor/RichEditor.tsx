@@ -1,11 +1,15 @@
 "use client";
 
 import Placeholder from "@tiptap/extension-placeholder";
+import { TableKit } from "@tiptap/extension-table";
+import TextAlign from "@tiptap/extension-text-align";
+import Youtube from "@tiptap/extension-youtube";
 import { EditorContent, useEditor, useEditorState, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Fragment, useEffect, useRef } from "react";
 import { FILE_ACCEPT, IMAGE_ACCEPT } from "@/lib/attachments";
 import { LINK_ERROR, linkHref } from "@/lib/post-rules";
+import { YOUTUBE_ERROR, youtubeId } from "@/lib/youtube";
 import { FileCard, SiteImage } from "./FileCard";
 import { useUpload } from "./useUpload";
 
@@ -32,6 +36,10 @@ export function RichEditor({ initialHtml, onChange, onUploadingChange, postId = 
       Placeholder.configure({ placeholder: "오늘 배운 것, 생각한 것, 무엇이든 적어 보세요 ✏️" }),
       SiteImage,
       FileCard,
+      // 표·문단 정렬·YouTube (개선 9). 저장할 때 lib/sanitize.ts가 같은 모양만 남긴다
+      TableKit.configure({ table: { resizable: false } }),
+      TextAlign.configure({ types: ["heading", "paragraph"], alignments: ["left", "center", "right"] }),
+      Youtube.configure({ nocookie: true, controls: true, modestBranding: true, width: 640, height: 360 }),
     ],
     content: initialHtml,
     editorProps: {
@@ -110,6 +118,9 @@ function Toolbar({ editor, uploading, onPick }: { editor: Editor; uploading: boo
       quote: e.isActive("blockquote"),
       code: e.isActive("codeBlock"),
       link: e.isActive("link"),
+      table: e.isActive("table"),
+      center: e.isActive({ textAlign: "center" }),
+      right: e.isActive({ textAlign: "right" }),
       canUndo: e.can().undo(),
       canRedo: e.can().redo(),
     }),
@@ -124,6 +135,15 @@ function Toolbar({ editor, uploading, onPick }: { editor: Editor; uploading: boo
     if (href === null) window.alert(LINK_ERROR);
     else if (href === "") editor.chain().focus().extendMarkRange("link").unsetLink().run();
     else editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
+  };
+
+  // YouTube 주소(보기·공유·쇼츠 주소 모두)를 받아 영상을 넣는다
+  const addYoutube = () => {
+    const url = window.prompt("YouTube 영상 주소", "https://");
+    if (url === null) return;
+    const id = youtubeId(url);
+    if (!id) return window.alert(YOUTUBE_ERROR);
+    editor.chain().focus().setYoutubeVideo({ src: `https://www.youtube.com/watch?v=${id}` }).run();
   };
 
   const chain = () => editor.chain().focus();
@@ -145,6 +165,13 @@ function Toolbar({ editor, uploading, onPick }: { editor: Editor; uploading: boo
       { label: "</>", title: "코드 블록", active: state.code, run: () => chain().toggleCodeBlock().run() },
       { label: "―", title: "구분선", run: () => chain().setHorizontalRule().run() },
       { label: "🔗", title: "링크", active: state.link, run: setLink },
+    ],
+    [
+      { label: "▦", title: "표 넣기", active: state.table, run: () => chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() },
+      { label: "▶", title: "YouTube 영상", run: addYoutube },
+      { label: "⇤", title: "왼쪽 정렬", run: () => chain().unsetTextAlign().run() },
+      { label: "↔", title: "가운데 정렬", active: state.center, run: () => chain().toggleTextAlign("center").run() },
+      { label: "⇥", title: "오른쪽 정렬", active: state.right, run: () => chain().toggleTextAlign("right").run() },
     ],
     [
       { label: "↶", title: "되돌리기", disabled: !state.canUndo, run: () => chain().undo().run() },
@@ -176,6 +203,24 @@ function Toolbar({ editor, uploading, onPick }: { editor: Editor; uploading: boo
       <span role="separator" aria-orientation="vertical" className="mx-0.5 h-6 w-px bg-line" />
       <UploadButton label="🖼 사진" title="사진 올리기 (PNG·JPG·GIF·WEBP, 10MB 넘으면 줄여서 올려요)" accept={IMAGE_ACCEPT} disabled={uploading} onPick={onPick} />
       <UploadButton label="📎 파일" title="파일 올리기 (PDF·한글·오피스·ZIP 등, 30MB까지)" accept={FILE_ACCEPT} disabled={uploading} onPick={onPick} />
+      {/* 표 안에 있을 때만: 줄·칸 더하기·빼기 */}
+      {state.table && (
+        <div role="group" aria-label="표 고치기" className="flex w-full flex-wrap gap-1 border-t border-line pt-1" data-table-tools>
+          {(
+            [
+              ["줄 더하기", () => chain().addRowAfter().run()],
+              ["칸 더하기", () => chain().addColumnAfter().run()],
+              ["줄 빼기", () => chain().deleteRow().run()],
+              ["칸 빼기", () => chain().deleteColumn().run()],
+              ["표 지우기", () => chain().deleteTable().run()],
+            ] as const
+          ).map(([label, run]) => (
+            <button key={label} type="button" onClick={run} className="btn btn-ghost px-2 text-sm">
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
