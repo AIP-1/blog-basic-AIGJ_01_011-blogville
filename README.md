@@ -101,6 +101,7 @@ npm run posts:cleanup
 |---|---|---|
 | `main`·`develop`으로 가는 PR, `develop`에 push | lint → 타입 검사 → 단위 테스트 → 빌드 | `.github/workflows/ci.yml` |
 | `main`에 merge (release·hotfix) | 도커 이미지 → 서버에 올림 → 블루·그린 무중단 교체 | `.github/workflows/deploy.yml` |
+| `main`에 새 버전·릴리스 노트가 올라옴 | `docs/releases/v<버전>.md`로 GitHub 릴리스와 태그 만들기 | `.github/workflows/release.yml` |
 | 손으로 (Actions → status) | 서버 컨테이너·포트·로그 보기 (아무것도 바꾸지 않음) | `.github/workflows/status.yml` |
 
 E2E는 DB와 브라우저가 필요하고 전체가 약 25분 걸려서 CI에서 돌리지 않고, 기능을 만들 때 로컬에서 바뀐 부분의 시험을 돌립니다.
