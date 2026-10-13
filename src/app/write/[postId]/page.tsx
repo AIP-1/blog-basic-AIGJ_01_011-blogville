@@ -28,6 +28,7 @@ export default async function EditPage({ params }: PageProps<"/write/[postId]">)
           categoryId: post.categoryId,
           subcategoryId: post.subcategoryId,
           isPublic: post.isPublic,
+          publishAt: post.publishAt,
           tags: await getPostTags(post.id),
         }}
       />
