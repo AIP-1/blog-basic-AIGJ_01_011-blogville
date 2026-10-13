@@ -9,6 +9,7 @@ import { CommentSection } from "@/components/post/CommentSection";
 import { LikeButton } from "@/components/post/LikeButton";
 import { PublishNotice } from "@/components/post/PublishNotice";
 import { PostJsonLd } from "@/components/post/PostJsonLd";
+import { SeriesBox } from "@/components/post/SeriesBox";
 import { AdjacentPosts } from "@/components/post/AdjacentPosts";
 import { CategoryPosts } from "@/components/post/CategoryPosts";
 import { TagList } from "@/components/post/TagList";
@@ -123,6 +124,7 @@ export default async function PostPage({ params, searchParams }: PageProps<"/blo
           <ViewCount postId={post.id} initial={post.viewCount + (firstToday ? 1 : 0)} record={countsView} />
           {!post.isPublic && <span className="ml-2 font-semibold">{post.publishAt ? `⏰ ${scheduleLabel(post.publishAt)} 공개 예약` : "🔒 비공개"}</span>}
         </p>
+        {post.seriesId !== null && <SeriesBox slug={blog.slug} seriesId={post.seriesId} postId={post.id} viewerIsOwner={isOwner} />}
         {/* content_html은 저장할 때 허용 태그만 남긴 HTML이다 (NF-03) */}
         <div className="prose-post mt-6" dangerouslySetInnerHTML={{ __html: post.contentHtml }} />
         <TagList tags={await getPostTags(post.id)} />

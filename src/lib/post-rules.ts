@@ -32,7 +32,18 @@ export type RawPostInput = {
   tags: string;
   /** 예약일 때만: 한국 시간 `2026-10-14T09:00` */
   publishAt?: string;
+  /** 시리즈 (개선 12): "" 없음, "new" 새로 만들기(seriesTitle), 숫자면 내 시리즈 */
+  seriesId?: string;
+  seriesTitle?: string;
 };
+
+export const SERIES_TITLE_MAX = 40;
+export const SERIES_ERRORS = {
+  titleEmpty: "새 시리즈 이름을 적어 주세요",
+  titleTooLong: `시리즈 이름은 ${SERIES_TITLE_MAX}자까지예요`,
+} as const;
+
+export type SeriesChoice = { kind: "none" } | { kind: "existing"; id: number } | { kind: "new"; title: string };
 
 export type PostInput = {
   postId: number | null;
@@ -44,6 +55,7 @@ export type PostInput = {
   tags: string[];
   /** 예약 발행 시각. 예약이면 isPublic은 false */
   publishAt: Date | null;
+  series: SeriesChoice;
 };
 
 export function rawPostInput(formData: FormData): RawPostInput {
@@ -61,6 +73,8 @@ export function rawPostInput(formData: FormData): RawPostInput {
     visibility: get("visibility") || "public",
     tags: get("tags"),
     publishAt: get("publishAt"),
+    seriesId: get("seriesId"),
+    seriesTitle: get("seriesTitle"),
   };
 }
 
@@ -84,6 +98,17 @@ export function checkPostInput(raw: RawPostInput, now = new Date()): { ok: true;
   if (raw.visibility !== "public" && raw.visibility !== "private" && raw.visibility !== "scheduled") return { ok: false, error: POST_ERRORS.invalid };
   if (subcategoryId !== null && categoryId === null) return { ok: false, error: POST_ERRORS.invalid };
   if (raw.tags.length > TAGS_MAX_CHARS) return { ok: false, error: POST_ERRORS.tagsTooLong };
+  let series: SeriesChoice = { kind: "none" };
+  if (raw.seriesId === "new") {
+    const seriesTitle = (raw.seriesTitle ?? "").trim().replace(/\s+/g, " ");
+    if (seriesTitle.length === 0) return { ok: false, error: SERIES_ERRORS.titleEmpty };
+    if (seriesTitle.length > SERIES_TITLE_MAX) return { ok: false, error: SERIES_ERRORS.titleTooLong };
+    series = { kind: "new", title: seriesTitle };
+  } else if (raw.seriesId) {
+    const id = parseId(raw.seriesId);
+    if (id === null) return { ok: false, error: POST_ERRORS.invalid };
+    series = { kind: "existing", id };
+  }
   let publishAt: Date | null = null;
   if (raw.visibility === "scheduled") {
     publishAt = parseKstLocal(raw.publishAt ?? "");
@@ -101,6 +126,7 @@ export function checkPostInput(raw: RawPostInput, now = new Date()): { ok: true;
       isPublic: raw.visibility === "public",
       tags: parseTags(raw.tags),
       publishAt,
+      series,
     },
   };
 }

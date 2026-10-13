@@ -296,6 +296,23 @@ export const categories = pgTable(
   ],
 );
 
+// 시리즈 (개선 12): 블로그 안의 연재 묶음. 글 순서는 글 날짜순
+export const series = pgTable(
+  "series",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    blogId: integer("blog_id")
+      .notNull()
+      .references(() => blogs.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("series_blog_title_unique").on(t.blogId, t.title),
+    check("series_title_check", sql`char_length(${t.title}) between 1 and 40 and ${t.title} = btrim(${t.title})`),
+  ],
+);
+
 export const subcategories = pgTable(
   "subcategories",
   {
@@ -334,12 +351,15 @@ export const posts = pgTable(
     blindReason: text("blind_reason"),
     /** post_views에서 셀 수 있는 합계를 일부러 저장한 값 (POST-06) */
     viewCount: integer("view_count").notNull().default(0),
+    /** 시리즈 (개선 12): 연재 묶음. 같은 블로그의 시리즈만 (서버가 확인). 시리즈를 지우면 null */
+    seriesId: integer("series_id").references(() => series.id, { onDelete: "set null" }),
     /** 예약 발행 (개선 11): 이 시각이 되면 공개로 바뀐다. 기다리는 동안은 비공개(작성자만 봄). 공개되면 null */
     publishAt: timestamp("publish_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
+    index("posts_series_idx").on(t.seriesId, t.createdAt, t.id).where(sql`${t.seriesId} is not null`),
     index("posts_publish_at_idx").on(t.publishAt).where(sql`${t.publishAt} is not null`),
     check("posts_scheduled_private", sql`${t.publishAt} is null or not ${t.isPublic}`),
     index("posts_blog_list_idx").on(t.blogId, t.createdAt.desc(), t.id.desc()),

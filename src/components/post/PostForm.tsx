@@ -4,15 +4,18 @@ import { useActionState, useCallback, useEffect, useMemo, useRef, useState, useT
 import { savePost, type PostFormState } from "@/app/write/actions";
 import { POST_REWARD_MIN_LENGTH, REWARD_RULES } from "@/lib/game";
 import { clearDraft, DRAFT_ASK, DRAFT_DELAY_MS, DRAFT_HINT, isEmptyDraft, readDraft, savedLabel, writeDraft } from "@/lib/draft";
-import { checkPostInput, CONTENT_BYTES_MAX, POST_ERRORS, TAGS_MAX_CHARS, TITLE_MAX, utf8Bytes } from "@/lib/post-rules";
+import { checkPostInput, CONTENT_BYTES_MAX, POST_ERRORS, SERIES_TITLE_MAX, TAGS_MAX_CHARS, TITLE_MAX, utf8Bytes } from "@/lib/post-rules";
 import { defaultScheduleValue, formatKstLocal } from "@/lib/schedule";
 import { postTextLength } from "@/lib/text-length";
 import { RichEditor } from "../editor/RichEditor";
 
 export type CategoryOption = { id: number; name: string; subs: { id: number; name: string }[] };
+export type SeriesOption = { id: number; title: string };
 
 type Props = {
   categories: CategoryOption[];
+  /** 내 블로그의 시리즈 (개선 12) */
+  seriesOptions?: SeriesOption[];
   initial?: {
     postId: number;
     title: string;
@@ -23,6 +26,7 @@ type Props = {
     tags: string[];
     /** 예약 글이면 공개될 시각 (개선 11) */
     publishAt: Date | null;
+    seriesId: number | null;
   };
   /** 새 글 화면만: 이 회원의 임시 글을 이 브라우저에 저장하고 불러온다 (POST-08) */
   draftOwnerId?: string;
@@ -49,7 +53,7 @@ function rewardHint(visibility: Visibility, length: number): string {
   return `저장하면 ✨ 경험치 ${exp} · 🪙 ${coin} 보상 (하루 ${dailyLimit}번까지)`;
 }
 
-export function PostForm({ categories, initial, draftOwnerId }: Props) {
+export function PostForm({ categories, seriesOptions, initial, draftOwnerId }: Props) {
   const [start, setStart] = useState<Start | null>(draftOwnerId ? null : EMPTY);
 
   // 그린 뒤에 임시 글을 읽고 한 번 묻는다. 고른 값으로 에디터를 처음부터 만들기 위해 그때까지 폼을 그리지 않는다.
@@ -74,10 +78,10 @@ export function PostForm({ categories, initial, draftOwnerId }: Props) {
   }, [draftOwnerId, categories]);
 
   if (!start) return <div aria-busy="true" aria-label="글쓰기 준비 중" className="min-h-96" />;
-  return <Form categories={categories} initial={initial} draftOwnerId={draftOwnerId} start={start} />;
+  return <Form categories={categories} seriesOptions={seriesOptions} initial={initial} draftOwnerId={draftOwnerId} start={start} />;
 }
 
-function Form({ categories, initial, draftOwnerId, start }: Props & { start: Start }) {
+function Form({ categories, seriesOptions = [], initial, draftOwnerId, start }: Props & { start: Start }) {
   const [state, action] = useActionState<PostFormState, FormData>(savePost, null);
   const [pending, startTransition] = useTransition();
   const [title, setTitle] = useState(initial?.title ?? start.title);
@@ -92,6 +96,9 @@ function Form({ categories, initial, draftOwnerId, start }: Props & { start: Sta
   );
   // 예약 시간 (한국 시간 `2026-10-14T09:00`). 예약을 고를 때 비어 있으면 다음 정각으로 채운다
   const [publishAt, setPublishAt] = useState(initial?.publishAt ? formatKstLocal(initial.publishAt) : "");
+  // 시리즈: "" 없음, "new" 새로 만들기, 숫자면 그 시리즈
+  const [seriesId, setSeriesId] = useState(initial?.seriesId ? String(initial.seriesId) : "");
+  const [seriesTitle, setSeriesTitle] = useState("");
   // 수정 화면은 저장된 태그를 이름순으로 `, `로 이어 채운다 (POST-04)
   const [tags, setTags] = useState(initial?.tags.join(", ") ?? start.tags);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -177,7 +184,7 @@ function Form({ categories, initial, draftOwnerId, start }: Props & { start: Sta
   const submit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (uploading) return;
-    const raw = { postId: initial ? String(initial.postId) : "", title, contentHtml, categoryId, subcategoryId, visibility, tags, publishAt: visibility === "scheduled" ? publishAt : "" };
+    const raw = { postId: initial ? String(initial.postId) : "", title, contentHtml, categoryId, subcategoryId, visibility, tags, publishAt: visibility === "scheduled" ? publishAt : "", seriesId, seriesTitle: seriesId === "new" ? seriesTitle : "" };
     const checked = checkPostInput(raw);
     if (!checked.ok) return setLocalError(checked.error);
     if (utf8Bytes(contentHtml) > CONTENT_BYTES_MAX) return setLocalError(POST_ERRORS.tooLong);
@@ -240,6 +247,39 @@ function Form({ categories, initial, draftOwnerId, start }: Props & { start: Sta
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <select
+          aria-label="시리즈"
+          className="field field-auto"
+          value={seriesId}
+          onChange={(e) => {
+            touch();
+            setSeriesId(e.target.value);
+          }}
+        >
+          <option value="">📚 시리즈 없음</option>
+          {seriesOptions.map((o) => (
+            <option key={o.id} value={o.id}>
+              📚 {o.title}
+            </option>
+          ))}
+          <option value="new">＋ 새 시리즈 만들기</option>
+        </select>
+        {seriesId === "new" && (
+          <input
+            aria-label="새 시리즈 이름"
+            placeholder="새 시리즈 이름 (40자까지)"
+            className="field min-w-0 flex-1"
+            maxLength={SERIES_TITLE_MAX}
+            value={seriesTitle}
+            onChange={(e) => {
+              touch();
+              setSeriesTitle(e.target.value);
+            }}
+          />
+        )}
       </div>
 
       <RichEditor
