@@ -137,15 +137,27 @@ export function step(from: Point, delta: Point, bodies: readonly Rect[]): Point 
   return p;
 }
 
-export type Entrance = { id: string; x: number; y: number };
+/** `around`: 이 상자(건물 둘레) 안에 서 있어도 입구 가까이로 본다 (집 옆·뒤에서도 들어가기) */
+export type Entrance = { id: string; x: number; y: number; around?: Rect };
+
+/** 집 둘레에서 들어갈 수 있는 거리 (px) */
+export const HOUSE_REACH = 40;
+
+/** 입구까지의 거리. 둘레(`around`) 안이면 `INTERACT_DISTANCE`로 쳐서, 더 가까운 다른 입구가 있으면 그쪽이 먼저다 */
+export function entranceDistance(p: Point, e: Entrance): number {
+  const d = Math.hypot(e.x - p.x, e.y - p.y);
+  const a = e.around;
+  if (a && p.x >= a.x && p.x <= a.x + a.width && p.y >= a.y && p.y <= a.y + a.height) return Math.min(d, INTERACT_DISTANCE);
+  return d;
+}
 
 /** `INTERACT_DISTANCE` 안에서 가장 가까운 입구 */
 export function nearestEntrance<T extends Entrance>(p: Point, entrances: readonly T[]): T | null {
   let best: T | null = null;
   let bestDistance: number = INTERACT_DISTANCE;
   for (const e of entrances) {
-    const d = Math.hypot(e.x - p.x, e.y - p.y);
-    if (d <= bestDistance) {
+    const d = entranceDistance(p, e);
+    if (d < bestDistance || (d === bestDistance && best === null)) {
       best = e;
       bestDistance = d;
     }

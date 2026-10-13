@@ -22,6 +22,8 @@ import { getWallet } from "@/server/points";
 import { siteUrl } from "@/lib/feed";
 import { noticeDismissKey } from "@/lib/admin-rules";
 import { getActiveNotice } from "@/server/admin-tools";
+// 한글 글꼴 Pretendard를 이 사이트에서 직접 내려준다. 글자 범위별로 쪼갠 파일이라 화면에 쓰인 글자 몫만 받는다
+import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
 
 // metadataBase는 실행할 때의 사이트 주소로 정한다 (공유 미리보기의 사진·주소를 절대 주소로)

@@ -174,7 +174,7 @@ function Toolbar({ editor, uploading, onPick }: { editor: Editor; uploading: boo
         </Fragment>
       ))}
       <span role="separator" aria-orientation="vertical" className="mx-0.5 h-6 w-px bg-line" />
-      <UploadButton label="🖼 사진" title="사진 올리기 (PNG·JPG·GIF·WEBP, 10MB까지)" accept={IMAGE_ACCEPT} disabled={uploading} onPick={onPick} />
+      <UploadButton label="🖼 사진" title="사진 올리기 (PNG·JPG·GIF·WEBP, 10MB 넘으면 줄여서 올려요)" accept={IMAGE_ACCEPT} disabled={uploading} onPick={onPick} />
       <UploadButton label="📎 파일" title="파일 올리기 (PDF·한글·오피스·ZIP 등, 30MB까지)" accept={FILE_ACCEPT} disabled={uploading} onPick={onPick} />
     </div>
   );

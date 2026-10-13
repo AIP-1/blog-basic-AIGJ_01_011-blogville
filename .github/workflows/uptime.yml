@@ -1,0 +1,49 @@
+# 운영 사이트 감시 (15분마다). 첫 화면이 두 번 연속 응답하지 않으면 이슈 "🚨 사이트 응답 없음"을 열고,
+# 다시 응답하면 그 이슈에 회복 시각을 남기고 닫는다. 이슈가 열리면 GitHub 알림(메일·앱)으로 받는다.
+# 주소는 저장소 변수 SITE_URL(없으면 https://unqiuepcg.java21.net).
+name: uptime
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+concurrency:
+  group: uptime
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SITE: ${{ vars.SITE_URL || 'https://unqiuepcg.java21.net' }}
+      TITLE: "🚨 사이트 응답 없음"
+    steps:
+      - name: 확인
+        run: |
+          code=000
+          for i in 1 2; do
+            code=$(curl -s -o /dev/null -m 20 -w '%{http_code}' "$SITE/" || true)
+            [ "$code" = 200 ] && break
+            sleep 30
+          done
+          now=$(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M KST')
+          open=$(gh issue list -R "$GITHUB_REPOSITORY" --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number // empty')
+          if [ "$code" = 200 ]; then
+            echo "정상 ($code)"
+            if [ -n "$open" ]; then gh issue close "$open" -R "$GITHUB_REPOSITORY" --comment "✅ $now 다시 응답해요 (HTTP $code)."; fi
+          else
+            echo "::warning::$SITE 응답 없음 (HTTP $code)"
+            if [ -z "$open" ]; then
+              gh issue create -R "$GITHUB_REPOSITORY" --title "$TITLE" --body "$now 부터 $SITE 가 응답하지 않아요 (HTTP $code, 30초 간격 2번 확인).
+
+          확인할 것: Actions → status 로 서버 상태 보기 / 문제가 방금 배포 때문이면 Actions → rollback.
+          다시 응답하면 이 이슈는 저절로 닫혀요."
+            else
+              gh issue comment "$open" -R "$GITHUB_REPOSITORY" --body "$now 여전히 응답 없음 (HTTP $code)."
+            fi
+          fi

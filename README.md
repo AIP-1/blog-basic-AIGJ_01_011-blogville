@@ -118,3 +118,12 @@ E2E는 DB와 브라우저가 필요하고 전체가 약 25분 걸려서 CI에서
 - **무중단(블루·그린) 배포**: 8400번 포트는 작은 프록시(`bv8400-proxy`, `scripts/proxy.mjs`)가 받고, 앱은 `bv8400-blue`(8401)·`bv8400-green`(8402) 중 하나가 서비스합니다. 새 버전은 쉬고 있는 쪽에 띄워 응답을 확인한 뒤 `~/blogville/state/active-port`를 바꿔 넘기고, 이전 버전은 15초 뒤 멈춥니다. 새 버전이 뜨지 않으면 이전 버전이 그대로 서비스합니다. 서버의 도커를 다른 사람도 같이 쓰므로 컨테이너·이미지 이름은 `bv8400-`로 시작하고, 스크립트는 자기 이미지로 만든 컨테이너만 지웁니다. 프록시는 처음 한 번만 띄우므로 `scripts/proxy.mjs`를 고쳤다면 서버에서 `docker rm -f bv8400-proxy` 뒤 다시 배포합니다.
 - 서버의 `~/blogville/`에 로그인 비밀키(`auth-secret`, 처음 한 번 생성), 환경 변수(`app.env`), 올린 파일(`uploads/`)이 남습니다.
 - `DB_SCHEMA`가 `public`이 아니면 `scripts/migrate.mjs`가 SQL의 `"public".`을 그 스키마로 바꿔 적용합니다. 스키마를 새로 만들지 않으므로 미리 있는 스키마를 씁니다.
+
+### 운영 안전장치
+
+| 할 일 | 방법 |
+|---|---|
+| 방금 배포한 버전을 되돌리기 | Actions → **rollback** → Run workflow. 배포 때 이전 색(blue/green) 컨테이너를 멈춰 두므로 몇십 초 안에 이전 버전으로 넘어가요. 한 번 더 돌리면 다시 돌아와요. DB 마이그레이션은 되돌리지 않아요 |
+| DB 백업 | 매일 새벽 3시(KST) 자동, 바로 하려면 Actions → **backup**. 서버 `~/blogville/backups/<시각>/`에 표마다 JSON 줄(`.jsonl.gz`)과 `manifest.json`(행 수), 최근 14개만 남김 (`scripts/backup.mjs`) |
+| 사이트 감시 | 15분마다 첫 화면을 확인하고(Actions → **uptime**), 두 번 연속 응답이 없으면 이슈 `🚨 사이트 응답 없음`을 열어요. 회복하면 저절로 닫혀요. 이슈 알림은 GitHub 알림 설정(Watch)으로 받아요 |
+| 서버 상태 보기 | Actions → **status** (컨테이너, 포트, 관리자 계정 점검, 최근 로그) |
