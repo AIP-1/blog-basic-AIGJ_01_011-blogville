@@ -23,11 +23,13 @@ test.describe("US1 글에 태그 달기", () => {
     const username = await signUpOk(page);
     const t = uid("g");
     const id = await postWithTags(page, "태그 글", `${t.toUpperCase()}, #회고, ${t}`);
-    await expect(badges(page)).toHaveText([`#${t}`, "#회고"]);
-    await expect(badges(page).first()).toHaveAttribute("href", `/tags/${t}`);
+    // 이름순은 DB 정렬 규칙(collation)을 따른다. 한글과 영문의 앞뒤는 DB마다 달라 DB에 물어본 순서로 본다
+    const order = (await sql`select n from unnest(${[t, "회고"]}::text[]) as n order by n`).map((r) => `#${r.n}`);
+    await expect(badges(page)).toHaveText(order);
+    await expect(badges(page).filter({ hasText: `#${t}` })).toHaveAttribute("href", `/tags/${t}`);
 
     await page.goto(`/write/${id}`);
-    await expect(page.getByLabel("태그")).toHaveValue(`${t}, 회고`);
+    await expect(page.getByLabel("태그")).toHaveValue(order.map((o) => o.slice(1)).join(", "));
     await page.getByLabel("태그").fill("회고");
     await page.getByRole("button", { name: "수정 완료" }).click();
     await expect(page).toHaveURL(`/@${username}/${id}`);
