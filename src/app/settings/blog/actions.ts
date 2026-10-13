@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { BLOG_ERRORS, checkBlogIntro, checkBlogTitle } from "@/lib/blog-rules";
 import { parseId } from "@/lib/ids";
 import { getMyBlog, requireMember } from "@/server/dal";
-import { updateBlogAccent as saveAccent, updateBlogInfo as saveInfo, updateBlogSlug as saveSlug } from "@/server/blog";
+import { updateBlogAccent as saveAccent, updateBlogInfo as saveInfo, updateBlogListStyle as saveListStyle, updateBlogSlug as saveSlug } from "@/server/blog";
+import { isListStyle, LIST_STYLE_ERROR } from "@/lib/list-style";
 import { ACCENT_ERROR, isBlogAccent } from "@/lib/blog-accent";
 import * as category from "@/server/category";
 
@@ -47,6 +48,15 @@ export async function updateBlogAccent(_prev: SettingsState, formData: FormData)
   await saveAccent(member.userId, accent);
   refresh((await getMyBlog(member.userId)).slug);
   return { message: BLOG_ERRORS.saved, values: { accent } };
+}
+
+export async function updateBlogListStyle(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
+  const member = await requireMember();
+  const style = text(formData, "listStyle");
+  if (!isListStyle(style)) return { error: LIST_STYLE_ERROR };
+  await saveListStyle(member.userId, style);
+  refresh((await getMyBlog(member.userId)).slug);
+  return { message: BLOG_ERRORS.saved, values: { listStyle: style } };
 }
 
 // ── 카테고리 (BLOG-05) ──

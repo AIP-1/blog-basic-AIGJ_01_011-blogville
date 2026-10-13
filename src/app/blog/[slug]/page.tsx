@@ -6,6 +6,8 @@ import { CategoryNav } from "@/components/blog/CategoryNav";
 import { FollowButton } from "@/components/blog/FollowButton";
 import { Pagination } from "@/components/blog/Pagination";
 import { PostCard } from "@/components/blog/PostCard";
+import { PostGalleryTile, PostListRow } from "@/components/blog/PostListRow";
+import { listStyleOf } from "@/lib/list-style";
 import { Miniroom } from "@/components/game/Miniroom";
 import { HouseRoom } from "@/components/house/HouseRoom";
 import { houseInfo } from "@/lib/house";
@@ -93,6 +95,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
     isOwner ? getOwnedFurniture(blog.ownerId) : null,
   ]);
   const house = houseInfo(ownerWallet.progress.level);
+  const listStyle = listStyleOf(blog.listStyle);
   const filterQuery: Record<string, string> = {};
   if (town) filterQuery.q = town;
   else if (search) filterQuery.s = search;
@@ -276,11 +279,26 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
               )}
             </div>
           ) : (
-            <div className="space-y-3">
-              {items.map((row) => (
-                <PostCard key={row.post.id} slug={blog.slug} post={row.post} categoryName={row.categoryName} subcategoryName={row.subcategoryName} commentCount={row.commentCount} likeCount={row.likeCount} />
-              ))}
-            </div>
+            // 글 목록 모양은 주인이 블로그 관리에서 고른다 (블로그 꾸미기). 마을 검색 결과는 늘 카드형
+            listStyle === "list" ? (
+              <ul className="divide-y divide-line rounded-xl border border-line bg-surface" data-list-style="list">
+                {items.map((row) => (
+                  <PostListRow key={row.post.id} slug={blog.slug} post={row.post} commentCount={row.commentCount} likeCount={row.likeCount} />
+                ))}
+              </ul>
+            ) : listStyle === "gallery" ? (
+              <ul className="grid grid-cols-2 gap-3 md:grid-cols-3" data-list-style="gallery">
+                {items.map((row) => (
+                  <PostGalleryTile key={row.post.id} slug={blog.slug} post={row.post} likeCount={row.likeCount} />
+                ))}
+              </ul>
+            ) : (
+              <div className="space-y-3">
+                {items.map((row) => (
+                  <PostCard key={row.post.id} slug={blog.slug} post={row.post} categoryName={row.categoryName} subcategoryName={row.subcategoryName} commentCount={row.commentCount} likeCount={row.likeCount} />
+                ))}
+              </div>
+            )
           )}
           <Pagination basePath={`/@${blog.slug}`} query={filterQuery} page={page} totalPages={Math.ceil((townFeed?.total ?? total) / PAGE_SIZE)} />
         </section>

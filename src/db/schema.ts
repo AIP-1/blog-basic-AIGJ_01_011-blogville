@@ -256,6 +256,8 @@ export const blogs = pgTable(
     roofColor: text("roof_color"),
     // 블로그 강조색 (src/lib/blog-accent.ts). NULL이면 기본 초록
     accentColor: text("accent_color"),
+    // 글 목록 모양 (src/lib/list-style.ts). NULL이면 카드형
+    listStyle: text("list_style"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -272,6 +274,7 @@ export const blogs = pgTable(
       sql`char_length(${t.title}) between 1 and 40 and ${t.title} = btrim(${t.title})`,
     ),
     check("blogs_intro_check", sql`char_length(${t.intro}) <= 160`),
+    check("blogs_list_style_check", sql`${t.listStyle} in ('list', 'gallery')`),
     check("blogs_accent_color_check", sql`${t.accentColor} in ('green', 'blue', 'purple', 'pink', 'orange', 'gray')`),
     check(
       "blogs_roof_color_check",
