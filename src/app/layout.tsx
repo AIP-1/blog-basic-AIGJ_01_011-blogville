@@ -18,7 +18,7 @@ import { getMyBlog, getSession } from "@/server/dal";
 import { formatNumber } from "@/lib/game";
 import { todayKST } from "@/lib/kst";
 import { countUnreadNotifications, getPendingLevelUp } from "@/server/notifications";
-import { ensureTodayAttendance } from "@/server/attendance";
+import { ensureTodayAttendanceOnce } from "@/server/attendance";
 import { getAvatar } from "@/server/items";
 import { getWallet } from "@/server/points";
 import { siteUrl } from "@/lib/feed";
@@ -51,16 +51,28 @@ export const viewport: Viewport = {
 /** 그날 처음 그리는 헤더가 자동 출석을 기록한다 (GAME-04). 실패해도 화면은 그대로 열린다 */
 async function attendToday(userId: string, sessionId: string) {
   try {
-    await ensureTodayAttendance(userId, sessionId);
+    await ensureTodayAttendanceOnce(userId, sessionId);
   } catch (error) {
     console.error("자동 출석 실패", error);
   }
 }
 
+/** 헤더를 그리는 동안 자리를 지키는 막대 (로고만). 본문은 헤더를 기다리지 않고 먼저 그린다 */
+function HeaderFallback() {
+  return (
+    <header className="border-b border-line bg-surface" aria-busy="true">
+      <div className="mx-auto flex max-w-5xl items-center px-4 py-2">
+        <Link href="/" className="flex min-h-11 shrink-0 items-center whitespace-nowrap text-xl font-extrabold text-accent">
+          Blogville
+        </Link>
+      </div>
+    </header>
+  );
+}
+
 async function Header() {
+  // 출석은 RootLayout이 먼저 했다 (코인·레벨에 오늘 보상이 들어 있다)
   const member = await getSession();
-  // 헤더의 코인·레벨이 출석 보상까지 반영되게 먼저 한다
-  if (member) await attendToday(member.userId, member.sessionId);
   const [blog, unread, wallet, avatar, levelUp] = member
     ? await Promise.all([
         getMyBlog(member.userId),
@@ -161,7 +173,10 @@ async function NoticeBar() {
   return <SiteNoticeBar key={notice.updatedAt.getTime()} text={notice.text} link={notice.link} dismissKey={noticeDismissKey(notice.updatedAt)} />;
 }
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // 헤더와 화면의 코인·레벨이 오늘 출석 보상까지 반영되게 본문보다 먼저 한다 (이미 했으면 읽기 한 번)
+  const member = await getSession();
+  if (member) await attendToday(member.userId, member.sessionId);
   return (
     // 고른 화면 밝기는 그리기 전에 스크립트가 data-theme으로 붙인다 (서버 HTML과 달라도 괜찮다)
     <html lang="ko" suppressHydrationWarning>
@@ -169,8 +184,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
       <body className="flex min-h-dvh flex-col">
-        <NoticeBar />
-        <Header />
+        {/* 공지 띠·헤더(세션·출석·코인·알림 읽기)를 본문과 따로 그려서, 본문이 헤더 쿼리를 기다리지 않는다 */}
+        <Suspense fallback={null}>
+          <NoticeBar />
+        </Suspense>
+        <Suspense fallback={<HeaderFallback />}>
+          <Header />
+        </Suspense>
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
         {/* 아래 막대 (SUP-01): 업데이트 소식(릴리스 노트, /updates)과 버그·문의(/support). 마을(PC)에서는 CSS가 숨긴다 */}
         <footer className="site-footer border-t border-line bg-surface">
