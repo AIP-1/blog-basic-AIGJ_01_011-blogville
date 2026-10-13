@@ -187,8 +187,8 @@ export function pasteAction(
   return "reupload";
 }
 
-/** 작은 사진(썸네일) 너비. 글 목록 대표 사진·프로필 동그라미가 이 크기의 webp를 받는다 */
-export const THUMB_WIDTHS = [96, 320, 640] as const;
+/** 작은 사진(썸네일) 너비. 글 목록 대표 사진·프로필 동그라미·블로그 커버가 이 크기의 webp를 받는다 */
+export const THUMB_WIDTHS = [96, 320, 640, 1280] as const;
 export type ThumbWidth = (typeof THUMB_WIDTHS)[number];
 
 /** `?w=` 값이 썸네일 너비면 그 수, 아니면 null (원본) */
