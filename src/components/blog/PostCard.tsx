@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Post } from "@/db/schema";
+import { firstImageUrl } from "@/lib/attachments";
 import { excerpt, formatDate } from "@/lib/text";
 import { CategoryBadge } from "../post/CategoryBadge";
 
@@ -21,6 +22,8 @@ type Props = {
 };
 
 export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle, commentCount = 0, likeCount = 0, author, pinned = false }: Props) {
+  // 대표 사진: 본문의 첫 사진 (비공개 글도 주인에게만 목록에 나오므로 그대로)
+  const cover = firstImageUrl(post.contentHtml);
   return (
     <article>
       {author && (
@@ -29,21 +32,27 @@ export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle,
           <span className="min-w-0 truncate text-ink-soft">· {author.blogTitle}</span>
         </Link>
       )}
-      <Link href={`/@${slug}/${post.id}`} className="block rounded-xl border border-line bg-surface p-4 hover:border-accent">
-        <div className="flex flex-wrap items-center gap-2">
-          {pinned && <span className="notice-yellow rounded-full px-2 py-0.5 text-sm font-semibold">⭐ 즐겨찾는 이웃</span>}
-          <CategoryBadge categoryName={categoryName} subcategoryName={subcategoryName} />
-          {!post.isPublic && <span className="text-sm font-semibold text-ink-soft">🔒 비공개</span>}
+      <Link href={`/@${slug}/${post.id}`} className="flex gap-4 rounded-xl border border-line bg-surface p-4 hover:border-accent">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            {pinned && <span className="notice-yellow rounded-full px-2 py-0.5 text-sm font-semibold">⭐ 즐겨찾는 이웃</span>}
+            <CategoryBadge categoryName={categoryName} subcategoryName={subcategoryName} />
+            {!post.isPublic && <span className="text-sm font-semibold text-ink-soft">🔒 비공개</span>}
+          </div>
+          <h2 className="mt-2 text-lg font-bold">{post.title}</h2>
+          <p className="mt-1 line-clamp-2 text-ink-soft">{excerpt(post.contentText)}</p>
+          <p className="mt-2 text-sm text-ink-soft">
+            {blogTitle && `${blogTitle} · `}
+            {formatDate(post.createdAt)}
+            <span aria-label={`공감 ${likeCount}`}> · ♥ {likeCount}</span>
+            {commentCount > 0 && <span aria-label={`댓글 ${commentCount}개`}> · 💬 {commentCount}</span>}
+            <span aria-label={`조회 ${post.viewCount}`}> · 👀 {post.viewCount}</span>
+          </p>
         </div>
-        <h2 className="mt-2 text-lg font-bold">{post.title}</h2>
-        <p className="mt-1 line-clamp-2 text-ink-soft">{excerpt(post.contentText)}</p>
-        <p className="mt-2 text-sm text-ink-soft">
-          {blogTitle && `${blogTitle} · `}
-          {formatDate(post.createdAt)}
-          <span aria-label={`공감 ${likeCount}`}> · ♥ {likeCount}</span>
-          {commentCount > 0 && <span aria-label={`댓글 ${commentCount}개`}> · 💬 {commentCount}</span>}
-          <span aria-label={`조회 ${post.viewCount}`}> · 👀 {post.viewCount}</span>
-        </p>
+        {cover && (
+          // eslint-disable-next-line @next/next/no-img-element -- 우리 저장소(/files) 사진, 크기를 모른다
+          <img src={cover} alt="" loading="lazy" className="size-20 shrink-0 self-center rounded-lg border border-line object-cover sm:size-24" data-post-cover />
+        )}
       </Link>
     </article>
   );

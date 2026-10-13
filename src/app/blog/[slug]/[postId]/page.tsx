@@ -9,6 +9,7 @@ import { CommentSection } from "@/components/post/CommentSection";
 import { LikeButton } from "@/components/post/LikeButton";
 import { PublishNotice } from "@/components/post/PublishNotice";
 import { AdjacentPosts } from "@/components/post/AdjacentPosts";
+import { CategoryPosts } from "@/components/post/CategoryPosts";
 import { TagList } from "@/components/post/TagList";
 import { parseId } from "@/lib/ids";
 import { hasPostReward } from "@/server/points";
@@ -17,7 +18,7 @@ import { loginHref } from "@/lib/safe-next";
 import { formatDate } from "@/lib/text";
 import { getBlogBySlug } from "@/server/blog";
 import { getSession } from "@/server/dal";
-import { getAdjacentPosts, getPostForView } from "@/server/post";
+import { getAdjacentPosts, getCategoryPosts, getPostForView } from "@/server/post";
 import { getCommentThread } from "@/server/comments";
 import { getLikeState } from "@/server/likes";
 import { hasViewedToday } from "@/server/stats";
@@ -49,7 +50,11 @@ export default async function PostPage({ params, searchParams }: PageProps<"/blo
   const data = await load(slug, postId);
   if (!data) notFound();
   const { blog, nickname, post, categoryName, subcategoryName, isOwner, member } = data;
-  const [thread, adjacent] = await Promise.all([getCommentThread(post.id, blog.ownerId, member), getAdjacentPosts(blog.id, post.id, isOwner)]);
+  const [thread, adjacent, sameCategory] = await Promise.all([
+    getCommentThread(post.id, blog.ownerId, member),
+    getAdjacentPosts(blog.id, post.id, isOwner),
+    post.categoryId ? getCategoryPosts(blog.id, post.id, post.categoryId, isOwner) : [],
+  ]);
   const categoryHref = post.categoryId
     ? `/@${blog.slug}?category=${post.categoryId}${post.subcategoryId ? `&sub=${post.subcategoryId}` : ""}`
     : undefined;
@@ -100,6 +105,7 @@ export default async function PostPage({ params, searchParams }: PageProps<"/blo
           {!isOwner && member?.role === "admin" && <AdminDeleteButton postId={post.id} title={post.title} leave />}
         </footer>
         <CommentSection postId={post.id} items={thread.items} count={thread.count} signedIn={member !== null} loginHref={loginHref(`${postPath}#comments`)} />
+        {post.categoryId && categoryName && <CategoryPosts slug={blog.slug} categoryName={categoryName} href={`/@${blog.slug}?category=${post.categoryId}`} items={sameCategory} />}
       </article>
     </>
   );

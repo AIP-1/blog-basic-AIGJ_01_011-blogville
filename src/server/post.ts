@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { blogs, categories, posts, postTags, profiles, subcategories, tags, users } from "@/db/schema";
 import { extractFileKeys } from "@/lib/attachments";
@@ -115,6 +115,16 @@ export async function getAdjacentPosts(blogId: number, postId: number, viewerIsO
       .limit(1),
   ]);
   return { older: older ?? null, newer: newer ?? null };
+}
+
+/** 글 상세 맨 아래 "같은 카테고리의 다른 글" (대분류 기준, 최신순 5개, 지금 글 빼고). 주인이 아니면 공개 글만 */
+export async function getCategoryPosts(blogId: number, postId: number, categoryId: number, viewerIsOwner: boolean, limit = 5) {
+  return db
+    .select({ id: posts.id, title: posts.title, createdAt: posts.createdAt })
+    .from(posts)
+    .where(and(eq(posts.blogId, blogId), eq(posts.categoryId, categoryId), ne(posts.id, postId), viewerIsOwner ? undefined : eq(posts.isPublic, true)))
+    .orderBy(desc(posts.createdAt), desc(posts.id))
+    .limit(limit);
 }
 
 /** 수정 화면용: 그 회원의 블로그 글만 */

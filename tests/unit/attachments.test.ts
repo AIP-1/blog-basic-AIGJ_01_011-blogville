@@ -3,6 +3,7 @@ import {
   ATTACH_MESSAGES as M,
   attachmentAccess,
   attachmentProblem,
+  firstImageUrl,
   cleanFileName,
   contentDisposition,
   extractFileKeys,
@@ -128,5 +129,18 @@ describe("pasteAction (POST-07 흐름 7)", () => {
   it("내 프로필 사진은 다시 올리고, 남의 프로필 사진은 넣지 않는다", () => {
     expect(pasteAction({ uploaderId: "me", postId: null, isProfilePhoto: true }, "me", null)).toBe("reupload");
     expect(pasteAction({ uploaderId: "you", postId: null, isProfilePhoto: true }, "me", null)).toBe("drop");
+  });
+});
+
+describe("글 목록 대표 사진", () => {
+  const k1 = "a".repeat(32);
+  const k2 = "b".repeat(32);
+  it("본문의 첫 사진", () => {
+    expect(firstImageUrl(`<p>글</p><img src="/files/${k1}" alt="" /><img src="/files/${k2}" alt="" />`)).toBe(`/files/${k1}`);
+  });
+  it("사진이 없거나 파일 카드뿐이면 없다", () => {
+    expect(firstImageUrl("<p>글만</p>")).toBeNull();
+    expect(firstImageUrl(`<a data-file href="/files/${k1}">파일</a>`)).toBeNull();
+    expect(firstImageUrl(`<img src="https://example.com/x.png" alt="" />`)).toBeNull();
   });
 });
