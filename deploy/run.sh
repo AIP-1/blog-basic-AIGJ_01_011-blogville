@@ -15,6 +15,7 @@
 #   IMAGE         (필수) 불러올 이미지 이름:태그 (예: blogville:1a2b3c4)
 #   APP_URL       (선택) 사용자가 여는 주소. 없으면 http://<서버 주소>:8400
 #   DEPLOY_DIR    (선택) 기본 ~/blogville
+#   ADMIN_USERNAME, ADMIN_PASSWORD (선택) 있으면 배포할 때 관리자 계정과 공지 블로그(/@notice)를 만들거나 비밀번호를 갱신한다
 #
 # 서버에 남는 것 (DEPLOY_DIR 아래)
 #   auth-secret   처음 한 번 만든 로그인 비밀키. 지우면 모든 로그인이 풀린다
@@ -128,6 +129,14 @@ if [ -z "$ready" ]; then
   exit 1
 fi
 echo "새 버전 응답 확인"
+
+# 관리자 계정 (AUTH-08). 시크릿이 있을 때만, 새 버전 컨테이너 안에서 scripts/create-admin.ts를 돌린다
+if [ -n "${ADMIN_USERNAME:-}" ] && [ -n "${ADMIN_PASSWORD:-}" ]; then
+  echo "관리자 계정 확인"
+  if ! "${DOCKER[@]}" exec -e ADMIN_USERNAME="$ADMIN_USERNAME" -e ADMIN_PASSWORD="$ADMIN_PASSWORD" "$NEXT_NAME" npx tsx scripts/create-admin.ts; then
+    echo "관리자 계정을 만들지 못했어요(위 문구 확인). 배포는 계속해요." >&2
+  fi
+fi
 
 # 프록시가 넘길 포트를 바꾼다 (파일을 통째로 바꿔 반쯤 쓴 내용을 읽지 않게)
 printf '%s\n' "$NEXT_PORT" > "$DEPLOY_DIR/state/active-port.tmp"
