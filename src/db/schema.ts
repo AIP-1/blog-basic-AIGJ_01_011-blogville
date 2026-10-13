@@ -483,6 +483,45 @@ export const guestbookEntries = pgTable(
   ],
 );
 
+// 버그·문의 (SUP-02~04, specs/057-support). 회원이 보낸 버그 신고·문의와 관리자·자동 처리(bot)의 답변.
+// 쓴 사람이 탈퇴하면 함께 지워진다. 답변(reply)·답변 시각·누가 답했는지는 같이 있거나 같이 없다 (feedback_reply_check).
+export const feedback = pgTable(
+  "feedback",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind").$type<"bug" | "question">().notNull(),
+    title: text("title").notNull(),
+    content: text("content").notNull(),
+    /** 문의를 쓰기 전에 보던 이 사이트 안의 주소 (`?from=`). 없으면 null */
+    pagePath: text("page_path"),
+    /** 서버가 요청 헤더에서 받은 브라우저 정보 (300자까지) */
+    userAgent: text("user_agent"),
+    status: text("status").$type<"new" | "in_progress" | "answered" | "fixed">().notNull().default("new"),
+    reply: text("reply"),
+    repliedAt: timestamp("replied_at", { withTimezone: true }),
+    repliedBy: text("replied_by").$type<"admin" | "bot">(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("feedback_status_created_idx").on(t.status, t.createdAt),
+    index("feedback_user_created_idx").on(t.userId, t.createdAt.desc()),
+    check("feedback_kind_check", sql`${t.kind} in ('bug', 'question')`),
+    check("feedback_status_check", sql`${t.status} in ('new', 'in_progress', 'answered', 'fixed')`),
+    check("feedback_title_check", sql`char_length(${t.title}) between 1 and 100`),
+    check("feedback_content_check", sql`char_length(${t.content}) between 1 and 2000`),
+    check("feedback_page_path_check", sql`${t.pagePath} is null or char_length(${t.pagePath}) between 1 and 2048`),
+    check("feedback_user_agent_check", sql`${t.userAgent} is null or char_length(${t.userAgent}) between 1 and 300`),
+    check(
+      "feedback_reply_check",
+      sql`(${t.reply} is null and ${t.repliedAt} is null and ${t.repliedBy} is null) or (${t.reply} is not null and char_length(${t.reply}) between 1 and 2000 and ${t.repliedAt} is not null and ${t.repliedBy} in ('admin', 'bot'))`,
+    ),
+  ],
+);
+
 // 조회수·방문자 (POST-06, BLOG-06, specs/005-blog-sidebar/data-model.md).
 // 기본 키가 "같은 브라우저는 하루 1번"을 보장한다. 날짜는 한국 날짜, IP·회원 ID는 저장하지 않는다.
 export const postViews = pgTable(
@@ -560,6 +599,7 @@ export type Attachment = typeof attachments.$inferSelect;
 // 닉네임·글 제목은 저장하지 않고 보여 줄 때 JOIN한다. 받는 사람·행동한 사람·글이 지워지면 함께 지워진다.
 // 레벨업은 행동한 사람·글이 없고 `level`만 있다 (notifications_shape_check).
 // 방명록 알림(BLOG-10)은 글 대신 방명록 글(`guestbook_entry_id`)이 있다.
+// 문의 답변 알림(SUP-03·04)은 행동한 사람 없이 문의(`feedback_id`)만 있다 (관리자·자동 처리가 답한다).
 export const notifications = pgTable(
   "notifications",
   {
@@ -572,6 +612,8 @@ export const notifications = pgTable(
     postId: integer("post_id").references(() => posts.id, { onDelete: "cascade" }),
     /** 방명록 알림의 그 방명록 글 (BLOG-10). 글이 지워지면 알림도 지워진다 */
     guestbookEntryId: integer("guestbook_entry_id").references(() => guestbookEntries.id, { onDelete: "cascade" }),
+    /** 문의 답변 알림의 그 문의 (SUP-03·04). 문의가 지워지면 알림도 지워진다 */
+    feedbackId: integer("feedback_id").references(() => feedback.id, { onDelete: "cascade" }),
     level: integer("level"),
     createdAt: createdAt(),
     readAt: timestamp("read_at", { withTimezone: true }),
@@ -582,15 +624,16 @@ export const notifications = pgTable(
     index("notifications_post_idx").on(t.postId),
     index("notifications_actor_idx").on(t.actorId),
     index("notifications_guestbook_entry_idx").on(t.guestbookEntryId),
+    index("notifications_feedback_idx").on(t.feedbackId),
     // 공감 알림은 같은 사람·같은 글에 한 번만 (껐다 켜도, 동시에 눌러도)
     uniqueIndex("notifications_like_uq").on(t.userId, t.actorId, t.postId).where(sql`${t.kind} = 'like'`),
     // 같은 레벨 알림은 한 번만 (GAME-06)
     uniqueIndex("notifications_level_up_uq").on(t.userId, t.level).where(sql`${t.kind} = 'level_up'`),
-    check("notifications_kind_check", sql`${t.kind} in ('like', 'comment', 'reply', 'level_up', 'guestbook', 'guestbook_reply')`),
+    check("notifications_kind_check", sql`${t.kind} in ('like', 'comment', 'reply', 'level_up', 'guestbook', 'guestbook_reply', 'feedback_reply')`),
     check("notifications_not_self_check", sql`${t.actorId} is null or ${t.userId} <> ${t.actorId}`),
     check(
       "notifications_shape_check",
-      sql`(${t.kind} = 'level_up' and ${t.actorId} is null and ${t.postId} is null and ${t.guestbookEntryId} is null and ${t.level} between 2 and 99) or (${t.kind} in ('like', 'comment', 'reply') and ${t.actorId} is not null and ${t.postId} is not null and ${t.guestbookEntryId} is null and ${t.level} is null) or (${t.kind} in ('guestbook', 'guestbook_reply') and ${t.actorId} is not null and ${t.postId} is null and ${t.guestbookEntryId} is not null and ${t.level} is null)`,
+      sql`(${t.kind} = 'level_up' and ${t.actorId} is null and ${t.postId} is null and ${t.guestbookEntryId} is null and ${t.feedbackId} is null and ${t.level} between 2 and 99) or (${t.kind} in ('like', 'comment', 'reply') and ${t.actorId} is not null and ${t.postId} is not null and ${t.guestbookEntryId} is null and ${t.feedbackId} is null and ${t.level} is null) or (${t.kind} in ('guestbook', 'guestbook_reply') and ${t.actorId} is not null and ${t.postId} is null and ${t.guestbookEntryId} is not null and ${t.feedbackId} is null and ${t.level} is null) or (${t.kind} = 'feedback_reply' and ${t.actorId} is null and ${t.postId} is null and ${t.guestbookEntryId} is null and ${t.feedbackId} is not null and ${t.level} is null)`,
     ),
   ],
 );

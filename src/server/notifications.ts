@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, between, count, desc, eq, inArray, isNull, lte, max, min, or, sql } from "drizzle-orm";
 import { db, type Tx } from "@/db";
-import { blogs, guestbookEntries, items, notifications, posts, profiles } from "@/db/schema";
+import { blogs, feedback, guestbookEntries, items, notifications, posts, profiles } from "@/db/schema";
 import { levelsGained } from "@/lib/game";
 import {
   isActivityKind,
@@ -45,6 +45,14 @@ export async function notifyGuestbook(
 }
 
 /**
+ * 문의 답변 알림 (SUP-03·04, specs/057-support): 문의를 바꾸는 트랜잭션 안에서 부른다.
+ * 관리자·자동 처리가 하는 일이라 행동한 사람은 없다.
+ */
+export async function notifyFeedbackReply(tx: Tx, recipientId: string, feedbackId: number): Promise<void> {
+  await tx.insert(notifications).values({ userId: recipientId, kind: "feedback_reply", feedbackId });
+}
+
+/**
  * 레벨업 알림 (GAME-06): 누적 경험치가 before → after가 되며 오른 레벨마다 한 줄. 원장을 넣은 트랜잭션 안에서 부른다.
  * 같은 레벨은 한 번만 (부분 고유 인덱스 notifications_level_up_uq).
  */
@@ -58,13 +66,13 @@ export async function notifyLevelUps(tx: Tx, userId: string, before: number, aft
 }
 
 /**
- * 받는 사람이 지금 볼 수 있는 알림만: 레벨업, 방명록(받는 사람은 블로그 주인이나 그 글 작성자라 늘 본다),
+ * 받는 사람이 지금 볼 수 있는 알림만: 레벨업, 방명록(받는 사람은 블로그 주인이나 그 글 작성자라 늘 본다), 문의 답변(내 문의),
  * 그리고 글이 공개이거나 내 글인 활동 알림 (답글 알림의 글이 나중에 비공개가 되면 숨긴다)
  */
 const visibleTo = (userId: string) =>
   and(
     eq(notifications.userId, userId),
-    or(inArray(notifications.kind, ["level_up", "guestbook", "guestbook_reply"]), eq(posts.isPublic, true), eq(blogs.ownerId, userId)),
+    or(inArray(notifications.kind, ["level_up", "guestbook", "guestbook_reply", "feedback_reply"]), eq(posts.isPublic, true), eq(blogs.ownerId, userId)),
   );
 
 /** 알림의 블로그: 활동 알림은 글의 블로그, 방명록 알림은 방명록 글의 블로그 */
@@ -120,6 +128,7 @@ export type NotificationItem = { id: number; createdAt: Date; read: boolean } & 
   | { kind: ActivityKind; nickname: string; postId: number; postTitle: string; blogSlug: string }
   | { [K in GuestbookKind]: { kind: K; nickname: string; blogSlug: string } }[GuestbookKind]
   | { kind: "level_up"; level: number }
+  | { kind: "feedback_reply"; feedbackTitle: string }
 );
 
 /** 알림함: 최신순 20개씩, 닉네임·글 제목·블로그 주소는 지금 값으로 */
@@ -135,6 +144,7 @@ export async function listNotifications(userId: string, page: number): Promise<{
         postId: posts.id,
         postTitle: posts.title,
         blogSlug: blogs.slug,
+        feedbackTitle: feedback.title,
         createdAt: notifications.createdAt,
         readAt: notifications.readAt,
       })
@@ -143,6 +153,7 @@ export async function listNotifications(userId: string, page: number): Promise<{
       .leftJoin(guestbookEntries, eq(guestbookEntries.id, notifications.guestbookEntryId))
       .leftJoin(blogs, notificationBlog)
       .leftJoin(profiles, eq(profiles.userId, notifications.actorId))
+      .leftJoin(feedback, eq(feedback.id, notifications.feedbackId))
       .where(where)
       .orderBy(desc(notifications.createdAt), desc(notifications.id))
       .limit(NOTIFICATIONS_PAGE_SIZE)
@@ -155,9 +166,10 @@ export async function listNotifications(userId: string, page: number): Promise<{
       .leftJoin(blogs, notificationBlog)
       .where(where),
   ]);
-  const items = rows.flatMap(({ id, kind, level, nickname, postId, postTitle, blogSlug, createdAt, readAt }): NotificationItem[] => {
+  const items = rows.flatMap(({ id, kind, level, nickname, postId, postTitle, blogSlug, feedbackTitle, createdAt, readAt }): NotificationItem[] => {
     const base = { id, createdAt, read: readAt !== null };
     if (kind === "level_up" && level !== null) return [{ ...base, kind, level }];
+    if (kind === "feedback_reply" && feedbackTitle !== null) return [{ ...base, kind, feedbackTitle }];
     if (isActivityKind(kind) && nickname !== null && postId !== null && postTitle !== null && blogSlug !== null) {
       return [{ ...base, kind, nickname, postId, postTitle, blogSlug }];
     }
@@ -170,7 +182,8 @@ export async function listNotifications(userId: string, page: number): Promise<{
 export type NotificationTarget =
   | { kind: ActivityKind; blogSlug: string; postId: number }
   | { [K in GuestbookKind]: { kind: K; blogSlug: string } }[GuestbookKind]
-  | { kind: "level_up" };
+  | { kind: "level_up" }
+  | { kind: "feedback_reply" };
 
 /** 내 알림 하나를 읽음으로 하고 갈 곳을 돌려준다. 남의 알림·없는 알림·볼 수 없는 글이면 null (아무것도 바꾸지 않음) */
 export async function readNotification(userId: string, id: number): Promise<NotificationTarget | null> {
@@ -184,6 +197,7 @@ export async function readNotification(userId: string, id: number): Promise<Noti
   if (!row) return null;
   let target: NotificationTarget;
   if (row.kind === "level_up") target = { kind: "level_up" };
+  else if (row.kind === "feedback_reply") target = { kind: "feedback_reply" };
   else if (isActivityKind(row.kind) && row.blogSlug !== null && row.postId !== null) target = { kind: row.kind, blogSlug: row.blogSlug, postId: row.postId };
   else if (isGuestbookKind(row.kind) && row.blogSlug !== null) target = { kind: row.kind, blogSlug: row.blogSlug };
   else return null;
