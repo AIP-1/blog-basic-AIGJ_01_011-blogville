@@ -11,6 +11,7 @@ const TABS = [
   { href: "/admin/feedback", label: "🐞 버그·문의" },
   { href: "/admin/settings", label: "⚙️ 사이트 설정" },
   { href: "/admin/audit", label: "📜 관리 기록" },
+  { href: "/admin/errors", label: "⚠️ 오류" },
 ] as const;
 
 /** 관리자 화면 위 탭 (ADM-07). 지금 화면을 강조한다. 좁은 화면에서는 탭 줄만 옆으로 밀린다 */

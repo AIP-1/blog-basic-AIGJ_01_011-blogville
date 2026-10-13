@@ -10,6 +10,7 @@ import { DailyBarChart } from "@/components/admin/DailyBarChart";
 import { parseStatRange, STAT_RANGES } from "@/lib/admin-rules";
 import { getDailyStats, getModerationCounts, getTopBlogs } from "@/server/admin-tools";
 import { countOpenReports } from "@/server/reports";
+import { countRecentErrors } from "@/server/error-log";
 
 export const metadata = { title: "관리자 | Blogville" };
 
@@ -24,7 +25,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   const range = parseStatRange(params.range);
   const query = typeof raw === "string" ? normalizeName(raw) : "";
   const searched = query.length > 0 && query.length <= 64;
-  const [stats, members, recent, found, newFeedback, daily, topBlogs, moderation, openReports] = await Promise.all([
+  const [stats, members, recent, found, newFeedback, daily, topBlogs, moderation, openReports, recentErrors] = await Promise.all([
     getAdminStats(),
     listRecentMembers(),
     listRecentPosts(),
@@ -34,6 +35,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
     getTopBlogs(),
     getModerationCounts(),
     countOpenReports(),
+    countRecentErrors(),
   ]);
   const cards = [
     ["가입 계정", stats.members],
@@ -129,6 +131,18 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
         </h2>
         <Link href={newFeedback > 0 ? "/admin/feedback?status=new" : "/admin/feedback"} className="btn">
           문의 보기
+        </Link>
+      </section>
+
+      {/* 서버 오류 기록: 최근 24시간에 난 처리 못 한 서버 오류 횟수 */}
+      <section aria-labelledby="admin-errors" className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-surface p-4">
+        <h2 id="admin-errors" className="font-bold">
+          <span className={recentErrors.total > 0 ? "text-danger" : "text-ink-soft"} data-errors-recent={recentErrors.total}>
+            ⚠️ 최근 24시간 오류 {recentErrors.total.toLocaleString("ko-KR")}건
+          </span>
+        </h2>
+        <Link href="/admin/errors" className="btn">
+          오류 보기
         </Link>
       </section>
 

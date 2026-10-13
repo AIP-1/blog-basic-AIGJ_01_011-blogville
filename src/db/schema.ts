@@ -927,3 +927,33 @@ export const bookmarks = pgTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.postId] }), index("bookmarks_user_created_idx").on(t.userId, t.createdAt.desc()), index("bookmarks_post_idx").on(t.postId)],
 );
+
+// 서버 오류 기록 (instrumentation.ts의 onRequestError, server/error-log.ts).
+// 같은 오류(digest, 없으면 메시지)·같은 경로가 1시간 안에 또 나면 새 줄 대신 count·last_seen_at만 올린다.
+// 30일 지난 줄은 기록할 때 가끔(1%) 지운다. 쿼리 문자열·환경 값은 남기지 않는다.
+export const errorLogs = pgTable(
+  "error_logs",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    createdAt: createdAt(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    digest: text("digest"),
+    message: text("message").notNull(),
+    stack: text("stack"),
+    routePath: text("route_path"),
+    routeType: text("route_type"),
+    method: text("method"),
+    /** 경로만 (쿼리 문자열 없이) */
+    url: text("url"),
+    userAgent: text("user_agent"),
+    count: integer("count").notNull().default(1),
+  },
+  (t) => [
+    index("error_logs_last_seen_idx").on(t.lastSeenAt.desc()),
+    index("error_logs_group_idx").on(t.routePath, t.digest, t.lastSeenAt),
+    check("error_logs_message_check", sql`char_length(${t.message}) <= 1000`),
+    check("error_logs_stack_check", sql`${t.stack} is null or char_length(${t.stack}) <= 4000`),
+    check("error_logs_user_agent_check", sql`${t.userAgent} is null or char_length(${t.userAgent}) <= 300`),
+    check("error_logs_count_check", sql`${t.count} >= 1`),
+  ],
+);
