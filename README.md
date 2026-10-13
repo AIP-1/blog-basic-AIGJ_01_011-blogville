@@ -56,6 +56,6 @@ npm run posts:cleanup
 - `APP_URL`이 없으면 `http://SSH_ADDRESS:8400`을 로그인 주소로 씁니다. 도메인·https를 붙이면 `APP_URL`을 그 주소로 등록합니다.
 - 서버에는 docker가 있어야 하고, SSH 계정이 docker를 쓸 수 있어야 합니다(docker 그룹 또는 비밀번호 없는 sudo).
 - 컨테이너는 시작할 때 `scripts/migrate.mjs`(drizzle 마이그레이터, 실패하면 DB 오류를 그대로 보여 줌)로 DB를 맞춘 뒤 `next start -p 8400`으로 뜹니다.
-- **무중단(블루·그린) 배포**: 8400번 포트는 작은 프록시(`blogville-proxy`, `scripts/proxy.mjs`)가 받고, 앱은 `blogville-blue`(8401)·`blogville-green`(8402) 중 하나가 서비스합니다. 새 버전은 쉬고 있는 쪽에 띄워 응답을 확인한 뒤 `~/blogville/state/active-port`를 바꿔 넘기고, 이전 버전은 15초 뒤 멈춥니다. 새 버전이 뜨지 않으면 이전 버전이 그대로 서비스합니다. 프록시는 처음 한 번만 띄우므로 `scripts/proxy.mjs`를 고쳤다면 서버에서 `docker rm -f blogville-proxy` 뒤 다시 배포합니다.
+- **무중단(블루·그린) 배포**: 8400번 포트는 작은 프록시(`bv8400-proxy`, `scripts/proxy.mjs`)가 받고, 앱은 `bv8400-blue`(8401)·`bv8400-green`(8402) 중 하나가 서비스합니다. 새 버전은 쉬고 있는 쪽에 띄워 응답을 확인한 뒤 `~/blogville/state/active-port`를 바꿔 넘기고, 이전 버전은 15초 뒤 멈춥니다. 새 버전이 뜨지 않으면 이전 버전이 그대로 서비스합니다. 서버의 도커를 다른 사람도 같이 쓰므로 컨테이너·이미지 이름은 `bv8400-`로 시작하고, 스크립트는 자기 이미지로 만든 컨테이너만 지웁니다. 프록시는 처음 한 번만 띄우므로 `scripts/proxy.mjs`를 고쳤다면 서버에서 `docker rm -f bv8400-proxy` 뒤 다시 배포합니다.
 - 서버의 `~/blogville/`에 로그인 비밀키(`auth-secret`, 처음 한 번 생성), 환경 변수(`app.env`), 올린 파일(`uploads/`)이 남습니다.
 - 마이그레이션 SQL이 `"public"` 스키마를 직접 가리키므로 `DB_SCHEMA`는 `public`이어야 합니다.
