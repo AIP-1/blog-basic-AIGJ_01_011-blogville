@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { blogs, categories, posts, postTags, profiles, subcategories, tags, users } from "@/db/schema";
 import { extractFileKeys } from "@/lib/attachments";
@@ -14,6 +14,7 @@ import { grantReward } from "./points";
 import { likeCountSql } from "./likes";
 import { resolveCategory } from "./category";
 import { syncPostTags } from "./tags";
+import { checkBannedWords } from "./banned-words";
 
 export const PAGE_SIZE = 8;
 
@@ -29,11 +30,13 @@ export async function savePost(blogId: number, ownerId: string, input: PostInput
     if (input.postId !== null) {
       // 남의 글에 첨부를 붙이지 않게 먼저 내 글인지 본다
       const [mine] = await tx
-        .select({ id: posts.id })
+        .select({ id: posts.id, blindedAt: posts.blindedAt })
         .from(posts)
         .where(and(eq(posts.id, input.postId), eq(posts.blogId, blogId)))
         .for("update");
       if (!mine) throw new Error("내 글이 아닌 글을 고치려 함");
+      // 관리자가 가린 글은 고쳐도 비공개로 남는다
+      if (mine.blindedAt) input = { ...input, isPublic: false };
     }
     // 회원 → 프로필 → 첨부 순서로 잠근다. 회원 행은 보상 원장 외래 키가 나중에 잠그므로 탈퇴(deleteMember: 회원 행 먼저)와 같은 순서로 먼저 잡는다.
     // 프로필은 setProfilePhoto와 같은 순서라 그 사이 프로필 사진이 된 첨부를 본문에 남기지 않는다
@@ -43,6 +46,9 @@ export async function savePost(blogId: number, ownerId: string, input: PostInput
     const contentHtml = sanitizePostHtml(input.contentHtml, known);
     const contentText = htmlToText(contentHtml);
     if (contentText.length === 0) throw new PostSaveError(POST_ERRORS.contentEmpty);
+    // 금지어 (ADM-05): 제목과 본문 글자
+    const banned = await checkBannedWords(input.title, contentText);
+    if (banned) throw new PostSaveError(banned);
 
     const category = await resolveCategory(tx, blogId, input.categoryId, input.subcategoryId);
     if (category === "invalid") throw new PostSaveError(POST_ERRORS.invalid);
@@ -204,7 +210,8 @@ export async function setPostVisibility(blogId: number, postId: number, isPublic
   const rows = await db
     .update(posts)
     .set({ isPublic, updatedAt: sql`${posts.updatedAt}` })
-    .where(and(eq(posts.id, postId), eq(posts.blogId, blogId)))
+    // 관리자가 가린 글은 다시 공개할 수 없다
+    .where(and(eq(posts.id, postId), eq(posts.blogId, blogId), isPublic ? isNull(posts.blindedAt) : undefined))
     .returning({ id: posts.id });
   return rows.length > 0;
 }

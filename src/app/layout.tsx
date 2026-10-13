@@ -7,6 +7,7 @@ import { SignOutButton } from "@/components/auth/SignOutButton";
 import { AttendanceDayWatcher } from "@/components/game/AttendanceDayWatcher";
 import { LevelUpDialog } from "@/components/game/LevelUpDialog";
 import { PhoneTabs } from "@/components/layout/PhoneTabs";
+import { SiteNoticeBar } from "@/components/layout/SiteNoticeBar";
 import { SupportLink } from "@/components/layout/SupportLink";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
@@ -21,6 +22,8 @@ import { ensureTodayAttendance } from "@/server/attendance";
 import { getAvatar } from "@/server/items";
 import { getWallet } from "@/server/points";
 import { siteUrl } from "@/lib/feed";
+import { noticeDismissKey } from "@/lib/admin-rules";
+import { getActiveNotice } from "@/server/admin-tools";
 // 한글 글꼴 Pretendard를 이 사이트에서 직접 내려준다. 글자 범위별로 쪼갠 파일이라 화면에 쓰인 글자 몫만 받는다
 import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
@@ -142,6 +145,13 @@ async function Header() {
   );
 }
 
+/** 사이트 공지 띠 (ADM-04): 관리자가 켜 둔 공지가 있을 때만 */
+async function NoticeBar() {
+  const notice = await getActiveNotice();
+  if (!notice) return null;
+  return <SiteNoticeBar key={notice.updatedAt.getTime()} text={notice.text} link={notice.link} dismissKey={noticeDismissKey(notice.updatedAt)} />;
+}
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     // 고른 화면 밝기는 그리기 전에 스크립트가 data-theme으로 붙인다 (서버 HTML과 달라도 괜찮다)
@@ -150,6 +160,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
       <body className="flex min-h-dvh flex-col">
+        <NoticeBar />
         <Header />
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
         {/* 아래 막대 (SUP-01): 업데이트 소식(릴리스 노트, /updates)과 버그·문의(/support). 마을(PC)에서는 CSS가 숨긴다 */}

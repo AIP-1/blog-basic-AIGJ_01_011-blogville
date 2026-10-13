@@ -204,6 +204,13 @@
       "when": 1791877331989,
       "tag": "0028_support",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791879445449,
+      "tag": "0029_admin_tools",
+      "breakpoints": true
     }
   ]
 }

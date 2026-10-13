@@ -1,5 +1,7 @@
 import "server-only";
 import { betterAuth } from "better-auth";
+import { APIError } from "better-auth/api";
+import { and, eq, gt, sql } from "drizzle-orm";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { username } from "better-auth/plugins";
@@ -11,6 +13,16 @@ import { providerKeys, socialEmail } from "./social-login";
 export const SESSION_REMEMBER_SECONDS = 60 * 60 * 24 * 7;
 /** 소셜 로그인 버튼을 누를 때 [로그인 상태 유지]를 담아 두는 쿠키 (돌아와서 세션을 만들 때 읽는다) */
 export const SOCIAL_REMEMBER_COOKIE = "bv_social_remember";
+/** 정지된 회원이 로그인하면 세션을 만들지 않고 이 코드로 거절한다 (관리자 회원 정지) */
+export const SUSPENDED_CODE = "ACCOUNT_SUSPENDED";
+
+async function isSuspendedNow(userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(and(eq(schema.users.id, userId), gt(schema.users.suspendedUntil, sql`now()`)));
+  return Boolean(row);
+}
 
 // 소셜 로그인 (AUTH-01): 키가 있는 서비스만 켠다. 소셜로 새 회원을 만들지 않는다(disableSignUp).
 // 이메일은 서비스 ID로 만든 자리값을 쓴다 (socialEmail). 카카오는 이메일 동의를 요청하지 않는다.
@@ -86,6 +98,8 @@ export const auth = betterAuth({
       create: {
         // 소셜 로그인으로 만든 세션: 버튼을 누를 때 [로그인 상태 유지]를 골랐으면 7일 유지, 아니면 아이디 로그인처럼 2시간 (AUTH-09)
         before: async (session, ctx) => {
+          // 정지된 회원은 아이디·소셜 어느 쪽으로도 세션을 만들 수 없다
+          if (await isSuspendedNow(session.userId)) throw new APIError("FORBIDDEN", { message: SUSPENDED_CODE, code: SUSPENDED_CODE });
           if (!ctx?.path?.startsWith("/callback/")) return;
           if (ctx.getCookie(SOCIAL_REMEMBER_COOKIE) === "1") return { data: { ...session, rememberMe: true } };
           return { data: { ...session, rememberMe: false, expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000) } };

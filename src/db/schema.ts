@@ -37,12 +37,16 @@ export const users = pgTable(
     name: text("name").notNull(),
     image: text("image"),
     role: text("role").notNull().default("user"),
+    /** 관리자 정지: 이 시각까지 로그인할 수 없다. 영구 정지는 'infinity', 정지 아님은 null (관리자 회원 관리) */
+    suspendedUntil: timestamp("suspended_until", { withTimezone: true }),
+    suspendReason: text("suspend_reason"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     check("users_username_check", sql`${t.username} ~ '^[a-z0-9_]{4,20}$'`),
     check("users_role_check", sql`${t.role} in ('user', 'admin')`),
+    check("users_suspend_reason_check", sql`${t.suspendReason} is null or char_length(${t.suspendReason}) between 1 and 200`),
   ],
 );
 
@@ -325,6 +329,9 @@ export const posts = pgTable(
     contentHtml: text("content_html").notNull(),
     contentText: text("content_text").notNull(),
     isPublic: boolean("is_public").notNull().default(true),
+    /** 관리자 블라인드: 가린 글은 비공개로만 둘 수 있다 (작성자만 봄). 풀면 null (관리자 글 관리) */
+    blindedAt: timestamp("blinded_at", { withTimezone: true }),
+    blindReason: text("blind_reason"),
     /** post_views에서 셀 수 있는 합계를 일부러 저장한 값 (POST-06) */
     viewCount: integer("view_count").notNull().default(0),
     createdAt: createdAt(),
@@ -343,6 +350,8 @@ export const posts = pgTable(
       "posts_subcategory_needs_category",
       sql`${t.subcategoryId} is null or ${t.categoryId} is not null`,
     ),
+    check("posts_blinded_private", sql`${t.blindedAt} is null or not ${t.isPublic}`),
+    check("posts_blind_reason_check", sql`${t.blindReason} is null or char_length(${t.blindReason}) between 1 and 200`),
   ],
 );
 
@@ -779,4 +788,47 @@ export const fishingCatches = pgTable(
     primaryKey({ columns: [t.userId, t.date] }),
     check("fishing_catches_catch_check", sql`${t.catch} in ('minnow', 'crucian', 'carp', 'golden_carp', 'feed', 'boot')`),
   ],
+);
+
+/**
+ * 관리 기록 (ADM-06): 관리자가 회원·콘텐츠·사이트 설정을 바꾼 일. 지우지 않는다.
+ * 대상은 종류(target_type)·ID(target_id)와 사람이 읽는 이름(target_label: 아이디·글 제목 등)으로 남겨, 대상이 지워져도 무엇이었는지 보인다.
+ * 관리자가 탈퇴하면 admin_id만 비운다.
+ */
+export const adminAudit = pgTable(
+  "admin_audit",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    adminId: text("admin_id").references(() => users.id, { onDelete: "set null" }),
+    action: text("action").notNull(),
+    targetType: text("target_type").$type<"member" | "post" | "comment" | "reply" | "guestbook" | "feedback" | "site">().notNull(),
+    targetId: text("target_id"),
+    targetLabel: text("target_label").notNull(),
+    detail: text("detail"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("admin_audit_created_idx").on(t.createdAt.desc(), t.id.desc()),
+    index("admin_audit_action_created_idx").on(t.action, t.createdAt.desc()),
+    check("admin_audit_action_check", sql`char_length(${t.action}) between 1 and 40`),
+    check("admin_audit_target_type_check", sql`${t.targetType} in ('member', 'post', 'comment', 'reply', 'guestbook', 'feedback', 'site')`),
+    check("admin_audit_target_id_check", sql`${t.targetId} is null or char_length(${t.targetId}) between 1 and 64`),
+    check("admin_audit_target_label_check", sql`char_length(${t.targetLabel}) between 1 and 200`),
+    check("admin_audit_detail_check", sql`${t.detail} is null or char_length(${t.detail}) <= 1000`),
+  ],
+);
+
+/**
+ * 사이트 설정 (ADM-04·05): 키 하나에 값 하나.
+ * `notice`: 사이트 공지 띠 (JSON {text, link, enabled}), `banned_words`: 금지어 (한 줄에 하나).
+ * 값이 바뀐 시각(updated_at)은 공지 띠의 판(닫기 기억 키)으로도 쓴다.
+ */
+export const siteSettings = pgTable(
+  "site_settings",
+  {
+    key: text("key").primaryKey(),
+    value: text("value").notNull(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check("site_settings_value_check", sql`char_length(${t.value}) <= 10000`)],
 );
