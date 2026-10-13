@@ -48,3 +48,16 @@
   outline: 3px solid #e0b400;
   outline-offset: 2px;
 }
+
+/* 블로그 강조색 (블로그 꾸미기): 블로그 화면 칸에만 --accent를 바꾼다. 어두운 화면은 밝은 쪽 색 */
+[data-blog-accent] {
+  --accent: var(--blog-accent);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) [data-blog-accent] {
+    --accent: var(--blog-accent-dark);
+  }
+}
+:root[data-theme="dark"] [data-blog-accent] {
+  --accent: var(--blog-accent-dark);
+}

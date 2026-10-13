@@ -7,6 +7,7 @@ import { GUESTBOOK_PAGE_SIZE, guestbookPath } from "@/lib/guestbook-rules";
 import { parsePage } from "@/lib/ids";
 import { loginHref } from "@/lib/safe-next";
 import { getBlogBySlug } from "@/server/blog";
+import { accentProps } from "@/lib/blog-accent";
 import { getSession } from "@/server/dal";
 import { getGuestbook } from "@/server/guestbook";
 
@@ -28,7 +29,7 @@ export default async function GuestbookPage({ params, searchParams }: PageProps<
   const path = guestbookPath(blog.slug);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="mx-auto max-w-3xl space-y-4" {...accentProps(blog.accentColor)}>
       <header className="rounded-2xl border border-line bg-surface p-5">
         <Link href={`/@${blog.slug}`} className="-ml-1 flex min-h-11 w-fit max-w-full items-center px-1 font-semibold text-ink-soft hover:text-ink" data-blog-link>
           <span className="truncate">{blog.title}</span>

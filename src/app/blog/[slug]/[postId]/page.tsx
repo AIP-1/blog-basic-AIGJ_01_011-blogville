@@ -29,6 +29,7 @@ import { formatDate } from "@/lib/text";
 import { renderPostHtml } from "@/lib/post-render";
 import { readingMinutes, TOC_MIN_HEADINGS } from "@/lib/reader";
 import { getBlogBySlug } from "@/server/blog";
+import { accentProps } from "@/lib/blog-accent";
 import { getSession } from "@/server/dal";
 import { BlindNotice } from "@/components/post/BlindNotice";
 import { getAdjacentPosts, getCategoryPosts, getPostForView } from "@/server/post";
@@ -108,7 +109,8 @@ export default async function PostPage({ params, searchParams }: PageProps<"/blo
   const body = renderPostHtml(post.contentHtml);
 
   return (
-    <>
+    // 블로그 강조색은 CSS 변수라 display:contents 칸으로 감싸도 안쪽에 이어진다
+    <div className="contents" {...accentProps(blog.accentColor)}>
       {post.isPublic && (
         <PostJsonLd
           siteUrl={siteUrl()}
@@ -175,6 +177,6 @@ export default async function PostPage({ params, searchParams }: PageProps<"/blo
         {post.categoryId && categoryName && <CategoryPosts slug={blog.slug} categoryName={categoryName} href={`/@${blog.slug}?category=${post.categoryId}`} items={sameCategory} />}
       </article>
       <BackToTop />
-    </>
+    </div>
   );
 }
