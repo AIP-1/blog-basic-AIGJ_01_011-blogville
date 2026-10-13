@@ -15,12 +15,18 @@ import { countUnreadNotifications, getPendingLevelUp } from "@/server/notificati
 import { ensureTodayAttendance } from "@/server/attendance";
 import { getAvatar } from "@/server/items";
 import { getWallet } from "@/server/points";
+import { siteUrl } from "@/lib/feed";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "Blogville",
-  description: "글을 쓸수록 내 마을이 자라는 블로그",
-};
+// metadataBase는 실행할 때의 사이트 주소로 정한다 (공유 미리보기의 사진·주소를 절대 주소로)
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    metadataBase: new URL(siteUrl()),
+    title: "Blogville",
+    description: "글을 쓸수록 내 마을이 자라는 블로그",
+    openGraph: { siteName: "Blogville", locale: "ko_KR", type: "website" },
+  };
+}
 
 /** 그날 처음 그리는 헤더가 자동 출석을 기록한다 (GAME-04). 실패해도 화면은 그대로 열린다 */
 async function attendToday(userId: string, sessionId: string) {
