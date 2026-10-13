@@ -6,7 +6,7 @@ import { parseId } from "@/lib/ids";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { blogs, posts } from "@/db/schema";
-import { createComment, createReply, removeComment, removeReply } from "@/server/comments";
+import { createComment, createReply, editComment, editReply, removeComment, removeReply } from "@/server/comments";
 import { getSession, requireMember } from "@/server/dal";
 import { toggleFavorite, toggleFollow as storeFollow, unfollow } from "@/server/follows";
 import { FAVORITE_MESSAGES } from "@/lib/social";
@@ -23,13 +23,16 @@ const text = (formData: FormData, key: string) => {
   return typeof value === "string" ? value : "";
 };
 
+/** 🔒 비밀 댓글 체크: `"true"`일 때만 켠다 (specs/055-comment-edit-secret) */
+const secret = (formData: FormData) => formData.get("isSecret") === "true";
+
 export async function addComment(formData: FormData): Promise<CommentResult> {
   const member = await requireMember();
   const postId = parseId(formData.get("postId"));
   if (postId === null) return { ok: false, error: COMMENT_ERRORS.invalid };
   const checked = checkComment(text(formData, "content"));
   if (!checked.ok) return checked;
-  const result = await createComment(member.userId, postId, checked.content);
+  const result = await createComment(member.userId, postId, checked.content, secret(formData));
   if (result.ok) revalidatePath("/", "layout");
   return result;
 }
@@ -41,7 +44,30 @@ export async function addReply(formData: FormData): Promise<CommentResult> {
   if (postId === null || commentId === null) return { ok: false, error: COMMENT_ERRORS.invalid };
   const checked = checkComment(text(formData, "content"));
   if (!checked.ok) return checked;
-  const result = await createReply(member.userId, postId, commentId, checked.content);
+  const result = await createReply(member, postId, commentId, checked.content, secret(formData));
+  if (result.ok) revalidatePath("/", "layout");
+  return result;
+}
+
+/**
+ * 댓글·답글 수정 (specs/055-comment-edit-secret). 작성자는 로그인 세션으로만 정한다: 폼에서는 ID만 받는다.
+ * 남의 댓글·지운 댓글·이상한 ID는 `수정할 수 있는 댓글이 없어요`, 아무것도 바꾸지 않는다.
+ */
+export async function updateComment(formData: FormData): Promise<CommentResult> {
+  return update(formData, editComment);
+}
+
+export async function updateReply(formData: FormData): Promise<CommentResult> {
+  return update(formData, editReply);
+}
+
+async function update(formData: FormData, store: typeof editComment): Promise<CommentResult> {
+  const member = await requireMember();
+  const id = parseId(formData.get("id"));
+  if (id === null) return { ok: false, error: COMMENT_ERRORS.invalid };
+  const checked = checkComment(text(formData, "content"));
+  if (!checked.ok) return checked;
+  const result = await store(member.userId, id, checked.content, secret(formData));
   if (result.ok) revalidatePath("/", "layout");
   return result;
 }

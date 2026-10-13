@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SECRET_PLACEHOLDER } from "@/lib/comment-rules";
 import { excerpt } from "@/lib/text";
 import { SEARCH_MAX } from "@/lib/blog-search";
 import type { getBlogSidebar } from "@/server/sidebar";
@@ -104,7 +105,8 @@ export function BlogSidebar({ blogId, slug, sidebar, visits, recordVisit, search
                 <Link href={`/@${slug}/${c.postId}#${c.kind}-${c.id}`} className={`${linkClass} text-sm`}>
                   <span className="min-w-0 flex-1 truncate">
                     {c.kind === "reply" && <span aria-label="답글">↳ </span>}
-                    {excerpt(c.content, 40)}
+                    {/* 볼 수 없는 비밀 댓글은 내용 없이 문구만 (서버가 비워 보낸다) */}
+                    {c.hidden ? SECRET_PLACEHOLDER : excerpt(c.content, 40)}
                   </span>
                   <span className="shrink-0 text-ink-soft">{c.nickname ?? "알 수 없음"}</span>
                 </Link>

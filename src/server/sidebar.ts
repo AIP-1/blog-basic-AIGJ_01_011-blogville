@@ -1,22 +1,32 @@
 import "server-only";
-import { and, asc, count, desc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { comments, posts, postTags, profiles, replies, tags } from "@/db/schema";
+import type { Member } from "./dal";
 
 export const SIDEBAR_POSTS = 5;
 export const SIDEBAR_COMMENTS = 5;
 export const SIDEBAR_TAGS = 30;
 
-export type SidebarComment = { kind: "comment" | "reply"; id: number; postId: number; content: string; nickname: string | null };
+/** `hidden`이면 볼 수 없는 비밀 댓글: `content`는 빈 글자 (specs/055-comment-edit-secret) */
+export type SidebarComment = { kind: "comment" | "reply"; id: number; postId: number; content: string; nickname: string | null; hidden: boolean };
 
 /**
  * 블로그 홈 옆 칸 (BLOG-09): 최근 글·인기 글·최근 댓글·태그.
  * 주인이 아니면 비공개 글, 그 글의 댓글, 비공개 글에만 붙은 태그는 없다.
+ * 비밀 댓글·답글은 목록에 남기되, 볼 수 없는 사람에게는 내용을 SQL에서 비워 보낸다 (글 상세와 같은 규칙, canSeeSecret).
  */
-export async function getBlogSidebar(blogId: number, viewerIsOwner: boolean) {
+export async function getBlogSidebar(blogId: number, viewerIsOwner: boolean, viewer: Pick<Member, "userId" | "role"> | null = null) {
   const visible = and(eq(posts.blogId, blogId), viewerIsOwner ? undefined : eq(posts.isPublic, true));
   const postLink = { id: posts.id, title: posts.title };
   const uses = count(postTags.postId);
+  // 블로그 주인·관리자는 다 본다. 그 밖에는 그 줄의 작성자(답글이면 원댓글 작성자도)만
+  const seesAll = viewerIsOwner || viewer?.role === "admin";
+  const mine = (authorId: SQL) => (viewer ? sql`coalesce(${authorId} = ${viewer.userId}, false)` : sql`false`);
+  const commentHidden = seesAll ? sql`false` : sql`(c.is_secret and not ${mine(sql`c.author_id`)})`;
+  const replyHidden = seesAll
+    ? sql`false`
+    : sql`((r.is_secret or c.is_secret) and not (${mine(sql`r.author_id`)} or ${mine(sql`c.author_id`)}))`;
 
   const [recent, popular, recentComments, blogTags] = await Promise.all([
     db.select(postLink).from(posts).where(visible).orderBy(desc(posts.createdAt), desc(posts.id)).limit(SIDEBAR_POSTS),
@@ -27,15 +37,15 @@ export async function getBlogSidebar(blogId: number, viewerIsOwner: boolean) {
       .orderBy(desc(posts.viewCount), desc(posts.createdAt), desc(posts.id))
       .limit(SIDEBAR_POSTS),
     // 댓글과 답글을 합쳐 최근 5개 (지운 것 제외)
-    db.execute<{ kind: "comment" | "reply"; id: number; post_id: number; content: string; nickname: string | null }>(sql`
-      select * from (
-        select 'comment' as kind, c.id, c.post_id, c.content, p.nickname, c.created_at
+    db.execute<{ kind: "comment" | "reply"; id: number; post_id: number; content: string; nickname: string | null; hidden: boolean }>(sql`
+      select kind, id, post_id, case when hidden then '' else content end as content, nickname, hidden from (
+        select 'comment' as kind, c.id, c.post_id, c.content, ${commentHidden} as hidden, p.nickname, c.created_at
         from ${comments} c
         join ${posts} on ${posts.id} = c.post_id
         left join ${profiles} p on p.user_id = c.author_id
         where ${visible} and c.deleted_at is null
         union all
-        select 'reply' as kind, r.id, c.post_id, r.content, p.nickname, r.created_at
+        select 'reply' as kind, r.id, c.post_id, r.content, ${replyHidden} as hidden, p.nickname, r.created_at
         from ${replies} r
         join ${comments} c on c.id = r.comment_id
         join ${posts} on ${posts.id} = c.post_id
@@ -59,7 +69,7 @@ export async function getBlogSidebar(blogId: number, viewerIsOwner: boolean) {
     recent,
     popular,
     comments: recentComments.map(
-      (r): SidebarComment => ({ kind: r.kind, id: r.id, postId: r.post_id, content: r.content, nickname: r.nickname }),
+      (r): SidebarComment => ({ kind: r.kind, id: r.id, postId: r.post_id, content: r.content, nickname: r.nickname, hidden: r.hidden }),
     ),
     tags: blogTags,
   };

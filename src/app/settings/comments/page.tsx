@@ -56,6 +56,8 @@ export default async function ManageCommentsPage({ searchParams }: PageProps<"/s
                         <span className="font-bold">{who}</span>
                       )}
                       <time dateTime={c.createdAt.toISOString()}>{formatDateTime(c.createdAt)}</time>
+                      {/* 비밀 댓글도 주인은 내용을 본다 (specs/055-comment-edit-secret) */}
+                      {c.secret && <span aria-label="비밀 댓글">🔒</span>}
                     </p>
                     {/* 글자로만 보여 준다 (HTML로 넣지 않음, NF-03) */}
                     <p className="truncate">{excerpt(c.content, 80)}</p>
