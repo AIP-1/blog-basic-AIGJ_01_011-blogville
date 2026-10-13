@@ -106,6 +106,26 @@ describe("마을 배치 (TOWN-03·04)", () => {
   });
 });
 
+describe("집 옆·뒤에서 들어가기", () => {
+  it("앞문까지 가지 않아도 집 옆·뒤 가까이면 그 집 입구, 멀면 없다", () => {
+    const { entrances } = townLayout([house(3)], true);
+    const lot = HOUSE_LOTS[3];
+    // 집 뒤 (앞문에서 100px 넘게 떨어짐)
+    const back = { x: lot.x, y: lot.y - 80 };
+    expect(Math.hypot(lotFront(3).x - back.x, lotFront(3).y - back.y)).toBeGreaterThan(INTERACT_DISTANCE);
+    expect(nearestEntrance(back, entrances)?.id).toBe("house:3");
+    // 집 왼쪽 옆
+    expect(nearestEntrance({ x: lot.x - 80, y: lot.y - 40 }, entrances)?.id).toBe("house:3");
+    // 집에서 멀면 없다
+    expect(nearestEntrance({ x: lot.x, y: lot.y - 200 }, entrances)).toBeNull();
+  });
+  it("집 둘레 안이라도 더 가까운 우체통이 먼저다", () => {
+    const { entrances } = townLayout([house(3)], true);
+    const box = entrances.find((e) => e.id === "mailbox:3")!;
+    expect(nearestEntrance({ x: box.x, y: box.y }, entrances)?.id).toBe("mailbox:3");
+  });
+});
+
 describe("집 그림 (TOWN-11)", () => {
   it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])("%i단계 그림은 폭이 같고 모든 글자에 색이 있다", (stage) => {
     const art = houseArt(stage, ROOF_HEX.blue);

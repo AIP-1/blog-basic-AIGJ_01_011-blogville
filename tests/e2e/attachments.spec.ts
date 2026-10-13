@@ -1,6 +1,6 @@
 import { request as pwRequest } from "node:http";
 import { expect, test, type Page } from "./fixtures";
-import { dispatchFiles, makePng, PDF, png, uploadDirect } from "./files";
+import { dispatchFiles, PDF, png, uploadDirect } from "./files";
 import { signUpOk, sql } from "./helpers";
 
 const IMAGE_INPUT = /^사진 올리기/;
@@ -76,17 +76,54 @@ test.describe("US1 사진 넣기", () => {
     await page.getByLabel(IMAGE_INPUT).setInputFiles([
       { name: "그림.bmp", mimeType: "image/bmp", buffer: Buffer.from("BM....") },
       { name: "가짜.png", mimeType: "image/png", buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>') },
-      { name: "큰.png", mimeType: "image/png", buffer: Buffer.concat([makePng(), Buffer.alloc(10 * 1024 * 1024)]) },
+      { name: "큰.gif", mimeType: "image/gif", buffer: Buffer.concat([Buffer.from("GIF89a"), Buffer.alloc(10 * 1024 * 1024)]) },
       { name: "빈.png", mimeType: "image/png", buffer: Buffer.alloc(0) },
       png("좋은.png"),
     ]);
     await expect(editorImages(page)).toHaveCount(1);
     await expect(page.getByText("그림.bmp: 올릴 수 없는 형식이에요.", { exact: false })).toBeVisible();
     await expect(page.getByText("가짜.png: 사진 파일이 아니에요. PNG·JPG·GIF·WEBP 사진만 올릴 수 있어요")).toBeVisible();
-    await expect(page.getByText("큰.png: 사진은 10MB까지 올릴 수 있어요")).toBeVisible();
+    await expect(page.getByText("큰.gif: 사진은 10MB까지 올릴 수 있어요")).toBeVisible();
     await expect(page.getByText("빈.png: 빈 파일은 올릴 수 없어요")).toBeVisible();
     await page.getByRole("button", { name: "문구 닫기" }).first().click();
     await expect(page.getByRole("button", { name: "문구 닫기" })).toHaveCount(3);
+  });
+
+  test("10MB 넘는 사진은 줄여서 JPG로 올린다", async ({ page }) => {
+    test.setTimeout(90_000);
+    await signUpOk(page);
+    await startPost(page);
+    const dataUrl = await page.evaluate(() => {
+      // 무늬가 많아 잘 안 줄어드는 4000×3000 PNG
+      const canvas = document.createElement("canvas");
+      canvas.width = 4000;
+      canvas.height = 3000;
+      const ctx = canvas.getContext("2d")!;
+      const img = ctx.createImageData(4000, 3000);
+      for (let i = 0; i < img.data.length; i++) img.data[i] = (Math.random() * 256) | 0;
+      ctx.putImageData(img, 0, 0);
+      return canvas.toDataURL("image/png");
+    });
+    const big = Buffer.from(dataUrl.slice(dataUrl.indexOf(",") + 1), "base64");
+    expect(big.length).toBeGreaterThan(10 * 1024 * 1024);
+    await page.getByLabel(IMAGE_INPUT).setInputFiles([{ name: "원본.png", mimeType: "image/png", buffer: big }]);
+    await expect(editorImages(page)).toHaveCount(1);
+    await expect(page.locator("[data-editor-root] [role=alert]")).toHaveCount(0);
+    const [row] = await sql`select name, size from attachments order by created_at desc limit 1`;
+    expect(row.name).toBe("원본.jpg");
+    expect(Number(row.size)).toBeLessThanOrEqual(10 * 1024 * 1024);
+  });
+
+  test("본문을 누르지 않고 사진을 고르면 글 맨 앞이 아니라 끝에 들어간다", async ({ page }) => {
+    await signUpOk(page);
+    await startPost(page);
+    const id = await publish(page);
+    await page.goto(`/write/${id}`);
+    await expect(page.getByLabel("본문")).toContainText("사진과 파일");
+    await page.getByLabel(IMAGE_INPUT).setInputFiles([png("끝.png")]);
+    await expect(editorImages(page)).toHaveCount(1);
+    const order = await page.getByLabel("본문").evaluate((el) => [...el.children].map((c) => (c.querySelector("img") || c.tagName === "IMG" ? "img" : c.textContent)));
+    expect(order.indexOf("사진과 파일")).toBeLessThan(order.indexOf("img"));
   });
 
   test("사진만 있고 글자가 없으면 본문을 적어 주세요", async ({ page }) => {
