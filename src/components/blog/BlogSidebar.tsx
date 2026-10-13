@@ -143,6 +143,11 @@ export function BlogSidebar({ blogId, slug, sidebar, visits, recordVisit, search
         </h2>
         <VisitCount blogId={blogId} initial={visits} record={recordVisit} />
       </section>
+
+      {/* 구독: RSS 리더에 이 주소를 넣으면 새 글을 받아 본다. 내려받지 않고 새 탭에서 연다 */}
+      <a href={`/@${slug}/rss`} target="_blank" rel="noopener" className="widget flex min-h-11 items-center gap-2 text-sm hover:bg-bg" data-rss>
+        <span aria-hidden>📡</span> RSS로 구독하기
+      </a>
     </aside>
   );
 }

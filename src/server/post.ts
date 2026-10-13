@@ -198,3 +198,36 @@ export async function setPostVisibility(blogId: number, postId: number, isPublic
     .returning({ id: posts.id });
   return rows.length > 0;
 }
+
+/** RSS (블로그 구독): 그 블로그의 최신 공개 글. 비공개 글은 넣지 않는다 (POST-02). */
+export async function listFeedPosts(blogId: number, limit = 20) {
+  return db
+    .select({
+      id: posts.id,
+      title: posts.title,
+      contentHtml: posts.contentHtml,
+      contentText: posts.contentText,
+      createdAt: posts.createdAt,
+      categoryName: categories.name,
+    })
+    .from(posts)
+    .leftJoin(categories, eq(categories.id, posts.categoryId))
+    .where(and(eq(posts.blogId, blogId), eq(posts.isPublic, true)))
+    .orderBy(desc(posts.createdAt), desc(posts.id))
+    .limit(limit);
+}
+
+/** sitemap.xml: 모든 블로그 홈과 공개 글 (최신 5만 개까지, sitemap 한 파일의 한도) */
+export async function listSitemapEntries() {
+  const [blogRows, postRows] = await Promise.all([
+    db.select({ slug: blogs.slug, updatedAt: blogs.updatedAt }).from(blogs),
+    db
+      .select({ slug: blogs.slug, id: posts.id, updatedAt: posts.updatedAt })
+      .from(posts)
+      .innerJoin(blogs, eq(blogs.id, posts.blogId))
+      .where(eq(posts.isPublic, true))
+      .orderBy(desc(posts.updatedAt))
+      .limit(49_000),
+  ]);
+  return { blogs: blogRows, posts: postRows };
+}

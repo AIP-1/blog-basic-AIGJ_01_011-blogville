@@ -28,7 +28,16 @@ import { getBlogVisitStats } from "@/server/stats";
 
 export async function generateMetadata({ params }: PageProps<"/blog/[slug]">): Promise<Metadata> {
   const found = await getBlogBySlug((await params).slug);
-  return { title: found ? `${found.blog.title} | Blogville` : "길을 잃었어요 | Blogville" };
+  if (!found) return { title: "길을 잃었어요 | Blogville" };
+  const { blog, nickname } = found;
+  const description = blog.intro || `${nickname}님의 블로그`;
+  return {
+    title: `${blog.title} | Blogville`,
+    description,
+    // 구독 (RSS): 브라우저·RSS 리더가 블로그 주소만으로 구독 주소를 찾는다
+    alternates: { canonical: `/@${blog.slug}`, types: { "application/rss+xml": [{ url: `/@${blog.slug}/rss`, title: blog.title }] } },
+    openGraph: { type: "website", title: blog.title, description, url: `/@${blog.slug}` },
+  };
 }
 
 export default async function BlogHome({ params, searchParams }: PageProps<"/blog/[slug]">) {

@@ -10,6 +10,7 @@ import { LikeButton } from "@/components/post/LikeButton";
 import { PublishNotice } from "@/components/post/PublishNotice";
 import { AdjacentPosts } from "@/components/post/AdjacentPosts";
 import { TagList } from "@/components/post/TagList";
+import { excerpt, firstImageKey } from "@/lib/feed";
 import { parseId } from "@/lib/ids";
 import { hasPostReward } from "@/server/points";
 import { showsPublishNotice } from "@/lib/post-rules";
@@ -39,8 +40,30 @@ export async function generateMetadata({ params }: PageProps<"/blog/[slug]/[post
   const { slug, postId } = await params;
   const data = await load(slug, postId);
   if (!data) return { title: "길을 잃었어요 | Blogville" };
-  // 비공개 글은 주인이 봐도 제목을 탭·기록에 남기지 않는다 (POST-02)
-  return { title: data.post.isPublic ? `${data.post.title} | ${data.blog.title}` : "글 | Blogville" };
+  // 비공개 글은 주인이 봐도 제목을 탭·기록에 남기지 않고, 공유 미리보기·검색에도 내놓지 않는다 (POST-02)
+  if (!data.post.isPublic) return { title: "글 | Blogville", openGraph: null, twitter: null, robots: { index: false, follow: false } };
+  const { post, blog, nickname } = data;
+  const description = excerpt(post.contentText);
+  const image = firstImageKey(post.contentHtml);
+  const url = `/@${blog.slug}/${post.id}`;
+  return {
+    title: `${post.title} | ${blog.title}`,
+    description,
+    alternates: { canonical: url, types: { "application/rss+xml": [{ url: `/@${blog.slug}/rss`, title: blog.title }] } },
+    // 카카오톡·SNS에 주소를 붙이면 보이는 미리보기 (제목·요약·첫 사진)
+    openGraph: {
+      type: "article",
+      title: post.title,
+      description,
+      url,
+      siteName: blog.title,
+      publishedTime: post.createdAt.toISOString(),
+      modifiedTime: post.updatedAt.toISOString(),
+      authors: [nickname],
+      ...(image ? { images: [{ url: `/files/${image}` }] } : {}),
+    },
+    twitter: { card: image ? "summary_large_image" : "summary", title: post.title, description },
+  };
 }
 
 export default async function PostPage({ params, searchParams }: PageProps<"/blog/[slug]/[postId]">) {
