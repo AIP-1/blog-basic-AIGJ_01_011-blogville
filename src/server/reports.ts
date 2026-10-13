@@ -138,7 +138,8 @@ export async function listOpenReports(page: number): Promise<{ items: ReportGrou
         count: sql<number>`count(*)::int`,
         lastAt: sql<string>`max(${reports.createdAt})`,
         reasons: sql<ReportReason[]>`array_agg(${reports.reason} order by ${reports.createdAt} desc)`,
-        details: sql<(string | null)[]>`array_agg(${reports.detail} order by ${reports.createdAt} desc)`,
+        // NULL을 넣으면 드라이버가 "NULL" 글자로 돌려주는 경우가 있어 DB에서 빼고 모은다
+        details: sql<(string | null)[]>`coalesce(array_agg(${reports.detail} order by ${reports.createdAt} desc) filter (where ${reports.detail} is not null), '{}')`,
       })
       .from(reports)
       .where(open)
