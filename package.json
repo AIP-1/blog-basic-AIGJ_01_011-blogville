@@ -14,6 +14,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx scripts/seed.ts",
     "admin:create": "tsx scripts/create-admin.ts",
+    "release:post": "tsx scripts/publish-release-notes.ts",
     "test:perf": "tsx tests/perf/blog-scale.ts",
     "posts:cleanup": "tsx --conditions=react-server scripts/cleanup-posts.ts"
   },
