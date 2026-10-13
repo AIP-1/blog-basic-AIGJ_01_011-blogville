@@ -24,7 +24,7 @@ export default async function ClothesPage() {
         </Link>
       </div>
       {shop.character ? (
-        <ClothesStudio character={shop.character} catalog={shop.catalog} current={shop.current} level={shop.level} coins={shop.coins} />
+        <ClothesStudio character={shop.character} style={shop.style} catalog={shop.catalog} current={shop.current} level={shop.level} coins={shop.coins} />
       ) : (
         <p className="rounded-2xl border border-line bg-surface p-6 text-center text-ink-soft">캐릭터가 있어야 옷을 입어 볼 수 있어요.</p>
       )}

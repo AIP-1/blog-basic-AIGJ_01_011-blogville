@@ -1,3 +1,4 @@
+import { HAIR_CHARACTERS, HAIR_COLORS } from "./art/hair";
 import { formatNumber } from "./game";
 import { withJosa } from "./josa";
 
@@ -127,10 +128,35 @@ export function isAvatarSlot(value: unknown): value is AvatarSlot {
   return typeof value === "string" && (AVATAR_SLOTS as readonly string[]).includes(value);
 }
 
-/** 캐릭터 그림과 입은 아이템 그림을 그릴 순서대로 */
-export function avatarLayers(character: string | null | undefined, equips: Partial<Record<AvatarSlot, string>>): string[] {
+/** 미용실 부위 (SHOP-07): 머리 모양·머리 색. 옷가게·꾸미기 부위와 따로 다룬다 */
+export const STYLE_SLOTS = ["hair", "hair_color"] as const;
+export type StyleSlot = (typeof STYLE_SLOTS)[number];
+export type LookSlot = AvatarSlot | StyleSlot;
+
+/** 머리 모양을 입힐 수 있는 캐릭터 (미용실 화면용 목록) */
+export const HAIR_CHARACTERS_LIST: readonly string[] = [...HAIR_CHARACTERS];
+
+export function isLookSlot(value: unknown): value is LookSlot {
+  return isAvatarSlot(value) || (typeof value === "string" && (STYLE_SLOTS as readonly string[]).includes(value));
+}
+
+/**
+ * 캐릭터 그림과 입은 아이템 그림을 그릴 순서대로: 몸 → 옷 → 머리 → 소품 → 모자.
+ * 머리 모양은 사람 캐릭터만 원래 머리를 지우고(`~bald`) 겹친다. 머리 색은 캐릭터·머리 그림의 `H` 색을 바꾼다(`~#색`).
+ */
+export function avatarLayers(character: string | null | undefined, equips: Partial<Record<LookSlot, string>>): string[] {
   if (!character) return [];
-  return [character, ...AVATAR_SLOTS.flatMap((slot) => (equips[slot] ? [equips[slot]] : []))];
+  const human = HAIR_CHARACTERS.has(character);
+  const color = human && equips.hair_color ? HAIR_COLORS[equips.hair_color] : undefined;
+  const tint = (key: string) => (color ? `${key}~${color}` : key);
+  const hair = human && equips.hair ? tint(equips.hair) : null;
+  const body = tint(hair ? `${character}~bald` : character);
+  const layers = [body];
+  if (equips.clothes) layers.push(equips.clothes);
+  if (hair) layers.push(hair);
+  if (equips.accessory) layers.push(equips.accessory);
+  if (equips.hat) layers.push(equips.hat);
+  return layers;
 }
 
 export const CLOSET_ERRORS = {

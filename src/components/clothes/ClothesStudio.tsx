@@ -8,7 +8,7 @@ import type { PixelArt } from "@/lib/art/characters";
 import { walkFrame, WALK_FPS, WALK_FRAMES, type WalkDir } from "@/lib/art/walk";
 import { billButton, CLOTHES_TABS, outfitBill, type ClothesItem, type Outfit } from "@/lib/clothes";
 import { formatNumber } from "@/lib/game";
-import { avatarLayers, type AvatarSlot } from "@/lib/shop";
+import { avatarLayers, type AvatarSlot, type StyleSlot } from "@/lib/shop";
 
 const DIRS: readonly { dir: WalkDir; label: string }[] = [
   { dir: "down", label: "앞" },
@@ -18,9 +18,9 @@ const DIRS: readonly { dir: WalkDir; label: string }[] = [
 ];
 
 /** 옷 그림 키 묶음 (캐릭터 → 옷 → 소품 → 모자) */
-function layersOf(character: string, outfit: Outfit, catalog: readonly ClothesItem[]): string[] {
+function layersOf(character: string, style: Partial<Record<StyleSlot, string>>, outfit: Outfit, catalog: readonly ClothesItem[]): string[] {
   const art = (slot: AvatarSlot) => catalog.find((i) => i.id === outfit[slot])?.art;
-  return avatarLayers(character, { clothes: art("clothes"), accessory: art("accessory"), hat: art("hat") });
+  return avatarLayers(character, { ...style, clothes: art("clothes"), accessory: art("accessory"), hat: art("hat") });
 }
 
 /** 거울: 고른 모습이 그 방향으로 걷는다 */
@@ -46,12 +46,14 @@ function Mirror({ layers, dir, walking }: { layers: readonly string[]; dir: Walk
 /** 옷가게 (SHOP-08): 카드를 누르면 거울이 바로 그 모습이 되고, 계산서 버튼으로 한 번에 사서 입는다 */
 export function ClothesStudio({
   character,
+  style = {},
   catalog,
   current,
   level,
   coins,
 }: {
   character: string;
+  style?: Partial<Record<StyleSlot, string>>;
   catalog: ClothesItem[];
   current: Outfit;
   level: number;
@@ -63,7 +65,7 @@ export function ClothesStudio({
   const [walking, setWalking] = useState(true);
   const [state, action, pending] = useActionState<OutfitState, FormData>(outfitAction, null);
   const bill = useMemo(() => outfitBill(outfit, current, catalog, level, coins), [outfit, current, catalog, level, coins]);
-  const layers = layersOf(character, outfit, catalog);
+  const layers = layersOf(character, style, outfit, catalog);
   const can = bill.kind === "ok";
   const pay = bill.kind === "ok" || bill.kind === "coins" ? bill.total : 0;
 
@@ -130,7 +132,7 @@ export function ClothesStudio({
         <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4" role="tabpanel" aria-label={tabInfo.title}>
           <li>
             <button type="button" className={`flex h-full w-full flex-col items-center gap-1 rounded-2xl border p-3 ${outfit[tab] === null ? "border-accent ring-2 ring-accent" : "border-line"} bg-surface`} aria-pressed={outfit[tab] === null} onClick={() => pick(tab, null)} data-outfit-card="none">
-              <PixelLayers arts={layersOf(character, { ...outfit, [tab]: null }, catalog)} size={64} />
+              <PixelLayers arts={layersOf(character, style, { ...outfit, [tab]: null }, catalog)} size={64} />
               <span className="font-semibold">{tabInfo.none}</span>
             </button>
           </li>
@@ -141,7 +143,7 @@ export function ClothesStudio({
             return (
               <li key={item.id}>
                 <button type="button" className={`flex h-full w-full flex-col items-center gap-1 rounded-2xl border p-3 ${chosen ? "border-accent ring-2 ring-accent" : "border-line"} bg-surface`} aria-pressed={chosen} onClick={() => pick(tab, item.id)} data-outfit-card={item.id}>
-                  <PixelLayers arts={layersOf(character, { ...outfit, [tab]: item.id }, catalog)} size={64} />
+                  <PixelLayers arts={layersOf(character, style, { ...outfit, [tab]: item.id }, catalog)} size={64} />
                   <span className="font-semibold">{item.name}</span>
                   <span className="text-sm text-ink-soft">{worn ? "입는 중 ✓" : item.owned ? "보유 ✓" : locked ? `🔒 Lv.${item.requiredLevel}` : `🪙 ${formatNumber(item.price)}`}</span>
                 </button>

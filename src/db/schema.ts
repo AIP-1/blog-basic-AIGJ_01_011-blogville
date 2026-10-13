@@ -132,7 +132,7 @@ export const items = pgTable(
     growthValue: integer("growth_value"),
   },
   (t) => [
-    check("items_type_check", sql`${t.type} in ('character', 'hat', 'clothes', 'accessory', 'furniture', 'background', 'growth')`),
+    check("items_type_check", sql`${t.type} in ('character', 'hat', 'clothes', 'accessory', 'furniture', 'background', 'growth', 'hair', 'hair_color')`),
     check("items_growth_check", sql`(${t.type} = 'growth') = (${t.growthValue} is not null) and (${t.growthValue} is null or ${t.growthValue} > 0)`),
     check("items_price_check", sql`${t.price} >= 0`),
     check("items_required_level_check", sql`${t.requiredLevel} between 1 and 99`),
@@ -173,7 +173,7 @@ export const avatarEquips = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.userId, t.slot] }),
-    check("avatar_equips_slot_check", sql`${t.slot} in ('hat', 'clothes', 'accessory')`),
+    check("avatar_equips_slot_check", sql`${t.slot} in ('hat', 'clothes', 'accessory', 'hair', 'hair_color')`),
     foreignKey({
       name: "avatar_equips_owned_fk",
       columns: [t.userId, t.itemId],

@@ -276,6 +276,9 @@ export function TownHud({
                 <Link href="/clothes" className="btn btn-ghost">
                   👗 옷가게
                 </Link>
+                <Link href="/salon" className="btn btn-ghost">
+                  💇 미용실
+                </Link>
                 <Link href="/attendance" className="btn btn-ghost">
                   📮 출석
                 </Link>
