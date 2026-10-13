@@ -2,7 +2,7 @@ import "server-only";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { db, type Tx } from "@/db";
 import { avatarEquips, blogs, items, profiles, userItems, users } from "@/db/schema";
-import { avatarLayers, CLOSET_ERRORS, isAvatarSlot, type AvatarSlot } from "@/lib/shop";
+import { avatarLayers, CLOSET_ERRORS, isAvatarSlot, isLookSlot, type LookSlot } from "@/lib/shop";
 
 // 아이템·캐릭터 (GAME-01, specs/032-pixel-characters) · 꾸미기 (SHOP-04·06, specs/036-closet)
 
@@ -27,15 +27,15 @@ export async function findStarterCharacter(tx: Tx, id: number): Promise<number |
 }
 
 /** 입은 아바타 아이템의 그림 (부위 → 그림 키) */
-async function equippedArts(userIds: string[]): Promise<Map<string, Partial<Record<AvatarSlot, string>>>> {
-  const map = new Map<string, Partial<Record<AvatarSlot, string>>>();
+async function equippedArts(userIds: string[]): Promise<Map<string, Partial<Record<LookSlot, string>>>> {
+  const map = new Map<string, Partial<Record<LookSlot, string>>>();
   if (userIds.length === 0) return map;
   const rows = await db
     .select({ userId: avatarEquips.userId, slot: avatarEquips.slot, art: items.art })
     .from(avatarEquips)
     .innerJoin(items, eq(items.id, avatarEquips.itemId))
     .where(inArray(avatarEquips.userId, userIds));
-  for (const r of rows) if (isAvatarSlot(r.slot)) map.set(r.userId, { ...map.get(r.userId), [r.slot]: r.art });
+  for (const r of rows) if (isLookSlot(r.slot)) map.set(r.userId, { ...map.get(r.userId), [r.slot]: r.art });
   return map;
 }
 

@@ -3,6 +3,7 @@ import { and, asc, count, eq, notInArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { items, userItems, users } from "@/db/schema";
 import { CLOTHES_SHOP_ONLY } from "@/lib/clothes";
+import { SALON_TYPES } from "@/lib/salon";
 import { buttonState, isStackable, SHOP_ERRORS, type ItemType, type ShopItem } from "@/lib/shop";
 import { addLedgerEntry, getWallet, lockUser } from "./points";
 
@@ -29,7 +30,7 @@ export async function listShopItems(userId: string): Promise<ShopItem[]> {
     })
     .from(items)
     .leftJoin(owners, eq(owners.itemId, items.id))
-    .where(and(eq(items.isOnSale, true), notInArray(items.code, [...CLOTHES_SHOP_ONLY])))
+    .where(and(eq(items.isOnSale, true), notInArray(items.code, [...CLOTHES_SHOP_ONLY]), notInArray(items.type, [...SALON_TYPES])))
     .orderBy(asc(items.id));
   return rows.map((r) => ({ ...r, type: r.type as ItemType, owned: r.quantity > 0 }));
 }
@@ -49,7 +50,7 @@ export async function buyItem(userId: string, itemId: number): Promise<BuyResult
     const [item] = await tx
       .select({ id: items.id, type: items.type, name: items.name, price: items.price, requiredLevel: items.requiredLevel })
       .from(items)
-      .where(and(eq(items.id, itemId), eq(items.isOnSale, true), notInArray(items.code, [...CLOTHES_SHOP_ONLY])));
+      .where(and(eq(items.id, itemId), eq(items.isOnSale, true), notInArray(items.code, [...CLOTHES_SHOP_ONLY]), notInArray(items.type, [...SALON_TYPES])));
     if (!item) return { ok: false, error: SHOP_ERRORS.invalid };
     const [owned] = await tx
       .select({ one: sql`1` })

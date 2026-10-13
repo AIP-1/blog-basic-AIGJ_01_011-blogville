@@ -3,7 +3,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { avatarEquips, items, profiles, userItems, users } from "@/db/schema";
 import { CLOTHES_ERRORS, EMPTY_OUTFIT, outfitBill, type ClothesItem, type Outfit } from "@/lib/clothes";
-import { AVATAR_SLOTS, isAvatarSlot } from "@/lib/shop";
+import { AVATAR_SLOTS, isAvatarSlot, STYLE_SLOTS } from "@/lib/shop";
 import { addLedgerEntry, getWallet, lockUser } from "./points";
 
 // 옷가게 (SHOP-08, specs/051-clothes-shop)
@@ -33,13 +33,16 @@ async function currentOutfit(userId: string, tx: Pick<typeof db, "select"> = db)
 
 /** 옷가게 화면: 내 캐릭터, 고를 수 있는 것, 지금 입은 것, 레벨·코인 */
 export async function getClothesShop(userId: string) {
-  const [[character], catalog, current, wallet] = await Promise.all([
+  const [[character], catalog, current, wallet, hair] = await Promise.all([
     db.select({ art: items.art }).from(profiles).leftJoin(items, eq(items.id, profiles.characterItemId)).where(eq(profiles.userId, userId)),
     catalogOf(userId),
     currentOutfit(userId),
     getWallet(userId),
+    // 미용실에서 바꾼 머리도 거울에 함께 (SHOP-07)
+    db.select({ slot: avatarEquips.slot, art: items.art }).from(avatarEquips).innerJoin(items, eq(items.id, avatarEquips.itemId)).where(and(eq(avatarEquips.userId, userId), inArray(avatarEquips.slot, [...STYLE_SLOTS]))),
   ]);
-  return { character: character?.art ?? null, catalog, current, level: wallet.progress.level, coins: wallet.coin };
+  const style: Record<string, string> = Object.fromEntries(hair.map((h) => [h.slot, h.art]));
+  return { character: character?.art ?? null, style, catalog, current, level: wallet.progress.level, coins: wallet.coin };
 }
 
 export type OutfitResult = { ok: true; bought: string[]; total: number } | { ok: false; error: string };
