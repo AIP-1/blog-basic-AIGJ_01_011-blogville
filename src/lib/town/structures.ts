@@ -10,6 +10,7 @@ import {
   GARDEN_GATE,
   HILL_ROAD,
   HOUSE_LOTS,
+  HOUSE_REACH,
   lotFront,
   PLAZA_RADIUS,
   ROADS,
@@ -286,12 +287,13 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean, m
     const house = houses.find((h) => h.lot === i);
     if (house) {
       const name = house.mine ? "내 집" : `${shortName(house.nickname)}의 집`;
+      const body = { x: lot.x - 55, y: lot.y - 55, width: 105, height: 55 };
       structures.push({
         id: `house:${i}`,
         art: houseArt(house.stage, house.roof),
         x: lot.x,
         y: lot.y,
-        body: { x: lot.x - 55, y: lot.y - 55, width: 105, height: 55 },
+        body,
         label: name,
         sub: house.blogTitle,
       });
@@ -302,6 +304,8 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean, m
         y: front.y,
         label: `🏠 ${name}`,
         href: `/@${house.slug}`,
+        // 앞문까지 돌아가지 않아도 집 옆·뒤 가까이에서 들어간다
+        around: { x: body.x - HOUSE_REACH, y: body.y - HOUSE_REACH, width: body.width + HOUSE_REACH * 2, height: body.height + HOUSE_REACH * 2 },
       });
       const box = { x: lot.x + MAILBOX_OFFSET.x, y: lot.y + MAILBOX_OFFSET.y };
       structures.push({

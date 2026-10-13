@@ -6,7 +6,7 @@ import { findArt } from "@/lib/art";
 import { pixelRects, type PixelArt } from "@/lib/art/characters";
 import { walkDir, walkFrame, WALK_DIRS, WALK_FPS, WALK_FRAMES, type ColorGrid, type WalkDir } from "@/lib/art/walk";
 import { TOWN_CELL } from "@/lib/art/town";
-import { HOUSE_LOTS, lotFront, PLAYER_SIZE, shortName, SPEED, WORLD, nearestEntrance, normalize, step, type Point } from "@/lib/town/layout";
+import { entranceDistance, HOUSE_LOTS, INTERACT_DISTANCE, lotFront, PLAYER_SIZE, shortName, SPEED, WORLD, nearestEntrance, normalize, step, type Point } from "@/lib/town/layout";
 import { createNpcs, NPC_TAG_DISTANCE, npcGraph, updateNpcs, type Npc } from "@/lib/town/npc";
 import { artSize, artVisibleHeight, entrancePrompt, lotChoice, mailboxLot, townLayout, type TownEntrance, type TownHouseInput } from "@/lib/town/structures";
 import { onStairs, STAIR_SLOW, stairEnds, STAIRS } from "@/lib/town/terrain";
@@ -264,7 +264,7 @@ export function TownGame({
       const door = hit && entrances.filter((e) => e.id === hit.id || (hit.id === "board" && (e.id === "feed" || e.id === "attendance")));
       if (door && door.length > 0) {
         const e = door.length === 1 ? door[0] : p.x < hit.x ? door[0] : door[1];
-        if (Math.hypot(e.x - pos.x, e.y - pos.y) <= 90) return go(e);
+        if (entranceDistance(pos, e) <= INTERACT_DISTANCE) return go(e);
         target = { x: e.x, y: e.y };
       } else {
         target = p;
@@ -483,7 +483,7 @@ export function TownGame({
         {prompt}
       </p>
       <p className="pointer-events-none absolute bottom-3 right-3 rounded-lg bg-white/85 px-3 py-1.5 text-xs text-[#5a4a3a]" data-town-hint>
-        {touch ? "탭으로 이동 · 건물을 탭해서 들어가기" : "방향키·WASD 또는 클릭으로 이동 · 건물 앞에서 Space로 들어가기"}
+        {touch ? "탭으로 이동 · 건물을 탭해서 들어가기" : "방향키·WASD 또는 클릭으로 이동 · 건물 가까이에서 Space로 들어가기"}
       </p>
     </div>
   );

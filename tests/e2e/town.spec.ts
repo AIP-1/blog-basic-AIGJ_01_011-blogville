@@ -18,7 +18,7 @@ test.describe("TOWN 마을", () => {
   test("방문자: 분수 아래에서 시작, 회색 주민, 상점·출석은 로그인 안내라 Space로 첫 화면, 마을 소식은 들어간다", async ({ page }) => {
     await openTown(page);
     await expect(page.getByRole("heading", { name: "중앙 광장" })).toBeAttached();
-    await expect(page.locator("[data-town-hint]")).toHaveText("방향키·WASD 또는 클릭으로 이동 · 건물 앞에서 Space로 들어가기");
+    await expect(page.locator("[data-town-hint]")).toHaveText("방향키·WASD 또는 클릭으로 이동 · 건물 가까이에서 Space로 들어가기");
     expect(await feet(page)).toEqual([1050, 960]);
     await expect(prompt(page)).toBeHidden();
     // 멀리서 누른 Space는 버린다

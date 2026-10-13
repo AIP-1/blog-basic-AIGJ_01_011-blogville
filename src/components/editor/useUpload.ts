@@ -1,9 +1,10 @@
 "use client";
 
 import type { Editor } from "@tiptap/react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { classifyPastedAttachments, reuploadPastedAttachment } from "@/app/write/actions";
 import { ATTACH_MESSAGES, attachmentProblem, keyFromUrl, PASTE_KEYS_MAX } from "@/lib/attachments";
+import { shrinkImage } from "./shrinkImage";
 
 export type UploadProblem = { id: number; name: string; message: string };
 type Uploaded = { url: string; kind: "image" | "file"; name: string; size: number; sizeLabel: string; ext: string };
@@ -17,6 +18,18 @@ export function useUpload(editor: Editor | null, onBusyChange: (busy: boolean) =
   const [problems, setProblems] = useState<UploadProblem[]>([]);
   const busy = useRef(false);
   const nextId = useRef(0);
+  // 본문을 한 번이라도 눌렀는가. 안 눌렀으면 커서가 맨 앞이라 도구 막대로 고른 사진은 글 끝에 넣는다
+  const placed = useRef(false);
+  useEffect(() => {
+    if (!editor) return;
+    const mark = () => {
+      placed.current = true;
+    };
+    editor.on("focus", mark);
+    return () => {
+      editor.off("focus", mark);
+    };
+  }, [editor]);
 
   const addProblem = useCallback((name: string, message: string) => {
     setProblems((list) => [...list, { id: nextId.current++, name, message }]);
@@ -29,16 +42,25 @@ export function useUpload(editor: Editor | null, onBusyChange: (busy: boolean) =
         addProblem(files[0].name, ATTACH_MESSAGES.busy);
         return;
       }
-      const ok = files.filter((f) => {
-        const problem = attachmentProblem(f.name, f.size);
-        if (problem) addProblem(f.name, problem);
-        return !problem;
-      });
-      if (ok.length === 0) return;
-
       busy.current = true;
+      // 10MB 넘는 사진은 줄여서 올린다
+      let ok: File[];
+      try {
+        ok = (await Promise.all(files.map(shrinkImage))).filter((f) => {
+          const problem = attachmentProblem(f.name, f.size);
+          if (problem) addProblem(f.name, problem);
+          return !problem;
+        });
+      } catch {
+        ok = [];
+      }
+      if (ok.length === 0) {
+        busy.current = false;
+        return;
+      }
+
       onBusyChange(true);
-      let pos = at ?? editor.state.selection.to;
+      let pos = at ?? (placed.current || editor.isEmpty ? editor.state.selection.to : editor.state.doc.content.size);
       let own = false;
       // 남이(회원이) 고친 만큼만 넣을 자리를 옮긴다. 내가 넣은 것은 아래에서 직접 계산한다.
       const follow = ({ transaction }: { transaction: { mapping: { map: (p: number) => number } } }) => {
