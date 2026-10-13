@@ -582,6 +582,25 @@ export const blogVisits = pgTable(
   (t) => [primaryKey({ columns: [t.blogId, t.date, t.visitorId] })],
 );
 
+// 글 유입 경로 (개선: 통계 상세). 글을 그날 처음 본 방문자가 어디서 왔는지 날짜·출처별로 센다.
+// 출처는 주소 전체가 아니라 사이트 이름(naver·google…)이나 호스트만 남긴다.
+export const blogReferrers = pgTable(
+  "blog_referrers",
+  {
+    blogId: integer("blog_id")
+      .notNull()
+      .references(() => blogs.id, { onDelete: "cascade" }),
+    date: date("date").notNull(),
+    source: text("source").notNull(),
+    count: integer("count").notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.blogId, t.date, t.source] }),
+    check("blog_referrers_source_check", sql`char_length(${t.source}) between 1 and 60`),
+    check("blog_referrers_count_check", sql`${t.count} >= 0`),
+  ],
+);
+
 // 공감 (SOC-03). 기본 키가 "한 글에 한 번"을 지킨다.
 export const postLikes = pgTable(
   "post_likes",

@@ -4,7 +4,8 @@ import { VisitChart } from "@/components/settings/VisitChart";
 import { BlogInfoForm, SlugForm } from "@/components/settings/SettingsForms";
 import { getCategoryTree } from "@/server/category";
 import { getMyBlog, requireMember } from "@/server/dal";
-import { getBlogVisitDays, getBlogVisitStats } from "@/server/stats";
+import { getBlogVisitDays, getBlogVisitStats, getPopularPosts, getReferrerStats } from "@/server/stats";
+import { PopularPosts, ReferrerList } from "@/components/settings/BlogInsights";
 
 export const metadata = { title: "블로그 관리 | Blogville" };
 
@@ -20,7 +21,13 @@ function Card({ id, title, children }: { id?: string; title: string; children: R
 export default async function BlogSettingsPage() {
   const member = await requireMember();
   const blog = await getMyBlog(member.userId);
-  const [tree, stats, days] = await Promise.all([getCategoryTree(blog.id, true), getBlogVisitStats(blog.id), getBlogVisitDays(blog.id)]);
+  const [tree, stats, days, referrers, popular] = await Promise.all([
+    getCategoryTree(blog.id, true),
+    getBlogVisitStats(blog.id),
+    getBlogVisitDays(blog.id),
+    getReferrerStats(blog.id),
+    getPopularPosts(blog.id),
+  ]);
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -42,6 +49,12 @@ export default async function BlogSettingsPage() {
       </div>
       <Card id="visits" title="👣 방문자">
         <VisitChart stats={stats} days={days} />
+      </Card>
+      <Card id="referrers" title="🧭 어디서 왔나요 (최근 30일)">
+        <ReferrerList stats={referrers} />
+      </Card>
+      <Card id="popular" title="🏆 인기 글">
+        <PopularPosts slug={blog.slug} posts={popular} />
       </Card>
       <Card title="블로그 정보">
         <BlogInfoForm title={blog.title} intro={blog.intro} />
