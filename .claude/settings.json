@@ -1,7 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(gh api repos/handsomeguen/docs/pulls/*/merge *)"
+      "Bash(gh api repos/handsomeguen/blogville/pulls/*/merge *)"
     ]
   }
 }
