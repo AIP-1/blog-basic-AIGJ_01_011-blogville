@@ -271,6 +271,9 @@ export function TownHud({
                 <Link href="/feed" className="btn btn-ghost">
                   📋 마을 소식
                 </Link>
+                <Link href="/popular" className="btn btn-ghost">
+                  🔥 인기 글
+                </Link>
                 <Link href="/shop" className="btn btn-ghost">
                   🏪 상점
                 </Link>

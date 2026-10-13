@@ -33,7 +33,7 @@ test.describe("TOWN-12 ☰ 마을 메뉴", () => {
     await expect(panel(page).getByRole("button", { name: "로그아웃" })).toBeVisible();
     await expect(panel(page).getByRole("link", { name: "👑 관리자" })).toHaveCount(0);
     // 헤더가 없어 바로 가기 링크
-    await expect(panel(page).getByRole("navigation", { name: "바로 가기" }).getByRole("link")).toHaveText(["✏️ 글쓰기", "📋 마을 소식", "🏪 상점", "👗 옷가게", "💇 미용실", "📮 출석", "🐮 동물 농장", "🎣 낚시터"]);
+    await expect(panel(page).getByRole("navigation", { name: "바로 가기" }).getByRole("link")).toHaveText(["✏️ 글쓰기", "📋 마을 소식", "🔥 인기 글", "🏪 상점", "👗 옷가게", "💇 미용실", "📮 출석", "🐮 동물 농장", "🎣 낚시터"]);
 
     await panel(page).getByRole("button", { name: /👤 내 프로필/ }).click();
     await expect(panel(page).getByRole("heading")).toHaveText("👤 내 프로필");
