@@ -1,5 +1,5 @@
 {
-  "id": "54456964-9fd0-4b3e-bcf9-785f93fd0c9d",
+  "id": "a42230fd-977f-4503-9e1d-ed08eb4d0e77",
   "prevId": "c0f4b0d9-c360-4c90-a72c-24c9e1c545a0",
   "version": "7",
   "dialect": "postgresql",
@@ -120,8 +120,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.admin_logs": {
-      "name": "admin_logs",
+    "public.admin_audit": {
+      "name": "admin_audit",
       "schema": "",
       "columns": {
         "id": {
@@ -131,7 +131,7 @@
           "notNull": true,
           "identity": {
             "type": "always",
-            "name": "admin_logs_id_seq",
+            "name": "admin_audit_id_seq",
             "schema": "public",
             "increment": "1",
             "startWith": "1",
@@ -153,8 +153,20 @@
           "primaryKey": false,
           "notNull": true
         },
-        "target": {
-          "name": "target",
+        "target_type": {
+          "name": "target_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target_id": {
+          "name": "target_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "target_label": {
+          "name": "target_label",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -174,8 +186,8 @@
         }
       },
       "indexes": {
-        "admin_logs_created_idx": {
-          "name": "admin_logs_created_idx",
+        "admin_audit_created_idx": {
+          "name": "admin_audit_created_idx",
           "columns": [
             {
               "expression": "created_at",
@@ -194,12 +206,33 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "admin_audit_action_created_idx": {
+          "name": "admin_audit_action_created_idx",
+          "columns": [
+            {
+              "expression": "action",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "admin_logs_admin_id_users_id_fk": {
-          "name": "admin_logs_admin_id_users_id_fk",
-          "tableFrom": "admin_logs",
+        "admin_audit_admin_id_users_id_fk": {
+          "name": "admin_audit_admin_id_users_id_fk",
+          "tableFrom": "admin_audit",
           "tableTo": "users",
           "columnsFrom": [
             "admin_id"
@@ -215,17 +248,25 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "admin_logs_action_check": {
-          "name": "admin_logs_action_check",
-          "value": "char_length(\"admin_logs\".\"action\") between 1 and 40"
+        "admin_audit_action_check": {
+          "name": "admin_audit_action_check",
+          "value": "char_length(\"admin_audit\".\"action\") between 1 and 40"
         },
-        "admin_logs_target_check": {
-          "name": "admin_logs_target_check",
-          "value": "char_length(\"admin_logs\".\"target\") between 1 and 200"
+        "admin_audit_target_type_check": {
+          "name": "admin_audit_target_type_check",
+          "value": "\"admin_audit\".\"target_type\" in ('member', 'post', 'comment', 'reply', 'guestbook', 'feedback', 'site')"
         },
-        "admin_logs_detail_check": {
-          "name": "admin_logs_detail_check",
-          "value": "\"admin_logs\".\"detail\" is null or char_length(\"admin_logs\".\"detail\") <= 500"
+        "admin_audit_target_id_check": {
+          "name": "admin_audit_target_id_check",
+          "value": "\"admin_audit\".\"target_id\" is null or char_length(\"admin_audit\".\"target_id\") between 1 and 64"
+        },
+        "admin_audit_target_label_check": {
+          "name": "admin_audit_target_label_check",
+          "value": "char_length(\"admin_audit\".\"target_label\") between 1 and 200"
+        },
+        "admin_audit_detail_check": {
+          "name": "admin_audit_detail_check",
+          "value": "\"admin_audit\".\"detail\" is null or char_length(\"admin_audit\".\"detail\") <= 1000"
         }
       },
       "isRLSEnabled": false
@@ -3498,7 +3539,7 @@
       "checkConstraints": {
         "site_settings_value_check": {
           "name": "site_settings_value_check",
-          "value": "char_length(\"site_settings\".\"value\") <= 500"
+          "value": "char_length(\"site_settings\".\"value\") <= 10000"
         }
       },
       "isRLSEnabled": false

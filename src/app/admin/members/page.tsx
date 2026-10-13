@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { adminSetRole, adminSuspend, adminUnsuspend } from "@/app/admin/tools-actions";
+import { adminForceDelete, adminSetRole, adminSuspend, adminUnsuspend } from "@/app/admin/tools-actions";
 import { AdminActionForm } from "@/components/admin/AdminActionForm";
 import { ResetPasswordButton } from "@/components/admin/ResetPasswordButton";
 import { Pagination } from "@/components/blog/Pagination";
@@ -18,7 +18,8 @@ const FILTERS: { value: MemberFilter; label: string }[] = [
   { value: "admin", label: "관리자" },
 ];
 
-// 관리자 회원 관리: 찾기, 정지·정지 풀기, 관리자 권한 주기·빼기, 비밀번호 초기화
+// 관리자 회원 관리 (ADM-01, specs/058-admin-tools): 아이디·닉네임으로 찾기, 정지·해제, 관리자 지정·해제, 비밀번호 초기화, 강제 탈퇴.
+// 내 계정에는 관리 칸이 없고, 서버도 다시 막는다 (나 자신·다른 관리자·마지막 관리자)
 export default async function AdminMembersPage({ searchParams }: PageProps<"/admin/members">) {
   const me = await requireAdmin();
   const params = await searchParams;
@@ -86,6 +87,7 @@ export default async function AdminMembersPage({ searchParams }: PageProps<"/adm
                 </p>
                 {suspended && m.suspendedUntil && <p className="text-danger">{suspendedMessage(m.suspendedUntil, m.suspendReason)}</p>}
 
+                {isMe && <p className="text-ink-soft">내 계정이에요. 내 권한은 다른 관리자만 바꿀 수 있어요.</p>}
                 {!isMe && (
                   <details className="rounded-xl bg-bg p-3">
                     <summary className="flex min-h-11 cursor-pointer items-center font-semibold">관리</summary>
@@ -128,16 +130,29 @@ export default async function AdminMembersPage({ searchParams }: PageProps<"/adm
                       <AdminActionForm
                         action={adminSetRole}
                         label="관리자 권한"
-                        confirm={m.role === "admin" ? `${m.username} 님의 관리자 권한을 뺄까요?` : `${m.username} 님을 관리자로 만들까요? 모든 관리자 기능을 쓸 수 있게 돼요.`}
+                        confirm={m.role === "admin" ? `${m.username} 님의 관리자 권한을 해제할까요?` : `${m.username} 님을 관리자로 지정할까요? 모든 관리자 기능을 쓸 수 있게 돼요.`}
                         className="flex flex-wrap items-center gap-2"
                       >
                         <input type="hidden" name="userId" value={m.userId} />
                         <input type="hidden" name="role" value={m.role === "admin" ? "user" : "admin"} />
                         <button type="submit" className="btn">
-                          {m.role === "admin" ? "관리자 권한 빼기" : "👑 관리자로 만들기"}
+                          {m.role === "admin" ? "관리자 해제" : "👑 관리자 지정"}
                         </button>
                       </AdminActionForm>
                       {m.role !== "admin" && <ResetPasswordButton key={m.userId} userId={m.userId} username={m.username} />}
+                      {m.role !== "admin" && (
+                        <AdminActionForm
+                          action={adminForceDelete}
+                          label="강제 탈퇴"
+                          confirm={`${m.username} 님을 강제 탈퇴시킬까요? 블로그·글·방명록이 모두 지워지고 되돌릴 수 없어요.`}
+                          className="flex flex-wrap items-center gap-2"
+                        >
+                          <input type="hidden" name="userId" value={m.userId} />
+                          <button type="submit" className="btn btn-danger">
+                            강제 탈퇴
+                          </button>
+                        </AdminActionForm>
+                      )}
                     </div>
                   </details>
                 )}

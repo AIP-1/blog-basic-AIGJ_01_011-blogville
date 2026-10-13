@@ -1,18 +1,40 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ADMIN_ERRORS, parseBanner, parseReason, parseSuspendDays, type AdminResult } from "@/lib/admin-rules";
+import { z } from "zod";
+import {
+  ADMIN_ERRORS,
+  parseBannedWords,
+  parseContentRefs,
+  parseContentTab,
+  parseNotice,
+  parseReason,
+  parseSuspendDays,
+  type AdminResult,
+} from "@/lib/admin-rules";
 import { parseId } from "@/lib/ids";
-import { blindPost, setBanner, setMemberRole, suspendMember, unblindPost, unsuspendMember, writeAdminLog } from "@/server/admin-tools";
-import { removeComment, removeReply } from "@/server/comments";
+import {
+  blindPost,
+  deleteContent,
+  forceDeleteMember,
+  saveBannedWords,
+  setMemberRole,
+  setNotice,
+  suspendMember,
+  unblindPost,
+  unsuspendMember,
+} from "@/server/admin-tools";
 import { requireAdmin } from "@/server/dal";
-import { db } from "@/db";
 
-// 관리자 회원·글·댓글·사이트 관리 (관리자 보강). 모두 첫 줄에서 관리자인지 본다: 아니면 404로 끝나고 아무것도 바꾸지 않는다.
+// 관리자 회원·콘텐츠·사이트 관리 (ADM-01~06, specs/058-admin-tools).
+// 모두 첫 줄에서 관리자인지 본다: 아니면 404로 끝나고 아무것도 바꾸지 않는다. 바꾼 일은 관리 기록에 남는다 (server/admin-tools.ts).
+
+const userIdSchema = z.string().min(1).max(64);
+const roleSchema = z.enum(["admin", "user"]);
 
 const userIdOf = (formData: FormData) => {
-  const v = formData.get("userId");
-  return typeof v === "string" && v.length >= 1 && v.length <= 64 ? v : null;
+  const parsed = userIdSchema.safeParse(formData.get("userId"));
+  return parsed.success ? parsed.data : null;
 };
 
 function done(result: AdminResult): AdminResult {
@@ -41,9 +63,17 @@ export async function adminUnsuspend(formData: FormData): Promise<AdminResult> {
 export async function adminSetRole(formData: FormData): Promise<AdminResult> {
   const admin = await requireAdmin();
   const userId = userIdOf(formData);
-  const role = formData.get("role");
-  if (!userId || (role !== "admin" && role !== "user")) return { ok: false, error: ADMIN_ERRORS.notFound };
-  return done(await setMemberRole(admin.userId, userId, role));
+  const role = roleSchema.safeParse(formData.get("role"));
+  if (!userId || !role.success) return { ok: false, error: ADMIN_ERRORS.invalid };
+  return done(await setMemberRole(admin.userId, userId, role.data));
+}
+
+/** 강제 탈퇴: 회원 탈퇴와 같은 정리 (나 자신·관리자는 거절) */
+export async function adminForceDelete(formData: FormData): Promise<AdminResult> {
+  const admin = await requireAdmin();
+  const userId = userIdOf(formData);
+  if (!userId) return { ok: false, error: ADMIN_ERRORS.notFound };
+  return done(await forceDeleteMember(admin.userId, userId));
 }
 
 export async function adminBlindPost(formData: FormData): Promise<AdminResult> {
@@ -62,22 +92,31 @@ export async function adminUnblindPost(formData: FormData): Promise<AdminResult>
   return done(await unblindPost(admin.userId, postId));
 }
 
-/** 댓글·답글 지우기 (자리는 "삭제된 댓글이에요"로 남는다) */
-export async function adminDeleteComment(formData: FormData): Promise<AdminResult> {
+/** 콘텐츠 선택 삭제 (ADM-02): `tab`과 고른 항목들(`items` = `comment:12` …) */
+export async function adminDeleteContent(formData: FormData): Promise<AdminResult> {
   const admin = await requireAdmin();
-  const id = parseId(formData.get("id"));
-  const kind = formData.get("kind");
-  if (id === null || (kind !== "comment" && kind !== "reply")) return { ok: false, error: "댓글을 찾지 못했어요" };
-  const removed = kind === "comment" ? await removeComment(admin, id) : await removeReply(admin, id);
-  if (removed === null) return { ok: false, error: "이미 지워졌거나 없는 댓글이에요" };
-  const summary = String(formData.get("summary") ?? "").slice(0, 100) || `${kind === "comment" ? "댓글" : "답글"} #${id}`;
-  await writeAdminLog(db, admin.userId, "delete_comment", summary);
-  return done({ ok: true, message: "댓글을 지웠어요" });
+  const tab = parseContentTab(formData.get("tab"));
+  const refs = parseContentRefs(tab, formData.getAll("items"));
+  if (!refs) return { ok: false, error: formData.getAll("items").length === 0 ? ADMIN_ERRORS.noneSelected : ADMIN_ERRORS.invalid };
+  const removed = await deleteContent(admin, refs);
+  return done({
+    ok: true,
+    message: removed === refs.length ? `${removed}개를 삭제했어요` : `${removed}개를 삭제했어요 (이미 지워진 ${refs.length - removed}개는 건너뜀)`,
+  });
 }
 
-export async function adminSetBanner(formData: FormData): Promise<AdminResult> {
+/** 사이트 공지 띠 (ADM-04) */
+export async function adminSaveNotice(formData: FormData): Promise<AdminResult> {
   const admin = await requireAdmin();
-  const text = parseBanner(formData.get("banner"));
-  if (text === null) return { ok: false, error: ADMIN_ERRORS.banner };
-  return done(await setBanner(admin.userId, text));
+  const parsed = parseNotice({ text: formData.get("text"), link: formData.get("link"), enabled: formData.get("enabled") });
+  if (!parsed.ok) return parsed;
+  return done(await setNotice(admin.userId, parsed.value));
+}
+
+/** 금지어 (ADM-05) */
+export async function adminSaveBannedWords(formData: FormData): Promise<AdminResult> {
+  const admin = await requireAdmin();
+  const parsed = parseBannedWords(formData.get("words"));
+  if (!parsed.ok) return parsed;
+  return done(await saveBannedWords(admin.userId, parsed.words));
 }

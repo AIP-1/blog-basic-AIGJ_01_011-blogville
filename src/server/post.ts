@@ -14,6 +14,7 @@ import { grantReward } from "./points";
 import { likeCountSql } from "./likes";
 import { resolveCategory } from "./category";
 import { syncPostTags } from "./tags";
+import { checkBannedWords } from "./banned-words";
 
 export const PAGE_SIZE = 8;
 
@@ -45,6 +46,9 @@ export async function savePost(blogId: number, ownerId: string, input: PostInput
     const contentHtml = sanitizePostHtml(input.contentHtml, known);
     const contentText = htmlToText(contentHtml);
     if (contentText.length === 0) throw new PostSaveError(POST_ERRORS.contentEmpty);
+    // 금지어 (ADM-05): 제목과 본문 글자
+    const banned = await checkBannedWords(input.title, contentText);
+    if (banned) throw new PostSaveError(banned);
 
     const category = await resolveCategory(tx, blogId, input.categoryId, input.subcategoryId);
     if (category === "invalid") throw new PostSaveError(POST_ERRORS.invalid);

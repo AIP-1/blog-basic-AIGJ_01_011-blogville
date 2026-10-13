@@ -790,27 +790,39 @@ export const fishingCatches = pgTable(
   ],
 );
 
-/** 관리 기록: 관리자가 회원·글·댓글·사이트 설정을 바꾼 일 (관리자 > 관리 기록) */
-export const adminLogs = pgTable(
-  "admin_logs",
+/**
+ * 관리 기록 (ADM-06): 관리자가 회원·콘텐츠·사이트 설정을 바꾼 일. 지우지 않는다.
+ * 대상은 종류(target_type)·ID(target_id)와 사람이 읽는 이름(target_label: 아이디·글 제목 등)으로 남겨, 대상이 지워져도 무엇이었는지 보인다.
+ * 관리자가 탈퇴하면 admin_id만 비운다.
+ */
+export const adminAudit = pgTable(
+  "admin_audit",
   {
     id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
     adminId: text("admin_id").references(() => users.id, { onDelete: "set null" }),
     action: text("action").notNull(),
-    /** 무엇에 했는지 사람이 읽는 한 줄 (아이디·글 제목 등). 대상이 지워져도 남는다 */
-    target: text("target").notNull(),
+    targetType: text("target_type").$type<"member" | "post" | "comment" | "reply" | "guestbook" | "feedback" | "site">().notNull(),
+    targetId: text("target_id"),
+    targetLabel: text("target_label").notNull(),
     detail: text("detail"),
     createdAt: createdAt(),
   },
   (t) => [
-    index("admin_logs_created_idx").on(t.createdAt.desc(), t.id.desc()),
-    check("admin_logs_action_check", sql`char_length(${t.action}) between 1 and 40`),
-    check("admin_logs_target_check", sql`char_length(${t.target}) between 1 and 200`),
-    check("admin_logs_detail_check", sql`${t.detail} is null or char_length(${t.detail}) <= 500`),
+    index("admin_audit_created_idx").on(t.createdAt.desc(), t.id.desc()),
+    index("admin_audit_action_created_idx").on(t.action, t.createdAt.desc()),
+    check("admin_audit_action_check", sql`char_length(${t.action}) between 1 and 40`),
+    check("admin_audit_target_type_check", sql`${t.targetType} in ('member', 'post', 'comment', 'reply', 'guestbook', 'feedback', 'site')`),
+    check("admin_audit_target_id_check", sql`${t.targetId} is null or char_length(${t.targetId}) between 1 and 64`),
+    check("admin_audit_target_label_check", sql`char_length(${t.targetLabel}) between 1 and 200`),
+    check("admin_audit_detail_check", sql`${t.detail} is null or char_length(${t.detail}) <= 1000`),
   ],
 );
 
-/** 사이트 설정 (관리자 > 사이트 설정). banner: 모든 화면 맨 위 공지 띠 */
+/**
+ * 사이트 설정 (ADM-04·05): 키 하나에 값 하나.
+ * `notice`: 사이트 공지 띠 (JSON {text, link, enabled}), `banned_words`: 금지어 (한 줄에 하나).
+ * 값이 바뀐 시각(updated_at)은 공지 띠의 판(닫기 기억 키)으로도 쓴다.
+ */
 export const siteSettings = pgTable(
   "site_settings",
   {
@@ -818,5 +830,5 @@ export const siteSettings = pgTable(
     value: text("value").notNull(),
     updatedAt: updatedAt(),
   },
-  (t) => [check("site_settings_value_check", sql`char_length(${t.value}) <= 500`)],
+  (t) => [check("site_settings_value_check", sql`char_length(${t.value}) <= 10000`)],
 );

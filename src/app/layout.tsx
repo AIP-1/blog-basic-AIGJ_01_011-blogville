@@ -7,6 +7,7 @@ import { SignOutButton } from "@/components/auth/SignOutButton";
 import { AttendanceDayWatcher } from "@/components/game/AttendanceDayWatcher";
 import { LevelUpDialog } from "@/components/game/LevelUpDialog";
 import { PhoneTabs } from "@/components/layout/PhoneTabs";
+import { SiteNoticeBar } from "@/components/layout/SiteNoticeBar";
 import { SupportLink } from "@/components/layout/SupportLink";
 import { UpdatesNewBadge } from "@/components/layout/UpdatesNewBadge";
 import { PixelLayers } from "@/components/game/PixelLayers";
@@ -19,6 +20,8 @@ import { ensureTodayAttendance } from "@/server/attendance";
 import { getAvatar } from "@/server/items";
 import { getWallet } from "@/server/points";
 import { siteUrl } from "@/lib/feed";
+import { noticeDismissKey } from "@/lib/admin-rules";
+import { getActiveNotice } from "@/server/admin-tools";
 import "./globals.css";
 
 // metadataBase는 실행할 때의 사이트 주소로 정한다 (공유 미리보기의 사진·주소를 절대 주소로)
@@ -137,10 +140,18 @@ async function Header() {
   );
 }
 
+/** 사이트 공지 띠 (ADM-04): 관리자가 켜 둔 공지가 있을 때만 */
+async function NoticeBar() {
+  const notice = await getActiveNotice();
+  if (!notice) return null;
+  return <SiteNoticeBar key={notice.updatedAt.getTime()} text={notice.text} link={notice.link} dismissKey={noticeDismissKey(notice.updatedAt)} />;
+}
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="ko">
       <body className="flex min-h-dvh flex-col">
+        <NoticeBar />
         <Header />
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
         {/* 아래 막대 (SUP-01): 업데이트 소식(릴리스 노트, /updates)과 버그·문의(/support). 마을(PC)에서는 CSS가 숨긴다 */}
