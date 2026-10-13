@@ -47,3 +47,14 @@ E2E는 `.env.local`의 DB에 고유한 아이디로 회원을 만들어 시험�
 npm run posts:cleanup -- --dry-run   # 지울 개수만
 npm run posts:cleanup
 ```
+
+## 배포 (도커, 포트 8400)
+
+`main`에 올라오면 GitHub Actions(`.github/workflows/deploy.yml`)가 도커 이미지를 만들어 서버에 올리고, SSH로 `deploy/run.sh`를 실행합니다. 손으로 돌리려면 Actions 탭의 **deploy → Run workflow**를 누릅니다.
+
+- 저장소 시크릿: `SSH_ADDRESS`, `SSH_PORT`, `SSH_ID`, `SSH_PASSWORD`, `DB_ADDRESS`, `DB_PORT`, `DB_NAME`, `DB_SCHEMA`, `DB_USERNAME`, `DB_PASSWORD`, (선택) `APP_URL`
+- `APP_URL`이 없으면 `http://SSH_ADDRESS:8400`을 로그인 주소로 씁니다. 도메인·https를 붙이면 `APP_URL`을 그 주소로 등록합니다.
+- 서버에는 docker가 있어야 하고, SSH 계정이 docker를 쓸 수 있어야 합니다(docker 그룹 또는 비밀번호 없는 sudo).
+- 컨테이너는 시작할 때 `drizzle-kit migrate`로 DB를 맞춘 뒤 `next start -p 8400`으로 뜹니다.
+- 서버의 `~/blogville/`에 로그인 비밀키(`auth-secret`, 처음 한 번 생성), 환경 변수(`app.env`), 올린 파일(`uploads/`)이 남습니다.
+- 마이그레이션 SQL이 `"public"` 스키마를 직접 가리키므로 `DB_SCHEMA`는 `public`이어야 합니다.

@@ -21,7 +21,8 @@ export async function ensureVisitorId(): Promise<string> {
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 365,
-    secure: process.env.NODE_ENV === "production",
+    // https로 열 때만 Secure (NF-11). http 서버(:8400)에서 Secure를 붙이면 브라우저가 쿠키를 버려 방문마다 새로 센다
+    secure: (process.env.BETTER_AUTH_URL ?? "").startsWith("https://"),
   });
   return id;
 }

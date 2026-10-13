@@ -1,0 +1,82 @@
+# main에 올라오면 도커 이미지를 만들어 서버에 올리고 deploy/run.sh로 실행한다 (포트 8400).
+# 쓰는 시크릿: SSH_ADDRESS, SSH_PORT, SSH_ID, SSH_PASSWORD,
+#             DB_ADDRESS, DB_PORT, DB_NAME, DB_SCHEMA, DB_USERNAME, DB_PASSWORD
+#             APP_URL (선택, 없으면 http://SSH_ADDRESS:8400)
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 도커 이미지 만들기
+        run: |
+          IMAGE="blogville:${GITHUB_SHA::7}"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          docker build -t "$IMAGE" .
+          mkdir -p out
+          docker save "$IMAGE" | gzip > out/blogville-image.tar.gz
+          cp deploy/run.sh out/run.sh
+          ls -lh out
+
+      - name: DB 접속 주소 만들기
+        env:
+          DB_ADDRESS: ${{ secrets.DB_ADDRESS }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_SCHEMA: ${{ secrets.DB_SCHEMA }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          SSH_ADDRESS: ${{ secrets.SSH_ADDRESS }}
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_ENV"
+          import os
+          from urllib.parse import quote
+          e = os.environ
+          user = quote(e["DB_USERNAME"], safe="")
+          pw = e.get("DB_PASSWORD", "")
+          auth = f"{user}:{quote(pw, safe='')}" if pw else user
+          url = f"postgres://{auth}@{e['DB_ADDRESS']}:{e.get('DB_PORT') or '5432'}/{quote(e['DB_NAME'], safe='')}"
+          if e.get("DB_SCHEMA"):
+              url += f"?search_path={quote(e['DB_SCHEMA'], safe='')}"
+          print(f"::add-mask::{url}")
+          print(f"DATABASE_URL={url}")
+          print(f"APP_URL={e.get('APP_URL') or 'http://' + e['SSH_ADDRESS'] + ':8400'}")
+          EOF
+
+      - name: 서버로 이미지 올리기
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_ADDRESS }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_ID }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: out/blogville-image.tar.gz,out/run.sh
+          target: blogville
+          strip_components: 1
+
+      - name: 서버에서 실행
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          APP_URL: ${{ env.APP_URL }}
+          IMAGE: ${{ env.IMAGE }}
+        with:
+          host: ${{ secrets.SSH_ADDRESS }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_ID }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          envs: DATABASE_URL,APP_URL,IMAGE
+          command_timeout: 10m
+          script: bash ~/blogville/run.sh
