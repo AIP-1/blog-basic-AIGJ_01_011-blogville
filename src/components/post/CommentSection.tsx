@@ -199,13 +199,15 @@ type FormProps = {
   initialContent?: string;
   initialSecret?: boolean;
   autoFocus?: boolean;
+  /** 비밀 체크 문구. null이면 체크가 없다 (방명록 주인 답글) */
+  secretLabel?: string | null;
   onDone?: () => void;
   onCancel?: () => void;
   cancelLabel?: string;
 };
 
-/** 댓글·답글·수정 공용 입력칸. 실패하면 문구만 보이고 쓴 내용은 남는다. */
-function CommentForm({
+/** 댓글·답글·수정 공용 입력칸 (방명록도 같이 쓴다). 실패하면 문구만 보이고 쓴 내용은 남는다. */
+export function CommentForm({
   send,
   placeholder,
   label,
@@ -215,6 +217,7 @@ function CommentForm({
   initialContent = "",
   initialSecret = false,
   autoFocus,
+  secretLabel = "🔒 비밀 댓글",
   onDone,
   onCancel,
   cancelLabel,
@@ -259,10 +262,12 @@ function CommentForm({
             {error}
           </p>
         )}
-        <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm">
-          <input type="checkbox" className="size-4" checked={isSecret} onChange={(e) => setSecret(e.target.checked)} />
-          🔒 비밀 댓글
-        </label>
+        {secretLabel !== null && (
+          <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+            <input type="checkbox" className="size-4" checked={isSecret} onChange={(e) => setSecret(e.target.checked)} />
+            {secretLabel}
+          </label>
+        )}
         {onCancel && (
           <button type="button" className="btn" onClick={onCancel}>
             {cancelLabel}

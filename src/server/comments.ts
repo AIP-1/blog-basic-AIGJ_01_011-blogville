@@ -111,7 +111,7 @@ export async function getCommentThread(postId: number, blogOwnerId: string, view
  * 알림을 받을 회원의 행은 글·원댓글보다 먼저 잠근다. 탈퇴(deleteMember)가 회원 행 → 글·댓글 순서로 잠그므로
  * 거꾸로 잠그면 알림 외래 키 확인과 엇갈려 교착 상태가 된다 (GAME-08).
  */
-async function lockMemberRow(tx: Tx, userId: string): Promise<boolean> {
+export async function lockMemberRow(tx: Tx, userId: string): Promise<boolean> {
   const rows = await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("key share");
   return rows.length > 0;
 }

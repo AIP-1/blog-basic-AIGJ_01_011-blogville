@@ -448,6 +448,41 @@ export const replies = pgTable(
   ],
 );
 
+// 방명록 (BLOG-10, specs/056-guestbook). 블로그마다 회원이 남기는 한마디와 블로그 주인의 답글 1개.
+// 답글은 따로 표 없이 그 줄의 `reply`에 둔다 (1단계, 주인만). 지우면 행을 지운다: 답글도 함께 사라진다.
+// 작성자가 탈퇴하면 그 회원의 방명록 글도 지워진다 (ON DELETE CASCADE). 블로그가 지워지면 함께 지워진다.
+export const guestbookEntries = pgTable(
+  "guestbook_entries",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    blogId: integer("blog_id")
+      .notNull()
+      .references(() => blogs.id, { onDelete: "cascade" }),
+    authorId: text("author_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    content: text("content").notNull(),
+    /** 비밀 방명록: 작성자·블로그 주인·관리자만 내용을 본다 (답글도 같다) */
+    isSecret: boolean("is_secret").notNull().default(false),
+    /** 작성자가 내용을 마지막으로 고친 시각 (`(수정됨)`) */
+    editedAt: timestamp("edited_at", { withTimezone: true }),
+    /** 블로그 주인의 답글. 없으면 null */
+    reply: text("reply"),
+    repliedAt: timestamp("replied_at", { withTimezone: true }),
+    replyEditedAt: timestamp("reply_edited_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("guestbook_entries_blog_created_idx").on(t.blogId, t.createdAt.desc(), t.id.desc()),
+    index("guestbook_entries_author_idx").on(t.authorId),
+    check("guestbook_entries_content_check", sql`char_length(${t.content}) between 1 and 1000`),
+    check(
+      "guestbook_entries_reply_check",
+      sql`(${t.reply} is null and ${t.repliedAt} is null and ${t.replyEditedAt} is null) or (${t.reply} is not null and char_length(${t.reply}) between 1 and 1000 and ${t.repliedAt} is not null)`,
+    ),
+  ],
+);
+
 // 조회수·방문자 (POST-06, BLOG-06, specs/005-blog-sidebar/data-model.md).
 // 기본 키가 "같은 브라우저는 하루 1번"을 보장한다. 날짜는 한국 날짜, IP·회원 ID는 저장하지 않는다.
 export const postViews = pgTable(
@@ -524,6 +559,7 @@ export type Attachment = typeof attachments.$inferSelect;
 // 알림 (GAME-08의 공감·댓글·답글, specs/017-notifications · GAME-06 레벨업, specs/034-level-up).
 // 닉네임·글 제목은 저장하지 않고 보여 줄 때 JOIN한다. 받는 사람·행동한 사람·글이 지워지면 함께 지워진다.
 // 레벨업은 행동한 사람·글이 없고 `level`만 있다 (notifications_shape_check).
+// 방명록 알림(BLOG-10)은 글 대신 방명록 글(`guestbook_entry_id`)이 있다.
 export const notifications = pgTable(
   "notifications",
   {
@@ -534,6 +570,8 @@ export const notifications = pgTable(
     kind: text("kind").notNull(),
     actorId: text("actor_id").references(() => users.id, { onDelete: "cascade" }),
     postId: integer("post_id").references(() => posts.id, { onDelete: "cascade" }),
+    /** 방명록 알림의 그 방명록 글 (BLOG-10). 글이 지워지면 알림도 지워진다 */
+    guestbookEntryId: integer("guestbook_entry_id").references(() => guestbookEntries.id, { onDelete: "cascade" }),
     level: integer("level"),
     createdAt: createdAt(),
     readAt: timestamp("read_at", { withTimezone: true }),
@@ -543,15 +581,16 @@ export const notifications = pgTable(
     index("notifications_unread_idx").on(t.userId).where(sql`${t.readAt} is null`),
     index("notifications_post_idx").on(t.postId),
     index("notifications_actor_idx").on(t.actorId),
+    index("notifications_guestbook_entry_idx").on(t.guestbookEntryId),
     // 공감 알림은 같은 사람·같은 글에 한 번만 (껐다 켜도, 동시에 눌러도)
     uniqueIndex("notifications_like_uq").on(t.userId, t.actorId, t.postId).where(sql`${t.kind} = 'like'`),
     // 같은 레벨 알림은 한 번만 (GAME-06)
     uniqueIndex("notifications_level_up_uq").on(t.userId, t.level).where(sql`${t.kind} = 'level_up'`),
-    check("notifications_kind_check", sql`${t.kind} in ('like', 'comment', 'reply', 'level_up')`),
+    check("notifications_kind_check", sql`${t.kind} in ('like', 'comment', 'reply', 'level_up', 'guestbook', 'guestbook_reply')`),
     check("notifications_not_self_check", sql`${t.actorId} is null or ${t.userId} <> ${t.actorId}`),
     check(
       "notifications_shape_check",
-      sql`(${t.kind} = 'level_up' and ${t.actorId} is null and ${t.postId} is null and ${t.level} between 2 and 99) or (${t.kind} <> 'level_up' and ${t.actorId} is not null and ${t.postId} is not null and ${t.level} is null)`,
+      sql`(${t.kind} = 'level_up' and ${t.actorId} is null and ${t.postId} is null and ${t.guestbookEntryId} is null and ${t.level} between 2 and 99) or (${t.kind} in ('like', 'comment', 'reply') and ${t.actorId} is not null and ${t.postId} is not null and ${t.guestbookEntryId} is null and ${t.level} is null) or (${t.kind} in ('guestbook', 'guestbook_reply') and ${t.actorId} is not null and ${t.postId} is null and ${t.guestbookEntryId} is not null and ${t.level} is null)`,
     ),
   ],
 );
