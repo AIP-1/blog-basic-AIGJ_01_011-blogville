@@ -56,6 +56,19 @@ EOF
 echo "이미지 불러오기: $IMAGE"
 gunzip -c "$TAR" | "${DOCKER[@]}" load
 
+# drizzle-kit migrate는 접속 오류를 보여 주지 않아서, 띄우기 전에 DB 접속을 따로 확인한다
+echo "DB 접속 확인"
+if ! "${DOCKER[@]}" run --rm --env-file "$DEPLOY_DIR/app.env" "$IMAGE" node -e '
+const postgres = require("postgres");
+const sql = postgres(process.env.DATABASE_URL, { max: 1, connect_timeout: 10 });
+sql`select current_user, current_schema(), version()`
+  .then(([r]) => { console.log("DB 접속 됨:", r.current_user, "/ 스키마", r.current_schema, "/", r.version.split(" on ")[0]); return sql.end(); })
+  .catch((e) => { console.error("DB 접속 실패:", e.code || "", e.message); process.exit(1); });
+'; then
+  echo "DB에 접속하지 못해 배포를 멈춰요. 위 오류를 보고 DB 시크릿(주소·포트·DB 이름·아이디·DB_PASSWORD)을 확인해 주세요." >&2
+  exit 1
+fi
+
 echo "이전 컨테이너 정리"
 "${DOCKER[@]}" rm -f "$NAME" >/dev/null 2>&1 || true
 
