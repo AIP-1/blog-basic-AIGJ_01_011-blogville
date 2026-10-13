@@ -2,7 +2,8 @@
 
 import { useActionState } from "react";
 import { changePassword, deleteAccount, updateNickname, type PasswordState, type WithdrawState } from "@/app/settings/account/actions";
-import { updateBlogInfo, updateBlogSlug, type SettingsState } from "@/app/settings/blog/actions";
+import { updateBlogAccent, updateBlogInfo, updateBlogSlug, type SettingsState } from "@/app/settings/blog/actions";
+import { BLOG_ACCENTS } from "@/lib/blog-accent";
 
 function Status({ state }: { state: SettingsState }) {
   if (state?.error)
@@ -38,6 +39,34 @@ export function BlogInfoForm({ title, intro }: { title: string; intro: string })
         <Status state={state} />
         <button type="submit" className="btn btn-primary" disabled={pending}>
           저장
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** 블로그 강조색 (블로그 꾸미기): 버튼·링크 색을 여섯 가지 중에서 */
+export function AccentForm({ accent }: { accent: string }) {
+  const [state, action, pending] = useActionState<SettingsState, FormData>(updateBlogAccent, null);
+  const current = state?.values?.accent ?? accent;
+  return (
+    <form action={action} className="space-y-3" key={JSON.stringify(state)}>
+      <fieldset>
+        <legend className="mb-2 text-sm font-semibold">버튼과 링크 색</legend>
+        <div className="flex flex-wrap gap-2">
+          {BLOG_ACCENTS.map((a) => (
+            <label key={a.key} className="btn btn-choice gap-2 has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-accent">
+              <input type="radio" name="accent" value={a.key} defaultChecked={current === a.key} className="sr-only" />
+              <span aria-hidden className="inline-block size-4 rounded-full" style={{ background: a.light }} />
+              {a.label}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <div className="flex items-center justify-end gap-3">
+        <Status state={state} />
+        <button type="submit" className="btn btn-primary" disabled={pending}>
+          색 바꾸기
         </button>
       </div>
     </form>

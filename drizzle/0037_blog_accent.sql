@@ -1,0 +1,2 @@
+ALTER TABLE "blogs" ADD COLUMN "accent_color" text;--> statement-breakpoint
+ALTER TABLE "blogs" ADD CONSTRAINT "blogs_accent_color_check" CHECK ("blogs"."accent_color" in ('green', 'blue', 'purple', 'pink', 'orange', 'gray'));

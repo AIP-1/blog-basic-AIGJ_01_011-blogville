@@ -15,6 +15,7 @@ import { parseSearchQuery, parseTagFilter, SEARCH_EMPTY, TOWN_SEARCH_EMPTY, TOWN
 import { parseId, parsePage } from "@/lib/ids";
 import { NOTICE_SLUG } from "@/lib/names";
 import { getBlogBySlug, searchBlogs } from "@/server/blog";
+import { accentProps } from "@/lib/blog-accent";
 import { getOwnedFurniture, getPlacedFurniture } from "@/server/house";
 import { getAvatar } from "@/server/items";
 import { getWallet } from "@/server/points";
@@ -111,7 +112,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
       : `${sub?.name ?? tree.find((c) => c.id === categoryId)?.name ?? "전체 글"} ${total}개`;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" {...accentProps(blog.accentColor)}>
       {isOwner && query.welcome === "1" && (
         <section className="rounded-2xl border border-accent/40 bg-accent/5 p-4" aria-label="환영">
           <p className="font-semibold">🎉 {nickname}님, Blogville에 오신 걸 환영해요!</p>
