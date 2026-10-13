@@ -12,7 +12,10 @@ const IMAGE_HOSTS = ["raw.githubusercontent.com", "camo.githubusercontent.com", 
  * 스크립트·이벤트·스타일은 지우고, 그림은 GitHub 주소만, 링크는 http(s)만 새 탭으로 연다.
  */
 export function sanitizeReleaseHtml(html: string): string {
-  return sanitizeHtml(html, {
+  // GitHub은 그림마다 원본 링크(<a><img></a>)를 씌운다. 그림이 늦게 뜨는 동안 높이 2px짜리 링크가 되어
+  // 누르기 어려운 대상(접근성 target-size)이 되므로 링크를 벗기고 그림만 남긴다
+  const unwrapped = html.replace(/<a\b[^>]*>\s*(<img\b[^>]*>)\s*<\/a>/gi, "$1");
+  return sanitizeHtml(unwrapped, {
     allowedTags: ["h1", "h2", "h3", "h4", "p", "br", "hr", "ul", "ol", "li", "strong", "em", "del", "code", "pre", "blockquote", "a", "img", "table", "thead", "tbody", "tr", "th", "td"],
     // target·rel·loading은 아래 transformTags가 정한 값으로 덮는다
     allowedAttributes: { a: ["href", "target", "rel"], img: ["src", "alt", "loading"], th: ["align"], td: ["align"] },

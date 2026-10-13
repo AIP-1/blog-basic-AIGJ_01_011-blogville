@@ -21,3 +21,11 @@ describe("업데이트 소식 (릴리스 노트 HTML)", () => {
     expect(out).toContain('<a href="https://github.com/o/r" target="_blank" rel="noopener noreferrer">좋음</a>');
   });
 });
+
+describe("업데이트 소식: 그림을 감싼 링크", () => {
+  it("GitHub이 그림에 씌운 원본 링크는 벗기고 그림만 남긴다", () => {
+    const out = sanitizeReleaseHtml('<p><a href="https://raw.githubusercontent.com/o/r/a.png"><img src="https://raw.githubusercontent.com/o/r/a.png" alt="그림"></a></p><p><a href="https://github.com/o/r">글 링크</a></p>');
+    expect(out).toContain('<p><img src="https://raw.githubusercontent.com/o/r/a.png" alt="그림" loading="lazy" /></p>');
+    expect(out).toContain(">글 링크</a>");
+  });
+});
