@@ -29,7 +29,7 @@ test.describe("US1 글에 태그 달기", () => {
     await expect(badges(page).filter({ hasText: `#${t}` })).toHaveAttribute("href", `/tags/${t}`);
 
     await page.goto(`/write/${id}`);
-    await expect(page.getByLabel("태그")).toHaveValue(`${t}, 회고`);
+    await expect(page.getByLabel("태그")).toHaveValue(order.map((o) => o.slice(1)).join(", "));
     await page.getByLabel("태그").fill("회고");
     await page.getByRole("button", { name: "수정 완료" }).click();
     await expect(page).toHaveURL(`/@${username}/${id}`);
