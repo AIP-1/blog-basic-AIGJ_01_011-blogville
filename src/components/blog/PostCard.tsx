@@ -27,8 +27,9 @@ export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle,
   return (
     <article>
       {author && (
-        <Link href={`/@${slug}`} className="flex min-h-11 min-w-0 items-center gap-1 px-1 text-sm" aria-label={`${author.nickname}의 블로그 ${author.blogTitle}`}>
-          <span className="shrink-0 font-bold">{author.nickname}</span>
+        // 읽는 이름 = 보이는 글자 (Lighthouse label-content-name-mismatch). 사이 공백은 flex라 화면에 안 보인다
+        <Link href={`/@${slug}`} className="flex min-h-11 min-w-0 items-center gap-1 px-1 text-sm">
+          <span className="shrink-0 font-bold">{author.nickname}</span>{" "}
           <span className="min-w-0 truncate text-ink-soft">· {author.blogTitle}</span>
         </Link>
       )}
