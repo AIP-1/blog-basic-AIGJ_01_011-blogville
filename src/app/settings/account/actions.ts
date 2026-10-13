@@ -13,6 +13,8 @@ import { enabledProviders, isSocialProvider } from "@/lib/social-login";
 import { isLinked, unlinkAccount } from "@/server/social-login";
 import { PHOTO_ERRORS, removeProfilePhoto, setProfilePhoto, updateNickname as saveNickname } from "@/server/profile";
 import type { SettingsState } from "../blog/actions";
+import { NOTIFICATION_PREFS_SAVED, parseNotificationPrefs, type NotificationPrefs } from "@/lib/notifications";
+import { saveNotificationPrefs } from "@/server/notifications";
 
 export async function updateNickname(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
   const member = await requireMember();
@@ -104,4 +106,15 @@ export async function unlinkSocial(formData: FormData) {
   await unlinkAccount(member.userId, provider);
   revalidatePath("/settings/account");
   redirect(`/settings/account?unlinked=${provider}`);
+}
+
+export type NotificationPrefsState = { message: string; prefs: NotificationPrefs } | null;
+
+/** 🔔 알림 설정 저장: 체크한 종류만 받는다 (문의 답변 알림은 늘 받는다) */
+export async function updateNotificationPrefs(_prev: NotificationPrefsState, formData: FormData): Promise<NotificationPrefsState> {
+  const member = await requireMember();
+  const prefs = parseNotificationPrefs(formData);
+  await saveNotificationPrefs(member.userId, prefs);
+  revalidatePath("/settings/account");
+  return { message: NOTIFICATION_PREFS_SAVED, prefs };
 }

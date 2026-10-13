@@ -10,6 +10,7 @@ import { htmlToText, sanitizePostHtml } from "@/lib/sanitize";
 import { lockLinkable, syncPostAttachments } from "./attachments";
 import { commentCountSql } from "./comments";
 import { growForPost } from "./farm";
+import { notifyNewPost } from "./notifications";
 import { grantReward } from "./points";
 import { likeCountSql } from "./likes";
 import { resolveCategory } from "./category";
@@ -27,7 +28,7 @@ export class PostSaveError extends Error {}
  * 남의 글·없는 글을 고치려 하면 예외(오류 화면). 입력 오류는 PostSaveError(문구).
  */
 export async function savePost(blogId: number, ownerId: string, input: PostInput): Promise<number> {
-  return db.transaction(async (tx) => {
+  const savedId = await db.transaction(async (tx) => {
     if (input.postId !== null) {
       // 남의 글에 첨부를 붙이지 않게 먼저 내 글인지 본다
       const [mine] = await tx
@@ -74,6 +75,9 @@ export async function savePost(blogId: number, ownerId: string, input: PostInput
     if (input.postId !== null) await removeEmptySeries(tx, blogId);
     return postId;
   });
+  // 공개 새 글이면 이웃에게 알린다 (고친 글·비공개·예약 글은 알리지 않는다. 예약 글은 공개될 때 publishDuePosts가 알린다)
+  if (input.postId === null && input.isPublic) await notifyNewPost(ownerId, savedId);
+  return savedId;
 }
 
 /** 내 글이면 지운다. 남의 글·없는 글이면 아무것도 하지 않는다. */
@@ -256,7 +260,11 @@ export async function publishDuePosts(now = new Date()): Promise<number> {
       if (postEarnsReward(true, true, row.textLength) && (await grantReward(tx, ownerId, "post", String(id)))) await growForPost(tx, ownerId);
       return true;
     });
-    if (done) published++;
+    if (done) {
+      published++;
+      // 예약 글이 공개되면 이웃에게 새 글 알림 (실패해도 발행은 그대로)
+      await notifyNewPost(ownerId, id);
+    }
   }
   return published;
 }
