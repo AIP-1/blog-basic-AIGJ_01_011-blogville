@@ -211,6 +211,13 @@
       "when": 1791879445449,
       "tag": "0029_admin_tools",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1791889543512,
+      "tag": "0030_search_trgm",
+      "breakpoints": true
     }
   ]
 }
