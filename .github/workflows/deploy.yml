@@ -38,28 +38,62 @@ jobs:
           DB_USERNAME: ${{ secrets.DB_USERNAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           SSH_ADDRESS: ${{ secrets.SSH_ADDRESS }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
           APP_URL: ${{ secrets.APP_URL }}
         run: |
-          python3 - <<'EOF' >> "$GITHUB_ENV"
-          import os
+          python3 - <<'EOF'
+          import os, re
           from urllib.parse import quote
           e = os.environ
-          user = quote(e["DB_USERNAME"], safe="")
+
+          # 시크릿에 들어가기 쉬운 군더더기(앞뒤 공백·줄바꿈, http://, 아이디@, :포트, 끝의 /)를 걷어 낸다
+          def host(raw):
+              h = raw.strip()
+              h = re.sub(r"^[a-zA-Z]+://", "", h)
+              h = h.split("/")[0]
+              h = h.rsplit("@", 1)[-1]
+              if h.count(":") == 1:
+                  h = h.split(":")[0]
+              return h
+
+          ssh_raw, db_raw = e["SSH_ADDRESS"], e["DB_ADDRESS"]
+          ssh, db = host(ssh_raw), host(db_raw)
+          # 값은 보이지 않고 모양만 알린다
+          for name, raw, clean in (("SSH_ADDRESS", ssh_raw, ssh), ("DB_ADDRESS", db_raw, db)):
+              kind = "IP" if re.fullmatch(r"[0-9.]+", clean) else "도메인"
+              print(f"{name}: {kind}, 정리 {'함' if raw != clean else '안 함'}, 길이 {len(clean)}")
+
+          user = quote(e["DB_USERNAME"].strip(), safe="")
           pw = e.get("DB_PASSWORD", "")
           auth = f"{user}:{quote(pw, safe='')}" if pw else user
-          url = f"postgres://{auth}@{e['DB_ADDRESS']}:{e.get('DB_PORT') or '5432'}/{quote(e['DB_NAME'], safe='')}"
-          if e.get("DB_SCHEMA"):
-              url += f"?search_path={quote(e['DB_SCHEMA'], safe='')}"
-          print(f"::add-mask::{url}")
-          print(f"DATABASE_URL={url}")
-          print(f"APP_URL={e.get('APP_URL') or 'http://' + e['SSH_ADDRESS'] + ':8400'}")
+          url = f"postgres://{auth}@{db}:{e.get('DB_PORT', '').strip() or '5432'}/{quote(e['DB_NAME'].strip(), safe='')}"
+          if e.get("DB_SCHEMA", "").strip():
+              url += f"?search_path={quote(e['DB_SCHEMA'].strip(), safe='')}"
+          app_url = e.get("APP_URL", "").strip() or f"http://{ssh}:8400"
+
+          for v in (ssh, url):
+              print(f"::add-mask::{v}")
+          with open(e["GITHUB_ENV"], "a") as f:
+              f.write(f"SSH_HOST={ssh}\nSSH_PORT={e.get('SSH_PORT', '').strip() or '22'}\nDATABASE_URL={url}\nAPP_URL={app_url}\n")
           EOF
+
+      - name: 서버 접속 확인
+        run: |
+          if ! getent hosts "$SSH_HOST" >/dev/null && ! [[ "$SSH_HOST" =~ ^[0-9.]+$ ]]; then
+            echo "::error::SSH_ADDRESS 주소를 찾을 수 없어요. 공인 IP나 인터넷에서 찾을 수 있는 도메인을 넣어 주세요 (사설 IP·내부 이름은 GitHub에서 닿지 않아요)."
+            exit 1
+          fi
+          if ! timeout 15 bash -c "</dev/tcp/$SSH_HOST/$SSH_PORT" 2>/dev/null; then
+            echo "::error::SSH_ADDRESS:SSH_PORT로 접속할 수 없어요. 서버가 켜져 있는지, 방화벽에서 GitHub Actions의 접속을 막지 않는지 확인해 주세요."
+            exit 1
+          fi
+          echo "서버 SSH 포트에 닿아요"
 
       - name: 서버로 이미지 올리기
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.SSH_ADDRESS }}
-          port: ${{ secrets.SSH_PORT }}
+          host: ${{ env.SSH_HOST }}
+          port: ${{ env.SSH_PORT }}
           username: ${{ secrets.SSH_ID }}
           password: ${{ secrets.SSH_PASSWORD }}
           source: out/blogville-image.tar.gz,out/run.sh
@@ -73,8 +107,8 @@ jobs:
           APP_URL: ${{ env.APP_URL }}
           IMAGE: ${{ env.IMAGE }}
         with:
-          host: ${{ secrets.SSH_ADDRESS }}
-          port: ${{ secrets.SSH_PORT }}
+          host: ${{ env.SSH_HOST }}
+          port: ${{ env.SSH_PORT }}
           username: ${{ secrets.SSH_ID }}
           password: ${{ secrets.SSH_PASSWORD }}
           envs: DATABASE_URL,APP_URL,IMAGE
