@@ -1,5 +1,6 @@
 import "server-only";
 import { and, asc, desc, eq, gte, lt, lte, sql } from "drizzle-orm";
+import { cache } from "react";
 import { db, type Tx } from "@/db";
 import { attendanceRewards, attendances, pointLedger, sessions, users } from "@/db/schema";
 import { nextCycleDay } from "@/lib/game";
@@ -41,6 +42,9 @@ export async function ensureTodayAttendance(userId: string, sessionId: string | 
     return { date: today, cycleDay, exp: reward.exp, coins: reward.coins };
   });
 }
+
+/** 한 요청 안에서 헤더와 화면이 같이 불러도 한 번만 (React cache) */
+export const ensureTodayAttendanceOnce = cache((userId: string, sessionId: string | null) => ensureTodayAttendance(userId, sessionId));
 
 async function readDay(tx: Tx | typeof db, userId: string, day: string): Promise<TodayAttendance | null> {
   const [row] = await tx

@@ -1,5 +1,6 @@
 import "server-only";
 import { desc, eq, ilike, max, or, sql } from "drizzle-orm";
+import { cache } from "react";
 import { db, type Tx } from "@/db";
 import { alias } from "drizzle-orm/pg-core";
 import { blogs, items, posts, profiles } from "@/db/schema";
@@ -10,8 +11,8 @@ import { findNameConflict, isUniqueViolation, lockName } from "./names";
 
 const backgroundItems = alias(items, "background_items");
 
-/** 주소로 블로그와 주인 닉네임·캐릭터·미니룸 배경. 주소는 들어온 그대로 비교한다 (대문자 주소는 없음 → 404, BLOG-02). */
-export async function getBlogBySlug(slug: string) {
+/** 주소로 블로그와 주인 닉네임·캐릭터·미니룸 배경. 주소는 들어온 그대로 비교한다 (대문자 주소는 없음 → 404, BLOG-02). 한 요청 안에서는 한 번만 읽는다. */
+export const getBlogBySlug = cache(async (slug: string) => {
   const [row] = await db
     .select({ blog: blogs, nickname: profiles.nickname, photoKey: profiles.photoKey, characterArt: items.art, backgroundArt: backgroundItems.art })
     .from(blogs)
@@ -21,7 +22,7 @@ export async function getBlogBySlug(slug: string) {
     .where(eq(blogs.slug, slug))
     .limit(1);
   return row ?? null;
-}
+});
 
 /**
  * 마을 검색(BLOG-07): 블로그 이름이나 주인 닉네임에 그 말이 든 블로그.
