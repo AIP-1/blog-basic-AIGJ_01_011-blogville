@@ -26,7 +26,7 @@ test.describe("US1 글에 태그 달기", () => {
     // 이름순은 DB 정렬 규칙(collation)을 따른다. 한글과 영문의 앞뒤는 DB마다 달라 DB에 물어본 순서로 본다
     const order = (await sql`select n from unnest(${[t, "회고"]}::text[]) as n order by n`).map((r) => `#${r.n}`);
     await expect(badges(page)).toHaveText(order);
-    await expect(badges(page).first()).toHaveAttribute("href", `/tags/${t}`);
+    await expect(badges(page).filter({ hasText: `#${t}` })).toHaveAttribute("href", `/tags/${t}`);
 
     await page.goto(`/write/${id}`);
     await expect(page.getByLabel("태그")).toHaveValue(`${t}, 회고`);
