@@ -31,11 +31,11 @@ test.describe("BLOG-03·04 프로필 사진", () => {
     await expect(photoBox(page).getByRole("status")).toHaveText("프로필 사진을 바꿨어요");
     const first = (await photoKey(username))!;
     expect(first).toMatch(/^[0-9a-f]{32}$/);
-    await expect(page.getByRole("img", { name: `${username} 프로필 사진` })).toHaveAttribute("src", `/files/${first}`);
+    await expect(page.getByRole("img", { name: `${username} 프로필 사진` })).toHaveAttribute("src", `/files/${first}?w=320`);
 
     await page.goto(`/@${username}`);
     const avatar = page.getByRole("img", { name: `${username} 프로필 사진` });
-    await expect(avatar).toHaveAttribute("src", `/files/${first}`);
+    await expect(avatar).toHaveAttribute("src", `/files/${first}?w=96`);
     const box = (await avatar.boundingBox())!;
     expect(Math.round(box.width)).toBe(48);
     expect(Math.round(box.height)).toBe(48);

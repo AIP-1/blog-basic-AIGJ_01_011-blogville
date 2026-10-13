@@ -75,7 +75,8 @@ test.describe("GAME-06 레벨업 팝업", () => {
     const unlocked = popup(owner.page).locator("[data-level-up-items]");
     await expect(unlocked).toContainText("이제 이런 친구를 데려올 수 있어요");
     await expect(unlocked.getByRole("listitem")).toHaveText(["원피스", "가방", "포근한 침대"]);
-    await expect(unlocked).toContainText("외 2개");
+    // 상점 아이템이 늘면 개수가 바뀌므로 "외 N개" 모양만 본다
+    await expect(unlocked).toContainText(/외 \d+개/);
     await popup(owner.page).getByRole("button", { name: "상점 가기" }).click();
     await expect(owner.page).toHaveURL(/\/shop$/);
     await expect(popup(owner.page)).toHaveCount(0);
@@ -90,8 +91,10 @@ test.describe("GAME-06 레벨업 팝업", () => {
     await page.reload();
     await expect(popup(page).getByRole("heading")).toHaveText("Lv.4가 되었어요!");
     // 안 읽은 Lv.3~4에 열린 아이템: Lv.4 소파·밤의 도시, Lv.3 원피스 … 외 4개 (성장 촉진제 포함)
-    await expect(popup(page).locator("[data-level-up-items] li")).toHaveText(["푹신한 소파", "밤의 도시", "원피스"]);
-    await expect(popup(page).locator("[data-level-up-items]")).toContainText("외 4개");
+    // 레벨이 높은 Lv.4 아이템이 먼저, 세 개까지 보인다 (아이템 목록은 상점이 늘면 바뀐다)
+    await expect(popup(page).locator("[data-level-up-items] li")).toHaveCount(3);
+    await expect(popup(page).locator("[data-level-up-items] li").first()).toHaveText("푹신한 소파");
+    await expect(popup(page).locator("[data-level-up-items]")).toContainText(/외 \d+개/);
     await popup(page).getByRole("button", { name: "확인" }).click();
     await expect.poll(() => levelUps(id)).toEqual([
       { level: 3, read: true },

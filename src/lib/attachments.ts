@@ -186,3 +186,23 @@ export function pasteAction(
   if (a.postId === null || a.postId === editingPostId) return "keep";
   return "reupload";
 }
+
+/** 작은 사진(썸네일) 너비. 글 목록 대표 사진·프로필 동그라미가 이 크기의 webp를 받는다 */
+export const THUMB_WIDTHS = [96, 320, 640] as const;
+export type ThumbWidth = (typeof THUMB_WIDTHS)[number];
+
+/** `?w=` 값이 썸네일 너비면 그 수, 아니면 null (원본) */
+export function thumbWidthOf(value: string | null): ThumbWidth | null {
+  const w = Number(value);
+  return (THUMB_WIDTHS as readonly number[]).includes(w) ? (w as ThumbWidth) : null;
+}
+
+/** 썸네일로 줄일 수 있는 사진 (움직이는 gif는 원본 그대로) */
+export function canThumb(mime: string): boolean {
+  return mime === "image/png" || mime === "image/jpeg" || mime === "image/webp";
+}
+
+/** `/files/키` 주소에 썸네일 너비를 붙인다. 우리 저장소 주소가 아니면 그대로 */
+export function thumbUrl(url: string, width: ThumbWidth): string {
+  return keyFromUrl(url) ? `${url}?w=${width}` : url;
+}

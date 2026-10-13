@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Post } from "@/db/schema";
-import { firstImageUrl } from "@/lib/attachments";
+import { firstImageUrl, thumbUrl } from "@/lib/attachments";
 import { scheduleLabel } from "@/lib/schedule";
 import { excerpt, formatDate } from "@/lib/text";
 import { CategoryBadge } from "../post/CategoryBadge";
@@ -20,9 +20,11 @@ type Props = {
   author?: { nickname: string; blogTitle: string };
   /** 이웃 새 글 맨 위로 올라온 즐겨찾는 이웃의 글 (TOWN-08) */
   pinned?: boolean;
+  /** 🔥 인기 글의 순위 (1부터) */
+  rank?: number;
 };
 
-export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle, commentCount = 0, likeCount = 0, author, pinned = false }: Props) {
+export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle, commentCount = 0, likeCount = 0, author, pinned = false, rank }: Props) {
   // 대표 사진: 본문의 첫 사진 (비공개 글도 주인에게만 목록에 나오므로 그대로)
   const cover = firstImageUrl(post.contentHtml);
   return (
@@ -35,6 +37,12 @@ export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle,
         </Link>
       )}
       <Link href={`/@${slug}/${post.id}`} className="flex gap-4 rounded-xl border border-line bg-surface p-4 hover:border-accent">
+        {rank !== undefined && (
+          <span className={`min-w-9 shrink-0 whitespace-nowrap text-center text-2xl font-extrabold tabular-nums ${rank <= 3 ? "text-accent" : "text-ink-soft"}`} data-popular-rank={rank}>
+            {rank}
+            <span className="sr-only">위</span>
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             {pinned && <span className="notice-yellow rounded-full px-2 py-0.5 text-sm font-semibold">⭐ 즐겨찾는 이웃</span>}
@@ -55,7 +63,7 @@ export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle,
         </div>
         {cover && (
           // eslint-disable-next-line @next/next/no-img-element -- 우리 저장소(/files) 사진, 크기를 모른다
-          <img src={cover} alt="" loading="lazy" className="size-20 shrink-0 self-center rounded-lg border border-line object-cover sm:size-24" data-post-cover />
+          <img src={thumbUrl(cover, 320)} alt="" loading="lazy" className="size-20 shrink-0 self-center rounded-lg border border-line object-cover sm:size-24" data-post-cover />
         )}
       </Link>
     </article>

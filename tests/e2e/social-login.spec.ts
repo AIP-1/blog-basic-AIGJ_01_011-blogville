@@ -16,7 +16,8 @@ test.describe("AUTH-01 간편 로그인", () => {
 
   test("연동 안 된 계정으로 돌아오면 연동 안내를 보인다", async ({ page }) => {
     await page.goto("/?error=signup_disabled");
-    await expect(page.getByRole("alert")).toHaveText("연동된 계정이 없어요. 아이디로 로그인한 뒤 내 정보에서 연동해 주세요");
+    // Next가 붙이는 화면 전환 안내(#__next-route-announcer__)도 role=alert라서 문구로 찾는다
+    await expect(page.getByRole("alert").filter({ hasText: "연동된 계정이 없어요" })).toHaveText("연동된 계정이 없어요. 아이디로 로그인한 뒤 내 정보에서 연동해 주세요");
   });
 
   test("라이브러리의 소셜 로그인·연동 시작 경로와 키 없는 콜백은 닫혀 있다", async ({ request }) => {
