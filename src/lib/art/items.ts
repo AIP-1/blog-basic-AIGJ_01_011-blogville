@@ -48,7 +48,45 @@ export const ITEM_ART: Readonly<Record<string, PixelArt>> = {
     rows: layer(0, [".......WW.......", ".....KBBBBK.....", "....KBBBBBBK....", "...KBBBBBBBBK...", "...KWWWWWWWWK..."]),
     palette: { K: OUTLINE, B: "#3f7fd1", W: "#f4f4f4" },
   },
+  // 옷가게 모자 (SHOP-08)
+  "hat.chef": {
+    rows: layer(0, [".....KWWWWK.....", "....KWWWWWWK....", "....KWWWWWWK....", "....KKKKKKKK....", "...KWWWWWWWWK..."]),
+    palette: { K: OUTLINE, W: "#fbfbfb" },
+  },
+  "hat.wizard": {
+    rows: layer(0, [".......KK.......", "......KPPK......", ".....KPPYPK.....", "....KPPPPPPK....", ".KKPPPYPPPPPPKK."]),
+    palette: { K: OUTLINE, P: "#6a4fb3", Y: "#f7d354" },
+  },
+  "hat.crown": {
+    rows: layer(0, ["...Y..Y..Y..Y...", "...KYKYKKYKYK...", "...KYYRYYBYYK...", "...KKKKKKKKKK..."]),
+    palette: { K: OUTLINE, Y: "#f2c230", R: "#e2384f", B: "#3f7fd1" },
+  },
   // ── 옷 (9~15줄)
+  // 옷가게 옷 (SHOP-08)
+  "clothes.pajama": {
+    rows: layer(10, ["....KBWBWBWK....", "...KSBWBWBWSK...", "...KSBWBWBWSK...", "....KBWBWBWK....", "....KBWKKWBK....", "....KKK..KKK...."]),
+    palette: { K: OUTLINE, B: "#7fb2e5", W: "#f4f4f4", S: "#ffd7b0" },
+  },
+  "clothes.chef": {
+    rows: layer(10, ["....KWWKKWWK....", "...KWWGWWGWWK...", "...KSWGWWGWSK...", "....KWWWWWWK....", "....KDDKKDDK....", "....KKK..KKK...."]),
+    palette: { K: OUTLINE, W: "#fbfbfb", G: "#9aa3ad", S: "#ffd7b0", D: "#5b6470" },
+  },
+  "clothes.suit": {
+    rows: layer(10, ["....KNWRRWNK....", "...KSNNRRNNSK...", "...KSNNRRNNSK...", "....KNNNNNNK....", "....KNNKKNNK....", "....KKK..KKK...."]),
+    palette: { K: OUTLINE, N: "#2f3440", W: "#f4f4f4", R: "#d9534f", S: "#ffd7b0" },
+  },
+  "clothes.hanbok": {
+    rows: layer(10, ["....KYYWWYYK....", "...KRYYRRYYBK...", "...KGYYRRYYPK...", "...KRRRRRRRRK...", "..KRRRRRRRRRRK..", "...KKKKKKKKKK..."]),
+    palette: { K: OUTLINE, Y: "#f7d354", W: "#f4f4f4", R: "#e2384f", B: "#3f7fd1", G: "#4caf6a", P: "#b06ad1" },
+  },
+  "clothes.robe": {
+    rows: layer(9, [".....KPPPPK.....", "....KPPPPPPK....", "...KPPPYPPPPK...", "...KSPPPPPYSK...", "...KPPYPPPPPK...", "..KPPPPPPYPPPK..", "..KKKKKKKKKKKK.."]),
+    palette: { K: OUTLINE, P: "#6a4fb3", Y: "#f7d354", S: "#ffd7b0" },
+  },
+  "clothes.armor": {
+    rows: layer(9, [".....KMMMMK.....", "....KMLLLLMK....", "...KMMLMMLMMK...", "...KMMMYYMMMK...", "....KMMMMMMK....", "....KMMKKMMK....", "....KKK..KKK...."]),
+    palette: { K: OUTLINE, M: "#a9b2bd", L: "#e3e8ee", Y: "#f2c230" },
+  },
   "clothes.overalls": {
     rows: layer(10, ["....KWDWWDWK....", "...KSDDDDDDSK...", "...KSDDYYDDSK...", "....KDDDDDDK....", "....KDDKKDDK....", "....KKK..KKK...."]),
     palette: { K: OUTLINE, W: "#f4f4f4", D: "#4f74b8", Y: "#f2cf6b", S: "#ffd7b0" },

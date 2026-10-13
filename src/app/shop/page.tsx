@@ -19,6 +19,13 @@ export default async function ShopPage() {
         <div>
           <h1 className="text-2xl font-extrabold">🏪 마을 상점</h1>
           <p className="mt-1 text-ink-soft">글을 쓰고 출석해서 모은 코인으로 내 캐릭터와 미니룸을 꾸며 보세요.</p>
+          <p className="mt-1 text-sm text-ink-soft">
+            요리사 옷·한복·갑옷 같은 새 옷과 모자는{" "}
+            <Link href="/clothes" className="font-semibold text-accent underline">
+              👗 옷가게
+            </Link>
+            에서 거울로 입어 보고 살 수 있어요.
+          </p>
         </div>
         <Link href="/wallet" className="rounded-2xl border border-line bg-surface px-4 py-2 font-bold" data-shop-wallet>
           Lv.{wallet.progress.level} 🪙 {formatNumber(wallet.coin)}
