@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
       { source: "/@:slug", destination: "/blog/:slug" },
       // 블로그 구독 RSS. 글 번호 주소보다 먼저 둔다
       { source: "/@:slug/rss", destination: "/blog/:slug/rss" },
+      // 방명록 (BLOG-10). 이것도 글 번호 주소보다 먼저
+      { source: "/@:slug/guestbook", destination: "/blog/:slug/guestbook" },
       { source: "/@:slug/:postId", destination: "/blog/:slug/:postId" },
     ];
   },

@@ -6,7 +6,9 @@ import { formatDate } from "./text";
 
 /** 회원이 남긴 활동 알림 (행동한 사람·글이 있다) */
 export type ActivityKind = "like" | "comment" | "reply";
-export type NotificationKind = ActivityKind | "level_up";
+/** 방명록 알림 (BLOG-10, specs/056-guestbook): 행동한 사람과 방명록 글이 있다 (글은 없다) */
+export type GuestbookKind = "guestbook" | "guestbook_reply";
+export type NotificationKind = ActivityKind | GuestbookKind | "level_up";
 
 export const NOTIFICATIONS_PAGE_SIZE = 20;
 /** 헤더 숫자는 10개까지만 센다 (`9+`) */
@@ -35,6 +37,20 @@ export function notificationText(kind: ActivityKind, nickname: string, postTitle
 export function notificationHref(kind: ActivityKind, blogSlug: string, postId: number): string {
   const post = `/@${blogSlug}/${postId}`;
   return kind === "like" ? post : `${post}#comments`;
+}
+
+/** 방명록 알림 문구: 주인에게는 새 방명록 글, 작성자에게는 주인의 답글 */
+export function guestbookNotificationText(kind: GuestbookKind, nickname: string): string {
+  return kind === "guestbook" ? `📖 ${nickname}님이 방명록에 글을 남겼어요` : `📖 ${nickname}님이 내 방명록 글에 답글을 달았어요`;
+}
+
+/** 방명록 알림을 누르면 그 블로그의 방명록으로 */
+export function guestbookNotificationHref(blogSlug: string): string {
+  return `/@${blogSlug}/guestbook`;
+}
+
+export function isGuestbookKind(value: string): value is GuestbookKind {
+  return value === "guestbook" || value === "guestbook_reply";
 }
 
 const MINUTE = 60_000;

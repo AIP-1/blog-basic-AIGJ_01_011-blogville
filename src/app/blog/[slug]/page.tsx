@@ -173,6 +173,9 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
             <Link href="/settings/comments" className="btn">
               💬 댓글 관리
             </Link>
+            <Link href={`/@${blog.slug}/guestbook`} className="btn">
+              📖 방명록 {sidebar.guestbookCount}
+            </Link>
             <Link href="/settings/blog#categories" className="btn">
               🗂 카테고리 관리
             </Link>

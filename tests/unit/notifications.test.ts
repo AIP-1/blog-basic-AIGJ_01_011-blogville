@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { notificationHref, notificationText, notificationTime, unreadBadge } from "@/lib/notifications";
+import { guestbookNotificationHref, guestbookNotificationText, isGuestbookKind, notificationHref, notificationText, notificationTime, unreadBadge } from "@/lib/notifications";
 
 describe("unreadBadge (GAME-08 헤더 숫자)", () => {
   it("없으면 null, 1~9는 그대로, 10개부터 9+", () => {
@@ -26,6 +26,17 @@ describe("notificationHref", () => {
     expect(notificationHref("like", "haneul", 7)).toBe("/@haneul/7");
     expect(notificationHref("comment", "haneul", 7)).toBe("/@haneul/7#comments");
     expect(notificationHref("reply", "haneul", 7)).toBe("/@haneul/7#comments");
+  });
+});
+
+describe("방명록 알림 (BLOG-10)", () => {
+  it("주인에게는 새 방명록 글, 작성자에게는 주인 답글. 누르면 그 블로그의 방명록", () => {
+    expect(guestbookNotificationText("guestbook", "민트")).toBe("📖 민트님이 방명록에 글을 남겼어요");
+    expect(guestbookNotificationText("guestbook_reply", "하늘")).toBe("📖 하늘님이 내 방명록 글에 답글을 달았어요");
+    expect(guestbookNotificationHref("haneul")).toBe("/@haneul/guestbook");
+    expect(isGuestbookKind("guestbook")).toBe(true);
+    expect(isGuestbookKind("guestbook_reply")).toBe(true);
+    expect(isGuestbookKind("comment")).toBe(false);
   });
 });
 
