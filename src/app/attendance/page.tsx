@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { formatNumber } from "@/lib/game";
 import { monthCalendar } from "@/lib/kst";
-import { ensureTodayAttendance, listAttendanceRewards, listMonthAttendances } from "@/server/attendance";
+import { ensureTodayAttendanceOnce, listAttendanceRewards, listMonthAttendances } from "@/server/attendance";
 import { requireMember } from "@/server/dal";
 
 export const metadata: Metadata = { title: "출석 체크 | Blogville" };
@@ -12,7 +12,7 @@ const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
 export default async function AttendancePage() {
   const member = await requireMember();
   // 헤더가 이미 기록했으면 읽기만 한다. 헤더에서 실패했으면 한 번 더 해 보고, 또 실패하면 오류 화면
-  const today = await ensureTodayAttendance(member.userId, member.sessionId);
+  const today = await ensureTodayAttendanceOnce(member.userId, member.sessionId);
   if (!today) throw new Error("출석을 기록하지 못함");
   const calendar = monthCalendar(today.date);
   const [rewards, attended] = await Promise.all([listAttendanceRewards(), listMonthAttendances(member.userId, calendar.start, calendar.end)]);

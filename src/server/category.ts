@@ -17,25 +17,20 @@ export type CategoryTree = {
 
 /** 블로그의 대분류·소분류 순서대로, 보는 사람이 볼 수 있는 글 수와 함께 (BLOG-05, POST-05) */
 export async function getCategoryTree(blogId: number, viewerIsOwner: boolean): Promise<CategoryTree> {
-  const cats = await db.select().from(categories).where(eq(categories.blogId, blogId)).orderBy(asc(categories.position));
-  if (cats.length === 0) return [];
-  const subs = await db
-    .select()
-    .from(subcategories)
-    .where(inArray(subcategories.categoryId, cats.map((c) => c.id)))
-    .orderBy(asc(subcategories.position));
-
   const visible = and(eq(posts.blogId, blogId), viewerIsOwner ? undefined : eq(posts.isPublic, true));
-  const catCounts = await db
-    .select({ id: posts.categoryId, n: count() })
-    .from(posts)
-    .where(visible)
-    .groupBy(posts.categoryId);
-  const subCounts = await db
-    .select({ id: posts.subcategoryId, n: count() })
-    .from(posts)
-    .where(visible)
-    .groupBy(posts.subcategoryId);
+  // 네 쿼리가 서로 기다리지 않게 한꺼번에 (소분류는 대분류 표와 이어서 이 블로그 것만)
+  const [cats, subs, catCounts, subCounts] = await Promise.all([
+    db.select().from(categories).where(eq(categories.blogId, blogId)).orderBy(asc(categories.position)),
+    db
+      .select({ id: subcategories.id, categoryId: subcategories.categoryId, name: subcategories.name })
+      .from(subcategories)
+      .innerJoin(categories, eq(categories.id, subcategories.categoryId))
+      .where(eq(categories.blogId, blogId))
+      .orderBy(asc(subcategories.position)),
+    db.select({ id: posts.categoryId, n: count() }).from(posts).where(visible).groupBy(posts.categoryId),
+    db.select({ id: posts.subcategoryId, n: count() }).from(posts).where(visible).groupBy(posts.subcategoryId),
+  ]);
+  if (cats.length === 0) return [];
   const catN = new Map(catCounts.map((r) => [r.id, r.n]));
   const subN = new Map(subCounts.map((r) => [r.id, r.n]));
 
