@@ -17,16 +17,16 @@ async function openWrite(page: Page) {
 test.describe("POST-01 에디터 도구", () => {
   test("명세 순서·구분, 마우스를 올리면 이름, 고른 도구는 검은 바탕, 모두 44px", async ({ page }) => {
     await openWrite(page);
-    await expect(toolbar(page).getByRole("button")).toHaveText(["H2", "H3", "B", "I", "U", "S", "•", "1.", "❝", "</>", "―", "🔗", "↶", "↷", "🖼 사진", "📎 파일"]);
+    await expect(toolbar(page).getByRole("button")).toHaveText(["H2", "H3", "B", "I", "U", "S", "•", "1.", "❝", "</>", "―", "🔗", "▦", "▶", "⇤", "↔", "⇥", "↶", "↷", "🖼 사진", "📎 파일"]);
     const names = await toolbar(page)
       .getByRole("button")
-      .evaluateAll((els) => els.slice(0, 14).map((el) => el.getAttribute("title")));
-    expect(names).toEqual(["큰 제목", "작은 제목", "굵게", "기울임", "밑줄", "취소선", "글머리 목록", "번호 목록", "인용", "코드 블록", "구분선", "링크", "되돌리기", "다시 실행"]);
+      .evaluateAll((els) => els.slice(0, 19).map((el) => el.getAttribute("title")));
+    expect(names).toEqual(["큰 제목", "작은 제목", "굵게", "기울임", "밑줄", "취소선", "글머리 목록", "번호 목록", "인용", "코드 블록", "구분선", "링크", "표 넣기", "YouTube 영상", "왼쪽 정렬", "가운데 정렬", "오른쪽 정렬", "되돌리기", "다시 실행"]);
     // 구분선 자리까지 명세 순서 그대로
     const sequence = await toolbar(page)
       .locator(":scope > button, :scope > [role=separator], :scope > * > button")
       .evaluateAll((els) => els.map((el) => (el.getAttribute("role") === "separator" ? "|" : el.textContent?.trim())));
-    expect(sequence).toEqual(["H2", "H3", "|", "B", "I", "U", "S", "|", "•", "1.", "❝", "</>", "―", "🔗", "|", "↶", "↷", "|", "🖼 사진", "📎 파일"]);
+    expect(sequence).toEqual(["H2", "H3", "|", "B", "I", "U", "S", "|", "•", "1.", "❝", "</>", "―", "🔗", "|", "▦", "▶", "⇤", "↔", "⇥", "|", "↶", "↷", "|", "🖼 사진", "📎 파일"]);
     for (const box of await toolbar(page).getByRole("button").all()) {
       const b = (await box.boundingBox())!;
       expect(Math.min(b.width, b.height)).toBeGreaterThanOrEqual(44);
@@ -156,7 +156,7 @@ test.describe("POST-01 에디터 도구", () => {
     await openWrite(page);
     const root = page.locator("[data-editor-root]");
     await expect(root).toHaveCSS("outline-style", "none");
-    await tool(page, "링크").focus(); // ↶·↷는 아직 눌리지 않아 건너뛴다
+    await tool(page, "오른쪽 정렬").focus(); // ↶·↷는 아직 눌리지 않아 건너뛴다
     await page.keyboard.press("Tab"); // 🖼 사진
     await page.keyboard.press("Tab"); // 📎 파일
     await page.keyboard.press("Tab"); // 본문

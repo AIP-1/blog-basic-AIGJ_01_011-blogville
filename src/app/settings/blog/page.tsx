@@ -6,6 +6,7 @@ import { getCategoryTree } from "@/server/category";
 import { getMyBlog, requireMember } from "@/server/dal";
 import { getBlogVisitDays, getBlogVisitStats, getPopularPosts, getReferrerStats } from "@/server/stats";
 import { PopularPosts, ReferrerList } from "@/components/settings/BlogInsights";
+import { EXPORT_MESSAGES } from "@/lib/export";
 
 export const metadata = { title: "블로그 관리 | Blogville" };
 
@@ -18,8 +19,11 @@ function Card({ id, title, children }: { id?: string; title: string; children: R
   );
 }
 
-export default async function BlogSettingsPage() {
+export default async function BlogSettingsPage({ searchParams }: PageProps<"/settings/blog">) {
   const member = await requireMember();
+  const query = await searchParams;
+  // 내보내기를 10분 안에 다시 누르면 라우트 핸들러가 ?export=wait&min=N으로 돌려보낸다
+  const waitMin = query.export === "wait" ? Math.min(10, Math.max(1, Number(query.min) || 10)) : null;
   const blog = await getMyBlog(member.userId);
   const [tree, stats, days, referrers, popular] = await Promise.all([
     getCategoryTree(blog.id, true),
@@ -64,6 +68,21 @@ export default async function BlogSettingsPage() {
       </Card>
       <Card id="categories" title="카테고리">
         <CategoryManager tree={tree} />
+      </Card>
+      <Card id="export" title="📦 내보내기">
+        <p className="mb-3 text-sm text-ink-soft">
+          글(비공개·예약 글 포함)·사진과 파일·카테고리·댓글·방명록을 .zip 파일 하나로 내려받아요. 압축을 풀면 브라우저로 글을 읽을 수 있고, Markdown 파일로 다른 곳에 옮길 수도 있어요.
+        </p>
+        {waitMin !== null && (
+          <p role="alert" className="form-error mb-3">
+            {EXPORT_MESSAGES.wait(waitMin)}
+          </p>
+        )}
+        {/* 파일을 내려받는 주소라 Link(미리 불러오기) 대신 a */}
+        <a href={`/settings/export?blog=${blog.slug}`} className="btn">
+          내 블로그 내려받기 (.zip)
+        </a>
+        <p className="mt-2 text-xs text-ink-soft">10분에 한 번 내려받을 수 있어요. 글과 첨부가 많으면 시간이 조금 걸려요.</p>
       </Card>
     </div>
   );
