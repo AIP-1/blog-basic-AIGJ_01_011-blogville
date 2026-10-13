@@ -141,7 +141,7 @@ test.describe("같은 카테고리의 다른 글·목록 대표 사진", () => {
     await expect(page).toHaveURL(/\/@[a-z0-9_]+\/\d+/);
     await page.goto(`/@${owner}`);
     const cover = page.locator("article", { hasText: "사진 글" }).locator("[data-post-cover]");
-    await expect(cover).toHaveAttribute("src", /^\/files\/[0-9a-f]{32}$/);
+    await expect(cover).toHaveAttribute("src", /^\/files\/[0-9a-f]{32}\?w=320$/);
     expect(await cover.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
   });
 });

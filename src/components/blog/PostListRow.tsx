@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Post } from "@/db/schema";
-import { firstImageUrl } from "@/lib/attachments";
+import { firstImageUrl, thumbUrl } from "@/lib/attachments";
 import { scheduleLabel } from "@/lib/schedule";
 import { formatDate } from "@/lib/text";
 
@@ -33,7 +33,7 @@ export function PostGalleryTile({ slug, post, likeCount = 0 }: Props) {
       <Link href={`/@${slug}/${post.id}`} className="block overflow-hidden rounded-xl border border-line bg-surface hover:border-accent" data-post-tile>
         {cover ? (
           // eslint-disable-next-line @next/next/no-img-element -- 우리 저장소(/files) 사진, 크기를 모른다
-          <img src={cover} alt="" loading="lazy" className="aspect-[4/3] w-full object-cover" />
+          <img src={thumbUrl(cover, 640)} alt="" loading="lazy" className="aspect-[4/3] w-full object-cover" />
         ) : (
           <span aria-hidden className="flex aspect-[4/3] w-full items-center justify-center bg-accent/10 text-4xl font-extrabold text-accent">
             {[...post.title.trim()][0] ?? "✎"}
