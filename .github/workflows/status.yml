@@ -20,15 +20,21 @@ jobs:
 
       - name: 서버 상태
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         with:
           host: ${{ env.SSH_HOST }}
           port: ${{ env.SSH_PORT }}
           username: ${{ secrets.SSH_ID }}
           password: ${{ secrets.SSH_PASSWORD }}
+          envs: ADMIN_USERNAME,ADMIN_PASSWORD
           script: |
             D=docker; docker info >/dev/null 2>&1 || D="sudo -n docker"
-            echo "== 컨테이너"; $D ps -a --filter name=blogville --format '{{.Names}} {{.Status}} {{.Image}}'
+            echo "== 컨테이너"; $D ps -a --filter name=bv8400- --format '{{.Names}} {{.Status}} {{.Image}}'
             echo "== 8400 포트"; (ss -ltnp 2>/dev/null || netstat -ltn 2>/dev/null) | grep -E ':8400\b' || echo "8400을 듣는 곳이 없어요"
             echo "== 서버 안에서 열기"; for u in http://127.0.0.1:8400/ http://$(hostname -I | awk '{print $1}'):8400/; do echo "$u -> $(curl -s -o /dev/null -m 10 -w '%{http_code}' $u || echo 실패)"; done
             echo "== 서버 IP"; hostname -I
-            echo "== 최근 로그"; $D logs --tail 30 blogville 2>&1 | grep -vE "collation|severity|01000|detail:|hint:|file:|line:|routine:|^\{|^\}" | tail -30
+            ACTIVE=$(cat ~/blogville/state/active 2>/dev/null || echo blue); APP="bv8400-$ACTIVE"; echo "== 서비스 중: $APP"
+            echo "== 관리자 계정 점검 (값은 찍지 않음)"; $D exec -e ADMIN_USERNAME="$ADMIN_USERNAME" -e ADMIN_PASSWORD="$ADMIN_PASSWORD" "$APP" node scripts/check-admin.mjs || echo "점검 스크립트가 없는 버전이에요 (다음 배포 뒤 다시)"
+            echo "== 최근 로그"; $D logs --tail 30 "$APP" 2>&1 | grep -vE "collation|severity|01000|detail:|hint:|file:|line:|routine:|^\{|^\}" | tail -30
