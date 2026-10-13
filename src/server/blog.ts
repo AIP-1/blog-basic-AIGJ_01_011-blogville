@@ -1,9 +1,9 @@
 import "server-only";
-import { desc, eq, ilike, max, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, isNull, max, or, sql } from "drizzle-orm";
 import { cache } from "react";
 import { db, type Tx } from "@/db";
 import { alias } from "drizzle-orm/pg-core";
-import { blogs, items, posts, profiles } from "@/db/schema";
+import { attachments, blogs, items, posts, profiles } from "@/db/schema";
 import { likePattern } from "@/lib/blog-search";
 import { DEFAULT_ACCENT, type BlogAccent } from "@/lib/blog-accent";
 import { DEFAULT_LIST_STYLE, type ListStyle } from "@/lib/list-style";
@@ -100,4 +100,49 @@ export async function updateBlogListStyle(ownerId: string, style: ListStyle) {
     .update(blogs)
     .set({ listStyle: style === DEFAULT_LIST_STYLE ? null : style })
     .where(eq(blogs.ownerId, ownerId));
+}
+
+export const COVER_ERRORS = {
+  invalid: "이 사진은 커버 사진으로 쓸 수 없어요. 다시 올려 주세요.",
+  saved: "커버 사진을 바꿨어요",
+  removed: "커버 사진을 지웠어요",
+} as const;
+
+/**
+ * 블로그 커버 사진 바꾸기: 프로필 사진(setProfilePhoto)과 같은 규칙. 내가 방금(1시간 안) 올렸고 어느 글에도 붙지 않은 사진만 받는다.
+ * 블로그 → 첨부 순서로 잠근다. 전 사진은 떨어진 첨부가 되어 하루 뒤 정리 작업이 지운다.
+ */
+export async function setBlogCover(ownerId: string, key: string): Promise<string | null> {
+  return db.transaction(async (tx) => {
+    const [blog] = await tx.select({ id: blogs.id, key: blogs.coverKey }).from(blogs).where(eq(blogs.ownerId, ownerId)).for("update");
+    if (!blog) return COVER_ERRORS.invalid;
+    if (blog.key === key) return null;
+    const [photo] = await tx
+      .select({ key: attachments.key })
+      .from(attachments)
+      .where(
+        and(
+          eq(attachments.key, key),
+          eq(attachments.userId, ownerId),
+          eq(attachments.kind, "image"),
+          isNull(attachments.postId),
+          sql`${attachments.createdAt} > now() - interval '1 hour'`,
+        ),
+      )
+      .for("update");
+    if (!photo) return COVER_ERRORS.invalid;
+    await tx.update(blogs).set({ coverKey: key }).where(eq(blogs.id, blog.id));
+    if (blog.key) await tx.update(attachments).set({ detachedAt: sql`now()` }).where(eq(attachments.key, blog.key));
+    return null;
+  });
+}
+
+/** 커버 사진 지우기: 비우고, 그 첨부는 하루 뒤 정리 작업이 지운다 */
+export async function removeBlogCover(ownerId: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    const [blog] = await tx.select({ id: blogs.id, key: blogs.coverKey }).from(blogs).where(eq(blogs.ownerId, ownerId)).for("update");
+    if (!blog?.key) return;
+    await tx.update(blogs).set({ coverKey: null }).where(eq(blogs.id, blog.id));
+    await tx.update(attachments).set({ detachedAt: sql`now()` }).where(eq(attachments.key, blog.key));
+  });
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BlogCoverForm } from "@/components/settings/BlogCoverForm";
 import { CategoryManager } from "@/components/settings/CategoryManager";
 import { VisitChart } from "@/components/settings/VisitChart";
 import { AccentForm, BlogInfoForm, ListStyleForm, SlugForm } from "@/components/settings/SettingsForms";
@@ -62,6 +63,9 @@ export default async function BlogSettingsPage({ searchParams }: PageProps<"/set
       </Card>
       <Card title="블로그 정보">
         <BlogInfoForm title={blog.title} intro={blog.intro} />
+      </Card>
+      <Card id="cover" title="🖼️ 커버 사진">
+        <BlogCoverForm coverKey={blog.coverKey} />
       </Card>
       <Card id="accent" title="🎨 강조색">
         <AccentForm accent={blog.accentColor ?? "green"} />

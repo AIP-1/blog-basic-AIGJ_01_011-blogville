@@ -6,8 +6,8 @@ import { attachments, blogs, posts, profiles, type Attachment } from "@/db/schem
 import { pasteAction, type AttachmentKind, type PasteAction } from "@/lib/attachments";
 import { copyFile, deleteFile, listFiles, saveFile } from "./storage";
 
-/** 지금 누군가의 프로필 사진인 첨부 (BLOG-04): 글에 붙이지 않고, 누구나 보며, 정리하지 않는다 */
-const isProfilePhotoSql = sql<boolean>`exists (select 1 from ${profiles} where ${profiles.photoKey} = ${attachments.key})`;
+/** 지금 누군가의 프로필 사진(BLOG-04)이나 블로그 커버 사진인 첨부: 글에 붙이지 않고, 누구나 보며, 정리하지 않는다 */
+const isProfilePhotoSql = sql<boolean>`(exists (select 1 from ${profiles} where ${profiles.photoKey} = ${attachments.key}) or exists (select 1 from ${blogs} where ${blogs.coverKey} = ${attachments.key}))`;
 
 /** 올린 파일을 저장하고 붙지 않은 첨부 행을 만든다 (POST-07 흐름 3) */
 export async function createAttachment(

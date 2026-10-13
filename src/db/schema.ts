@@ -258,6 +258,8 @@ export const blogs = pgTable(
     accentColor: text("accent_color"),
     // 글 목록 모양 (src/lib/list-style.ts). NULL이면 카드형
     listStyle: text("list_style"),
+    // 블로그 홈 맨 위 커버 사진의 첨부 키 (블로그 꾸미기). NULL이면 없음
+    coverKey: text("cover_key"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

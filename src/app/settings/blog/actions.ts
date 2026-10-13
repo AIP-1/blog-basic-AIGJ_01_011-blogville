@@ -3,8 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { BLOG_ERRORS, checkBlogIntro, checkBlogTitle } from "@/lib/blog-rules";
 import { parseId } from "@/lib/ids";
+import { KEY_PATTERN } from "@/lib/attachments";
 import { getMyBlog, requireMember } from "@/server/dal";
-import { updateBlogAccent as saveAccent, updateBlogInfo as saveInfo, updateBlogListStyle as saveListStyle, updateBlogSlug as saveSlug } from "@/server/blog";
+import { COVER_ERRORS, removeBlogCover, setBlogCover, updateBlogAccent as saveAccent, updateBlogInfo as saveInfo, updateBlogListStyle as saveListStyle, updateBlogSlug as saveSlug } from "@/server/blog";
 import { isListStyle, LIST_STYLE_ERROR } from "@/lib/list-style";
 import { ACCENT_ERROR, isBlogAccent } from "@/lib/blog-accent";
 import * as category from "@/server/category";
@@ -57,6 +58,27 @@ export async function updateBlogListStyle(_prev: SettingsState, formData: FormDa
   await saveListStyle(member.userId, style);
   refresh((await getMyBlog(member.userId)).slug);
   return { message: BLOG_ERRORS.saved, values: { listStyle: style } };
+}
+
+export type CoverState = { error: string } | { message: string } | null;
+
+/** 커버 사진 바꾸기: 화면이 `/api/uploads`로 올린 사진의 키를 받는다 */
+export async function saveBlogCover(formData: FormData): Promise<CoverState> {
+  const member = await requireMember();
+  const key = formData.get("key");
+  if (typeof key !== "string" || !KEY_PATTERN.test(key)) return { error: COVER_ERRORS.invalid };
+  const error = await setBlogCover(member.userId, key);
+  if (error) return { error };
+  refresh((await getMyBlog(member.userId)).slug);
+  return { message: COVER_ERRORS.saved };
+}
+
+/** 커버 사진 지우기 */
+export async function deleteBlogCover(): Promise<CoverState> {
+  const member = await requireMember();
+  await removeBlogCover(member.userId);
+  refresh((await getMyBlog(member.userId)).slug);
+  return { message: COVER_ERRORS.removed };
 }
 
 // ── 카테고리 (BLOG-05) ──
