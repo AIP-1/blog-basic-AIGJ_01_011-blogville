@@ -37,12 +37,16 @@ export const users = pgTable(
     name: text("name").notNull(),
     image: text("image"),
     role: text("role").notNull().default("user"),
+    /** 관리자 정지: 이 시각까지 로그인할 수 없다. 영구 정지는 'infinity', 정지 아님은 null (관리자 회원 관리) */
+    suspendedUntil: timestamp("suspended_until", { withTimezone: true }),
+    suspendReason: text("suspend_reason"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     check("users_username_check", sql`${t.username} ~ '^[a-z0-9_]{4,20}$'`),
     check("users_role_check", sql`${t.role} in ('user', 'admin')`),
+    check("users_suspend_reason_check", sql`${t.suspendReason} is null or char_length(${t.suspendReason}) between 1 and 200`),
   ],
 );
 
@@ -325,6 +329,9 @@ export const posts = pgTable(
     contentHtml: text("content_html").notNull(),
     contentText: text("content_text").notNull(),
     isPublic: boolean("is_public").notNull().default(true),
+    /** 관리자 블라인드: 가린 글은 비공개로만 둘 수 있다 (작성자만 봄). 풀면 null (관리자 글 관리) */
+    blindedAt: timestamp("blinded_at", { withTimezone: true }),
+    blindReason: text("blind_reason"),
     /** post_views에서 셀 수 있는 합계를 일부러 저장한 값 (POST-06) */
     viewCount: integer("view_count").notNull().default(0),
     createdAt: createdAt(),
@@ -343,6 +350,8 @@ export const posts = pgTable(
       "posts_subcategory_needs_category",
       sql`${t.subcategoryId} is null or ${t.categoryId} is not null`,
     ),
+    check("posts_blinded_private", sql`${t.blindedAt} is null or not ${t.isPublic}`),
+    check("posts_blind_reason_check", sql`${t.blindReason} is null or char_length(${t.blindReason}) between 1 and 200`),
   ],
 );
 
@@ -736,4 +745,35 @@ export const fishingCatches = pgTable(
     primaryKey({ columns: [t.userId, t.date] }),
     check("fishing_catches_catch_check", sql`${t.catch} in ('minnow', 'crucian', 'carp', 'golden_carp', 'feed', 'boot')`),
   ],
+);
+
+/** 관리 기록: 관리자가 회원·글·댓글·사이트 설정을 바꾼 일 (관리자 > 관리 기록) */
+export const adminLogs = pgTable(
+  "admin_logs",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    adminId: text("admin_id").references(() => users.id, { onDelete: "set null" }),
+    action: text("action").notNull(),
+    /** 무엇에 했는지 사람이 읽는 한 줄 (아이디·글 제목 등). 대상이 지워져도 남는다 */
+    target: text("target").notNull(),
+    detail: text("detail"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("admin_logs_created_idx").on(t.createdAt.desc(), t.id.desc()),
+    check("admin_logs_action_check", sql`char_length(${t.action}) between 1 and 40`),
+    check("admin_logs_target_check", sql`char_length(${t.target}) between 1 and 200`),
+    check("admin_logs_detail_check", sql`${t.detail} is null or char_length(${t.detail}) <= 500`),
+  ],
+);
+
+/** 사이트 설정 (관리자 > 사이트 설정). banner: 모든 화면 맨 위 공지 띠 */
+export const siteSettings = pgTable(
+  "site_settings",
+  {
+    key: text("key").primaryKey(),
+    value: text("value").notNull(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check("site_settings_value_check", sql`char_length(${t.value}) <= 500`)],
 );
