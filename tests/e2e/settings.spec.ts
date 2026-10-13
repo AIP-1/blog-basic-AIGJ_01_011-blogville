@@ -46,7 +46,8 @@ test.describe("US5 블로그 설정·닉네임", () => {
     await signUpOk(page);
     await page.goto("/settings/account");
     const nick = page.getByLabel("닉네임");
-    const save = page.getByRole("button", { name: "저장" });
+    // 알림 설정 카드에도 [저장]이 있어 닉네임 칸이 든 폼으로 좁힌다
+    const save = page.locator("form", { has: nick }).getByRole("button", { name: "저장" });
     await nick.fill("a");
     await save.click();
     await expect(page.locator("p[role=alert]")).toHaveText("닉네임은 2자 이상이에요");
