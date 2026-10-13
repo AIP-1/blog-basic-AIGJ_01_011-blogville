@@ -294,6 +294,9 @@ export function TownHud({
                 <Link href="/settings/account" className="btn btn-ghost">
                   ⚙️ 내 정보
                 </Link>
+                <Link href="/bookmarks" className="btn btn-ghost">
+                  🔖 내 스크랩
+                </Link>
                 {/* 마을에는 아래 막대(업데이트 소식·버그·문의)가 없어 여기에 둔다 (SUP-01) */}
                 <Link href={supportHref("/town")} className="btn btn-ghost">
                   🐞 버그·문의

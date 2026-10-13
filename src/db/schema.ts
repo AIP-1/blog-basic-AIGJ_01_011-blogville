@@ -875,3 +875,55 @@ export const siteSettings = pgTable(
   },
   (t) => [check("site_settings_value_check", sql`char_length(${t.value}) <= 10000`)],
 );
+
+// 신고 (specs/059-report-bookmarks). 회원이 글·댓글·답글·방명록을 신고하고 관리자가 처리한다.
+// 대상은 종류+ID로만 가리킨다 (외래 키 없음): 대상이 지워져도 신고는 남아 관리자가 정리한다.
+// 한 회원은 한 대상을 한 번만 신고한다 (reports_reporter_target_unique). 처리(resolved·dismissed)하면 처리한 관리자·시각이 함께 남는다.
+export const reports = pgTable(
+  "reports",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    reporterId: text("reporter_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    targetType: text("target_type").$type<"post" | "comment" | "reply" | "guestbook">().notNull(),
+    targetId: integer("target_id").notNull(),
+    reason: text("reason").$type<"spam" | "abuse" | "obscene" | "privacy" | "other">().notNull(),
+    /** 기타일 때 쓰는 설명 (1~300자). 다른 사유면 null */
+    detail: text("detail"),
+    status: text("status").$type<"open" | "resolved" | "dismissed">().notNull().default("open"),
+    resolvedBy: text("resolved_by").references(() => users.id, { onDelete: "set null" }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("reports_reporter_target_unique").on(t.reporterId, t.targetType, t.targetId),
+    index("reports_status_created_idx").on(t.status, t.createdAt),
+    index("reports_target_idx").on(t.targetType, t.targetId),
+    index("reports_reporter_created_idx").on(t.reporterId, t.createdAt),
+    check("reports_target_type_check", sql`${t.targetType} in ('post', 'comment', 'reply', 'guestbook')`),
+    check("reports_reason_check", sql`${t.reason} in ('spam', 'abuse', 'obscene', 'privacy', 'other')`),
+    check(
+      "reports_detail_check",
+      sql`(${t.reason} = 'other' and ${t.detail} is not null and char_length(${t.detail}) between 1 and 300) or (${t.reason} <> 'other' and ${t.detail} is null)`,
+    ),
+    check("reports_status_check", sql`${t.status} in ('open', 'resolved', 'dismissed')`),
+    check("reports_resolved_check", sql`(${t.status} = 'open') = (${t.resolvedAt} is null)`),
+  ],
+);
+
+// 스크랩 (나중에 읽기, specs/059-report-bookmarks). 기본 키가 "한 글에 한 번"을 지킨다.
+// 남의 비공개 글은 스크랩할 수 없고, 스크랩한 글이 비공개가 되면 목록에서 빠진다 (읽을 때 거른다).
+export const bookmarks = pgTable(
+  "bookmarks",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    postId: integer("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.postId] }), index("bookmarks_user_created_idx").on(t.userId, t.createdAt.desc()), index("bookmarks_post_idx").on(t.postId)],
+);

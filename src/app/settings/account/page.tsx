@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { DeleteAccountForm, NicknameForm, PasswordForm } from "@/components/settings/SettingsForms";
 import { ProfilePhotoForm } from "@/components/settings/ProfilePhotoForm";
 import { SocialAccounts } from "@/components/settings/SocialAccounts";
@@ -28,7 +29,13 @@ export default async function AccountPage({ searchParams }: PageProps<"/settings
   const notice = socialNotice(query);
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <h1 className="text-2xl font-extrabold">내 정보</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-2xl font-extrabold">내 정보</h1>
+        {/* 🔖 내 스크랩 (specs/059-report-bookmarks): 헤더 [👤 내 정보]에서 들어온다 */}
+        <Link href="/bookmarks" className="btn">
+          🔖 내 스크랩
+        </Link>
+      </div>
       <section className="rounded-2xl border border-line bg-surface p-5">
         <p className="mb-4 text-sm text-ink-soft">아이디: {member.username}</p>
         <NicknameForm nickname={nickname} />

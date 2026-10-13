@@ -7,6 +7,7 @@ const TABS = [
   { href: "/admin", label: "📊 대시보드" },
   { href: "/admin/members", label: "👥 회원" },
   { href: "/admin/content", label: "📝 콘텐츠" },
+  { href: "/admin/reports", label: "🚨 신고" },
   { href: "/admin/feedback", label: "🐞 버그·문의" },
   { href: "/admin/settings", label: "⚙️ 사이트 설정" },
   { href: "/admin/audit", label: "📜 관리 기록" },
