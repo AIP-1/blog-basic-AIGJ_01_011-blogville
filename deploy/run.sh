@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
-# 서버에서 Blogville 도커 이미지를 불러와 8400번 포트로 실행한다.
+# 서버에서 Blogville 도커 이미지를 불러와 8400번 포트로 **무중단(블루·그린)** 배포한다.
 # GitHub Actions(.github/workflows/deploy.yml)가 이미지 파일과 이 스크립트를 올린 뒤 SSH로 부른다.
+#
+# 구성 (모두 --network host)
+#   blogville-proxy  8400번 포트. state/active-port에 적힌 포트의 앱으로 요청을 넘긴다 (scripts/proxy.mjs)
+#   blogville-blue   8401번 포트의 앱
+#   blogville-green  8402번 포트의 앱
+# 순서: 쉬고 있는 색에 새 버전을 띄움 → 그 포트에서 응답 확인 → active-port를 바꿔 프록시가 넘김
+#       → 이전 색은 하던 요청을 마칠 시간(DRAIN초)을 준 뒤 멈춘다. 새 버전이 뜨지 않으면 이전 버전이 그대로 서비스한다.
 #
 # 받는 환경 변수
 #   DATABASE_URL  (필수) postgres://아이디:비밀번호@주소:포트/DB이름?search_path=스키마
@@ -12,10 +19,13 @@
 #   auth-secret   처음 한 번 만든 로그인 비밀키. 지우면 모든 로그인이 풀린다
 #   app.env       컨테이너 환경 변수 (권한 600)
 #   uploads/      올린 사진·파일
+#   state/        active(blue|green), active-port (프록시가 읽음)
 set -euo pipefail
 
 PORT=8400
-NAME=blogville
+DRAIN=15
+PROXY=blogville-proxy
+LEGACY=blogville   # 무중단 배포 전에 8400을 직접 쓰던 컨테이너
 DEPLOY_DIR="${DEPLOY_DIR:-$HOME/blogville}"
 TAR="$DEPLOY_DIR/blogville-image.tar.gz"
 
@@ -33,7 +43,7 @@ if ! docker info >/dev/null 2>&1; then
   fi
 fi
 
-mkdir -p "$DEPLOY_DIR/uploads"
+mkdir -p "$DEPLOY_DIR/uploads" "$DEPLOY_DIR/state"
 # 컨테이너는 node(1000) 계정으로 돈다
 chmod 777 "$DEPLOY_DIR/uploads" 2>/dev/null || true
 
@@ -69,35 +79,88 @@ sql`select current_user, current_schema(), version()`
   exit 1
 fi
 
-echo "이전 컨테이너 정리"
-"${DOCKER[@]}" rm -f "$NAME" >/dev/null 2>&1 || true
+# 지금 서비스 중인 색과 이번에 띄울 색
+ACTIVE=$(cat "$DEPLOY_DIR/state/active" 2>/dev/null || true)
+if [ "$ACTIVE" = "blue" ]; then NEXT=green; NEXT_PORT=8402; else NEXT=blue; NEXT_PORT=8401; fi
+NEXT_NAME="blogville-$NEXT"
 
-# 도커 기본 네트워크(bridge)에서는 이 서버의 공인 IP(DB)로 가는 길이 막혀 있어서(EHOSTUNREACH)
-# 서버 네트워크를 그대로 쓴다. 앱은 서버의 $PORT 포트에서 바로 열린다
-echo "컨테이너 실행 (포트 $PORT)"
+# 도커 기본 네트워크(bridge)에서는 이 서버의 공인 IP(DB)로 가는 길이 막혀 있어서(EHOSTUNREACH) 서버 네트워크를 그대로 쓴다
+echo "새 버전을 $NEXT($NEXT_PORT)에 띄워요 (지금 서비스: ${ACTIVE:-없음})"
+"${DOCKER[@]}" rm -f "$NEXT_NAME" >/dev/null 2>&1 || true
 "${DOCKER[@]}" run -d \
-  --name "$NAME" \
+  --name "$NEXT_NAME" \
   --restart unless-stopped \
   --env-file "$DEPLOY_DIR/app.env" \
+  -e PORT="$NEXT_PORT" \
   --network host \
   -v "$DEPLOY_DIR/uploads:/app/storage/uploads" \
   "$IMAGE" >/dev/null
 
-# 마이그레이션을 마치고 서버가 뜰 때까지 기다린다 (최대 2분)
+# 마이그레이션을 마치고 새 버전이 뜰 때까지 기다린다 (최대 2분)
+ready=""
 for _ in $(seq 1 60); do
-  if [ "$("${DOCKER[@]}" inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" != "true" ]; then
+  if [ "$("${DOCKER[@]}" inspect -f '{{.State.Running}}' "$NEXT_NAME" 2>/dev/null)" != "true" ]; then
     break
   fi
-  if "${DOCKER[@]}" exec "$NAME" node -e "fetch('http://127.0.0.1:$PORT/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))" 2>/dev/null; then
-    echo "배포 완료: $APP_URL"
-    rm -f "$TAR"
-    # 지금 쓰는 것 말고 남은 blogville 이미지는 지운다
-    "${DOCKER[@]}" images blogville --format '{{.Repository}}:{{.Tag}}' | grep -vx "$IMAGE" | xargs -r "${DOCKER[@]}" rmi >/dev/null 2>&1 || true
-    exit 0
+  if "${DOCKER[@]}" exec "$NEXT_NAME" node -e "fetch('http://127.0.0.1:$NEXT_PORT/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))" 2>/dev/null; then
+    ready=1
+    break
   fi
   sleep 2
 done
+if [ -z "$ready" ]; then
+  echo "새 버전이 뜨지 않아서 바꾸지 않았어요. 지금 서비스(${ACTIVE:-없음})는 그대로예요. 새 버전 로그:" >&2
+  "${DOCKER[@]}" logs --tail 50 "$NEXT_NAME" >&2 || true
+  "${DOCKER[@]}" rm -f "$NEXT_NAME" >/dev/null 2>&1 || true
+  exit 1
+fi
+echo "새 버전 응답 확인"
 
-echo "서버가 뜨지 않았어요. 컨테이너 로그:" >&2
-"${DOCKER[@]}" logs --tail 50 "$NAME" >&2 || true
-exit 1
+# 프록시가 넘길 포트를 바꾼다 (파일을 통째로 바꿔 반쯤 쓴 내용을 읽지 않게)
+printf '%s\n' "$NEXT_PORT" > "$DEPLOY_DIR/state/active-port.tmp"
+mv -f "$DEPLOY_DIR/state/active-port.tmp" "$DEPLOY_DIR/state/active-port"
+chmod 644 "$DEPLOY_DIR/state/active-port"
+
+# 프록시가 없으면 띄운다. 무중단 배포 전 컨테이너(8400 직접 사용)가 있으면 이번 한 번만 바꾸며 잠깐 끊긴다
+if [ "$("${DOCKER[@]}" inspect -f '{{.State.Running}}' "$PROXY" 2>/dev/null)" != "true" ]; then
+  "${DOCKER[@]}" rm -f "$LEGACY" "$PROXY" >/dev/null 2>&1 || true
+  echo "프록시를 띄워요 (포트 $PORT)"
+  "${DOCKER[@]}" run -d \
+    --name "$PROXY" \
+    --restart unless-stopped \
+    -e PORT="$PORT" \
+    -e ACTIVE_FILE=/state/active-port \
+    --network host \
+    -v "$DEPLOY_DIR/state:/state:ro" \
+    "$IMAGE" node scripts/proxy.mjs >/dev/null
+fi
+
+# 프록시를 거쳐 새 버전이 나오는지 확인한다
+ok=""
+for _ in $(seq 1 15); do
+  if "${DOCKER[@]}" exec "$PROXY" node -e "fetch('http://127.0.0.1:$PORT/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))" 2>/dev/null; then
+    ok=1
+    break
+  fi
+  sleep 1
+done
+if [ -z "$ok" ]; then
+  echo "프록시($PORT)가 응답하지 않아요. 프록시 로그:" >&2
+  "${DOCKER[@]}" logs --tail 30 "$PROXY" >&2 || true
+  exit 1
+fi
+echo "$NEXT" > "$DEPLOY_DIR/state/active"
+echo "배포 완료: $APP_URL ($NEXT, 포트 $NEXT_PORT)"
+
+# 이전 색은 하던 요청을 마칠 시간을 주고 멈춘다
+if [ -n "$ACTIVE" ] && [ "$ACTIVE" != "$NEXT" ]; then
+  sleep "$DRAIN"
+  "${DOCKER[@]}" stop -t 20 "blogville-$ACTIVE" >/dev/null 2>&1 || true
+  "${DOCKER[@]}" rm -f "blogville-$ACTIVE" >/dev/null 2>&1 || true
+  echo "이전 버전($ACTIVE) 정리"
+fi
+
+rm -f "$TAR"
+# 돌고 있는 컨테이너(프록시 포함)가 쓰지 않는 blogville 이미지는 지운다
+in_use=$("${DOCKER[@]}" ps --format '{{.Image}}' | sort -u)
+"${DOCKER[@]}" images blogville --format '{{.Repository}}:{{.Tag}}' | grep -vxF "$in_use" | xargs -r "${DOCKER[@]}" rmi >/dev/null 2>&1 || true
