@@ -13,6 +13,7 @@ import { growForPost } from "./farm";
 import { grantReward } from "./points";
 import { likeCountSql } from "./likes";
 import { resolveCategory } from "./category";
+import { removeEmptySeries, resolveSeries } from "./series";
 import { syncPostTags } from "./tags";
 import { checkBannedWords } from "./banned-words";
 
@@ -52,7 +53,9 @@ export async function savePost(blogId: number, ownerId: string, input: PostInput
 
     const category = await resolveCategory(tx, blogId, input.categoryId, input.subcategoryId);
     if (category === "invalid") throw new PostSaveError(POST_ERRORS.invalid);
-    const values = { title: input.title, contentHtml, contentText, isPublic: input.isPublic, publishAt: input.publishAt, ...category };
+    const seriesId = await resolveSeries(tx, blogId, input.series);
+    if (seriesId === "invalid") throw new PostSaveError(POST_ERRORS.invalid);
+    const values = { title: input.title, contentHtml, contentText, isPublic: input.isPublic, publishAt: input.publishAt, seriesId, ...category };
 
     let postId: number;
     if (input.postId === null) {
@@ -67,13 +70,18 @@ export async function savePost(blogId: number, ownerId: string, input: PostInput
     // 받았으면 키우는 동물이 모두 성장 +10 (TOWN-09)
     if (postEarnsReward(input.postId === null, input.isPublic, contentText.length) && (await grantReward(tx, ownerId, "post", String(postId)))) await growForPost(tx, ownerId);
     await syncPostTags(tx, postId, input.tags);
+    // 이 글을 다른 시리즈로 옮겼으면 비게 된 시리즈를 지운다
+    if (input.postId !== null) await removeEmptySeries(tx, blogId);
     return postId;
   });
 }
 
 /** 내 글이면 지운다. 남의 글·없는 글이면 아무것도 하지 않는다. */
 export async function deletePost(blogId: number, postId: number) {
-  await db.delete(posts).where(and(eq(posts.id, postId), eq(posts.blogId, blogId)));
+  await db.transaction(async (tx) => {
+    await tx.delete(posts).where(and(eq(posts.id, postId), eq(posts.blogId, blogId)));
+    await removeEmptySeries(tx, blogId);
+  });
 }
 
 const postWithCategory = {

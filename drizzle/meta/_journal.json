@@ -225,6 +225,13 @@
       "when": 1791889955801,
       "tag": "0031_scheduled_posts",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1791890637379,
+      "tag": "0032_series",
+      "breakpoints": true
     }
   ]
 }

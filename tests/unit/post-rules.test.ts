@@ -43,6 +43,21 @@ describe("checkPostInput", () => {
   });
 });
 
+describe("checkPostInput 시리즈", () => {
+  it("없음·내 시리즈·새 시리즈", () => {
+    const pick = (patch: Partial<RawPostInput>) => {
+      const r = checkPostInput({ ...ok, ...patch });
+      return r.ok ? r.value.series : r.error;
+    };
+    expect(pick({})).toEqual({ kind: "none" });
+    expect(pick({ seriesId: "7" })).toEqual({ kind: "existing", id: 7 });
+    expect(pick({ seriesId: "x" })).toBe(POST_ERRORS.invalid);
+    expect(pick({ seriesId: "new", seriesTitle: "  여행   일기 " })).toEqual({ kind: "new", title: "여행 일기" });
+    expect(pick({ seriesId: "new", seriesTitle: "  " })).toBe("새 시리즈 이름을 적어 주세요");
+    expect(pick({ seriesId: "new", seriesTitle: "가".repeat(41) })).toBe("시리즈 이름은 40자까지예요");
+  });
+});
+
 describe("linkHref (링크 창)", () => {
   it("비우거나 https://만 남기면 링크 풀기", () => {
     for (const v of ["", "  ", "https://", "http://", " HTTPS:// "]) expect(linkHref(v)).toBe("");
