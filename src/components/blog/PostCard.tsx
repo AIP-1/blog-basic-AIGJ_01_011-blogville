@@ -38,7 +38,7 @@ export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle,
       )}
       <Link href={`/@${slug}/${post.id}`} className="flex gap-4 rounded-xl border border-line bg-surface p-4 hover:border-accent">
         {rank !== undefined && (
-          <span className={`w-7 shrink-0 text-center text-2xl font-extrabold ${rank <= 3 ? "text-accent" : "text-ink-soft"}`} data-popular-rank={rank}>
+          <span className={`min-w-9 shrink-0 whitespace-nowrap text-center text-2xl font-extrabold tabular-nums ${rank <= 3 ? "text-accent" : "text-ink-soft"}`} data-popular-rank={rank}>
             {rank}
             <span className="sr-only">위</span>
           </span>
