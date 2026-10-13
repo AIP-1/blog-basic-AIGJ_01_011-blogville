@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { HeaderLoginLink } from "@/components/auth/HeaderLoginLink";
 import { SessionKeeper } from "@/components/auth/SessionKeeper";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { AttendanceDayWatcher } from "@/components/game/AttendanceDayWatcher";
 import { LevelUpDialog } from "@/components/game/LevelUpDialog";
 import { PhoneTabs } from "@/components/layout/PhoneTabs";
+import { SupportLink } from "@/components/layout/SupportLink";
+import { UpdatesNewBadge } from "@/components/layout/UpdatesNewBadge";
 import { PixelLayers } from "@/components/game/PixelLayers";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { getMyBlog, getSession } from "@/server/dal";
@@ -140,14 +143,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-dvh flex-col">
         <Header />
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
-        {/* 업데이트 소식 (릴리스 노트, /updates) */}
-        <footer className="site-footer border-t border-line">
-          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm text-ink-soft">
-            <span>Blogville</span>
-            <Link href="/updates" className="inline-flex min-h-11 items-center hover:text-accent" data-updates-link>
-              🆕 업데이트 소식
+        {/* 아래 막대 (SUP-01): 업데이트 소식(릴리스 노트, /updates)과 버그·문의(/support). 마을(PC)에서는 CSS가 숨긴다 */}
+        <footer className="site-footer border-t border-line bg-surface">
+          <nav aria-label="소식과 문의" className="mx-auto grid max-w-5xl grid-cols-2 gap-2 px-4 py-3 sm:flex sm:items-center sm:justify-end">
+            <span className="mr-auto hidden text-sm text-ink-soft sm:inline">Blogville</span>
+            <Link href="/updates" className="btn min-w-0 px-3 text-sm font-semibold" data-updates-link>
+              <span className="truncate">🆕 업데이트 소식</span>
+              <Suspense fallback={null}>
+                <UpdatesNewBadge />
+              </Suspense>
             </Link>
-          </div>
+            <SupportLink className="btn btn-primary min-w-0 px-3 text-sm font-semibold" />
+          </nav>
         </footer>
       </body>
     </html>

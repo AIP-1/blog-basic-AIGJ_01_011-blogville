@@ -5,6 +5,7 @@ import { formatDateTime } from "@/lib/comment-rules";
 import { normalizeName } from "@/lib/names";
 import { findMemberByUsername, getAdminStats, listRecentMembers, listRecentPosts, RECENT_MEMBERS, RECENT_POST_DAYS } from "@/server/admin";
 import { requireAdmin } from "@/server/dal";
+import { countNewFeedback } from "@/server/feedback";
 
 export const metadata = { title: "관리자 | Blogville" };
 
@@ -17,11 +18,12 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   const raw = (await searchParams).member;
   const query = typeof raw === "string" ? normalizeName(raw) : "";
   const searched = query.length > 0 && query.length <= 64;
-  const [stats, members, recent, found] = await Promise.all([
+  const [stats, members, recent, found, newFeedback] = await Promise.all([
     getAdminStats(),
     listRecentMembers(),
     listRecentPosts(),
     searched ? findMemberByUsername(query) : null,
+    countNewFeedback(),
   ]);
   const cards = [
     ["가입 계정", stats.members],
@@ -43,6 +45,19 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
             </p>
           </div>
         ))}
+      </section>
+
+      {/* 버그·문의 (SUP-03): 새로 들어온(접수) 문의 수 */}
+      <section aria-labelledby="admin-feedback" className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-surface p-4">
+        <h2 id="admin-feedback" className="font-bold">
+          🐞 버그·문의{" "}
+          <span className={newFeedback > 0 ? "text-danger" : "text-ink-soft"} data-feedback-new={newFeedback}>
+            새 문의 {newFeedback.toLocaleString("ko-KR")}건
+          </span>
+        </h2>
+        <Link href={newFeedback > 0 ? "/admin/feedback?status=new" : "/admin/feedback"} className="btn">
+          문의 보기
+        </Link>
       </section>
 
       <section aria-labelledby="find-member" className="rounded-2xl border border-line bg-surface p-4">

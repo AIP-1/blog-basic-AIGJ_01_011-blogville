@@ -8,7 +8,9 @@ import { blogs, posts } from "@/db/schema";
 import { parseId } from "@/lib/ids";
 import { makeTempPassword } from "@/lib/temp-password";
 import { RESET_ERRORS, resetMemberPassword, type ResetResult } from "@/server/account";
+import { checkReply, FEEDBACK_ERRORS, isFeedbackStatus } from "@/lib/support-rules";
 import { requireAdmin } from "@/server/dal";
+import { updateFeedback } from "@/server/feedback";
 
 /** 관리자 글 삭제 (AUTH-08): 어느 블로그의 글이든 지운다. 일반 회원이 보내면 404로 끝나고 아무것도 지우지 않는다. */
 export async function adminDeletePost(formData: FormData): Promise<void> {
@@ -43,4 +45,28 @@ export async function adminResetPassword(formData: FormData): Promise<ResetResul
   const userId = formData.get("userId");
   if (typeof userId !== "string" || userId.length < 1 || userId.length > 64) return { ok: false, error: RESET_ERRORS.notFound };
   return resetMemberPassword(userId, makeTempPassword());
+}
+
+export type FeedbackAdminResult = { ok: true; message: string } | { ok: false; error: string };
+
+/**
+ * 관리자 문의 처리 (SUP-03): 상태와 답변을 저장한다. 답변 칸을 비우면 답변을 지운다.
+ * 상태를 바꾸지 않고 새 답변만 달면 `접수`·`확인 중`은 `답변 완료`가 된다.
+ * 새 답변이 달리거나 `답변 완료`·`고침`이 되면 쓴 사람에게 알림이 간다. 일반 회원이 보내면 404로 끝나고 아무것도 바꾸지 않는다.
+ */
+export async function adminUpdateFeedback(_prev: FeedbackAdminResult | null, formData: FormData): Promise<FeedbackAdminResult> {
+  await requireAdmin();
+  const id = parseId(formData.get("id"));
+  const status = formData.get("status");
+  const rawReply = formData.get("reply");
+  if (id === null || typeof rawReply !== "string") return { ok: false, error: FEEDBACK_ERRORS.invalid };
+  if (!isFeedbackStatus(status)) return { ok: false, error: FEEDBACK_ERRORS.status };
+  const reply = checkReply(rawReply);
+  if (!reply.ok) return reply;
+  // 상태를 그대로 두고 새 답변만 달면 `답변 완료`로 올린다 (nextStatus). 화면이 열릴 때의 상태와 같으면 고르지 않은 것으로 본다
+  const picked = status === formData.get("prevStatus") ? undefined : status;
+  const updated = await updateFeedback(id, { status: picked, reply: reply.reply }, "admin");
+  if (!updated) return { ok: false, error: FEEDBACK_ERRORS.notFound };
+  revalidatePath("/", "layout");
+  return { ok: true, message: updated.notified ? "저장했어요. 쓴 사람에게 알림을 보냈어요" : "저장했어요" };
 }

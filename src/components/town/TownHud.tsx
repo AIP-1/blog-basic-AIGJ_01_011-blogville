@@ -11,6 +11,7 @@ import { formatNumber } from "@/lib/game";
 import { lotFront } from "@/lib/town/layout";
 import type { TownSpot } from "@/lib/town/structures";
 import type { HudMember, TownHouse } from "@/server/town";
+import { supportHref } from "@/lib/support-rules";
 
 type Panel = "menu" | "profile" | "notifications" | "teleport" | "friends" | "mailbox" | "lots";
 
@@ -292,6 +293,10 @@ export function TownHud({
               <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-line pt-3">
                 <Link href="/settings/account" className="btn btn-ghost">
                   ⚙️ 내 정보
+                </Link>
+                {/* 마을에는 아래 막대(업데이트 소식·버그·문의)가 없어 여기에 둔다 (SUP-01) */}
+                <Link href={supportHref("/town")} className="btn btn-ghost">
+                  🐞 버그·문의
                 </Link>
                 {admin && (
                   <Link href="/admin" className="btn btn-ghost">
