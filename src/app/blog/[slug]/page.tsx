@@ -128,69 +128,76 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
         </section>
       )}
 
-      <header className="rounded-2xl border border-line bg-surface p-5">
-        <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-start">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-3">
-              {/* 주인 프로필 사진 (BLOG-04, 없으면 캐릭터) */}
-              <ProfileAvatar photoKey={photoKey} nickname={nickname} character={avatar.layers} />
-              <h1 className="min-w-0 text-2xl font-extrabold">
-                <Link href={`/@${blog.slug}`} className="-ml-1 inline-flex min-h-11 min-w-11 max-w-full items-center px-1 hover:underline">
-                  {blog.title}
-                </Link>
-              </h1>
-            </div>
-            {blog.intro && <p className="mt-2 text-ink-soft">{blog.intro}</p>}
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm text-ink-soft" aria-label="블로그 정보">
-                by {nickname} · @{blog.slug} · 글 {allTotal} · <span data-followers>이웃 {followers}</span>
-              </p>
-              {member && !isOwner && (
-                <div className="flex flex-wrap items-center gap-2">
-                  {/* 친구 마을 구경 (TOWN-15): PC에서만, 공지 블로그는 없다 */}
-                  {blog.slug !== NOTICE_SLUG && (
-                    <span className="contents max-sm:hidden">
-                      <Link href={`/town/${blog.slug}`} className="btn" data-friend-town>
-                        🏘 마을 구경
-                      </Link>
-                    </span>
-                  )}
-                  <FollowButton ownerId={blog.ownerId} following={following} />
-                </div>
-              )}
-            </div>
-          </div>
-          {/* 미니룸 (BLOG-04): 건 배경과 입은 캐릭터 */}
-          <div className="w-full sm:w-56">
-            <Miniroom background={backgroundArt} avatar={avatar.layers} nickname={nickname} height={150} />
-          </div>
-        </div>
-        {isOwner && (
-          // 주인 도구 막대 (BLOG-08)
-          <nav aria-label="주인 도구" className="mt-4 flex flex-wrap gap-2">
-            <Link href="/write" className="btn btn-primary">
-              ✏️ 새 글 쓰기
-            </Link>
-            <Link href="/settings/posts" className="btn">
-              📝 글 관리 {myPostCount}
-            </Link>
-            <Link href="/settings/comments" className="btn">
-              💬 댓글 관리
-            </Link>
-            <Link href={`/@${blog.slug}/guestbook`} className="btn">
-              📖 방명록 {sidebar.guestbookCount}
-            </Link>
-            <Link href="/settings/blog#categories" className="btn">
-              🗂 카테고리 관리
-            </Link>
-            <Link href="/closet" className="btn">
-              🎨 꾸미기
-            </Link>
-            <Link href="/settings/blog" className="btn">
-              ⚙️ 블로그 설정
-            </Link>
-          </nav>
+      <header className="overflow-hidden rounded-2xl border border-line bg-surface">
+        {blog.coverKey && (
+          // 블로그 커버 사진 (블로그 꾸미기). 꾸밈 사진이라 읽지 않는다. 첫 화면 맨 위라 바로 받는다
+          // eslint-disable-next-line @next/next/no-img-element -- 권한을 확인하는 /files 주소라 next/image 최적화를 거치지 않는다
+          <img src={`/files/${blog.coverKey}?w=1280`} alt="" fetchPriority="high" className="aspect-[3/1] w-full object-cover sm:aspect-[4/1]" data-blog-cover />
         )}
+        <div className="p-5">
+          <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-start">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-3">
+                {/* 주인 프로필 사진 (BLOG-04, 없으면 캐릭터) */}
+                <ProfileAvatar photoKey={photoKey} nickname={nickname} character={avatar.layers} />
+                <h1 className="min-w-0 text-2xl font-extrabold">
+                  <Link href={`/@${blog.slug}`} className="-ml-1 inline-flex min-h-11 min-w-11 max-w-full items-center px-1 hover:underline">
+                    {blog.title}
+                  </Link>
+                </h1>
+              </div>
+              {blog.intro && <p className="mt-2 text-ink-soft">{blog.intro}</p>}
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm text-ink-soft" aria-label="블로그 정보">
+                  by {nickname} · @{blog.slug} · 글 {allTotal} · <span data-followers>이웃 {followers}</span>
+                </p>
+                {member && !isOwner && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* 친구 마을 구경 (TOWN-15): PC에서만, 공지 블로그는 없다 */}
+                    {blog.slug !== NOTICE_SLUG && (
+                      <span className="contents max-sm:hidden">
+                        <Link href={`/town/${blog.slug}`} className="btn" data-friend-town>
+                          🏘 마을 구경
+                        </Link>
+                      </span>
+                    )}
+                    <FollowButton ownerId={blog.ownerId} following={following} />
+                  </div>
+                )}
+              </div>
+            </div>
+            {/* 미니룸 (BLOG-04): 건 배경과 입은 캐릭터 */}
+            <div className="w-full sm:w-56">
+              <Miniroom background={backgroundArt} avatar={avatar.layers} nickname={nickname} height={150} />
+            </div>
+          </div>
+          {isOwner && (
+            // 주인 도구 막대 (BLOG-08)
+            <nav aria-label="주인 도구" className="mt-4 flex flex-wrap gap-2">
+              <Link href="/write" className="btn btn-primary">
+                ✏️ 새 글 쓰기
+              </Link>
+              <Link href="/settings/posts" className="btn">
+                📝 글 관리 {myPostCount}
+              </Link>
+              <Link href="/settings/comments" className="btn">
+                💬 댓글 관리
+              </Link>
+              <Link href={`/@${blog.slug}/guestbook`} className="btn">
+                📖 방명록 {sidebar.guestbookCount}
+              </Link>
+              <Link href="/settings/blog#categories" className="btn">
+                🗂 카테고리 관리
+              </Link>
+              <Link href="/closet" className="btn">
+                🎨 꾸미기
+              </Link>
+              <Link href="/settings/blog" className="btn">
+                ⚙️ 블로그 설정
+              </Link>
+            </nav>
+          )}
+        </div>
       </header>
 
       <HouseRoom
