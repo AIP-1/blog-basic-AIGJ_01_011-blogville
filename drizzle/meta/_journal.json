@@ -204,6 +204,34 @@
       "when": 1791877331989,
       "tag": "0028_support",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791879445449,
+      "tag": "0029_admin_tools",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1791889543512,
+      "tag": "0030_search_trgm",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1791889955801,
+      "tag": "0031_scheduled_posts",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1791890637379,
+      "tag": "0032_series",
+      "breakpoints": true
     }
   ]
 }

@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { db } from "@/db";
-import { blogs, profiles, sessions } from "@/db/schema";
+import { blogs, profiles, sessions, users } from "@/db/schema";
 import { auth } from "@/lib/auth";
 
 /** 유지 안 함 세션: 마지막 사용 2시간 뒤 무효 (AUTH-09) */
@@ -28,8 +28,17 @@ export const getSession = cache(async (): Promise<Member | null> => {
   const result = await auth.api.getSession({ headers: await headers(), query: { disableRefresh: true } });
   if (!result) return null;
   const { session, user } = result;
-  const row = await db.query.sessions.findFirst({ where: eq(sessions.id, session.id) });
+  const [row] = await db
+    .select({ id: sessions.id, rememberMe: sessions.rememberMe, updatedAt: sessions.updatedAt, suspended: sql<boolean>`coalesce(${users.suspendedUntil} > now(), false)` })
+    .from(sessions)
+    .innerJoin(users, eq(users.id, sessions.userId))
+    .where(eq(sessions.id, session.id));
   if (!row) return null;
+  // 정지된 회원 (ADM-01): 정지할 때 세션을 모두 지우지만, 그 사이에 만들어진 세션이 있어도 로그인하지 않은 것으로 본다
+  if (row.suspended) {
+    await db.delete(sessions).where(eq(sessions.id, row.id));
+    return null;
+  }
 
   if (!row.rememberMe) {
     const idle = Date.now() - row.updatedAt.getTime();

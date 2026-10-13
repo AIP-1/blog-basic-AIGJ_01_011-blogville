@@ -8,6 +8,8 @@ import { DeletePostButton } from "@/components/post/DeletePostButton";
 import { CommentSection } from "@/components/post/CommentSection";
 import { LikeButton } from "@/components/post/LikeButton";
 import { PublishNotice } from "@/components/post/PublishNotice";
+import { PostJsonLd } from "@/components/post/PostJsonLd";
+import { SeriesBox } from "@/components/post/SeriesBox";
 import { AdjacentPosts } from "@/components/post/AdjacentPosts";
 import { BackToTop } from "@/components/post/BackToTop";
 import { PostBody } from "@/components/post/PostBody";
@@ -20,11 +22,13 @@ import { parseId } from "@/lib/ids";
 import { hasPostReward } from "@/server/points";
 import { showsPublishNotice } from "@/lib/post-rules";
 import { loginHref } from "@/lib/safe-next";
+import { scheduleLabel } from "@/lib/schedule";
 import { formatDate } from "@/lib/text";
 import { renderPostHtml } from "@/lib/post-render";
 import { readingMinutes, TOC_MIN_HEADINGS } from "@/lib/reader";
 import { getBlogBySlug } from "@/server/blog";
 import { getSession } from "@/server/dal";
+import { BlindNotice } from "@/components/post/BlindNotice";
 import { getAdjacentPosts, getCategoryPosts, getPostForView } from "@/server/post";
 import { getCommentThread } from "@/server/comments";
 import { getLikeState } from "@/server/likes";
@@ -101,8 +105,21 @@ export default async function PostPage({ params, searchParams }: PageProps<"/blo
 
   return (
     <>
+      {post.isPublic && (
+        <PostJsonLd
+          siteUrl={siteUrl()}
+          blog={blog}
+          post={post}
+          nickname={nickname}
+          description={excerpt(post.contentText)}
+          imageKey={firstImageKey(post.contentHtml)}
+          categoryName={categoryName}
+          categoryHref={categoryHref ?? null}
+        />
+      )}
       {notice && <PublishNotice rewarded={await hasPostReward(blog.ownerId, post.id)} />}
       <article className="mx-auto max-w-3xl rounded-2xl border border-line bg-surface p-5 md:p-8">
+        {isOwner && post.blindedAt && <BlindNotice reason={post.blindReason} />}
         <Link href={`/@${blog.slug}`} className="-ml-1 flex min-h-11 w-fit max-w-full items-center px-1 font-semibold text-ink-soft hover:text-ink" data-blog-link>
           <span className="truncate">📖 {blog.title}</span>
         </Link>
@@ -116,8 +133,9 @@ export default async function PostPage({ params, searchParams }: PageProps<"/blo
           {` · 약 ${readingMinutes(post.contentText)}분 읽기`}
           {" · "}
           <ViewCount postId={post.id} initial={post.viewCount + (firstToday ? 1 : 0)} record={countsView} />
-          {!post.isPublic && <span className="ml-2 font-semibold">🔒 비공개</span>}
+          {!post.isPublic && <span className="ml-2 font-semibold">{post.publishAt ? `⏰ ${scheduleLabel(post.publishAt)} 공개 예약` : "🔒 비공개"}</span>}
         </p>
+        {post.seriesId !== null && <SeriesBox slug={blog.slug} seriesId={post.seriesId} postId={post.id} viewerIsOwner={isOwner} />}
         {body.toc.length >= TOC_MIN_HEADINGS && <TableOfContents items={body.toc} />}
         {/* content_html은 저장할 때 허용 태그만 남긴 HTML이고, renderPostHtml이 한 번 더 거른다 (NF-03) */}
         <PostBody html={body.html} />

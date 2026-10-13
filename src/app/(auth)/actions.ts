@@ -5,13 +5,15 @@ import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { sessions } from "@/db/schema";
-import { auth, SOCIAL_REMEMBER_COOKIE } from "@/lib/auth";
+import { sessions, users } from "@/db/schema";
+import { APIError } from "better-auth/api";
+import { suspendedMessage } from "@/lib/admin-rules";
+import { auth, SOCIAL_REMEMBER_COOKIE, SUSPENDED_CODE } from "@/lib/auth";
 import { AUTH_ERRORS, checkSignUp, PASSWORD_MAX } from "@/lib/auth-rules";
 import { parseId } from "@/lib/ids";
 import { normalizeName } from "@/lib/names";
 import { safeNext } from "@/lib/safe-next";
-import { enabledProviders, isSocialProvider } from "@/lib/social-login";
+import { enabledProviders, isSocialProvider, SOCIAL_MESSAGES } from "@/lib/social-login";
 import { getMyBlog, getSession } from "@/server/dal";
 import { clearLoginAttempts, reserveLoginAttempt } from "@/server/login-attempts";
 import { createMember, SignUpError } from "@/server/signup";
@@ -24,24 +26,25 @@ const field = (formData: FormData, key: string) => {
 };
 
 /** 라이브러리로 로그인하고 세션의 유지 방식을 기록한다 (AUTH-09: 유지 안 함 2시간 / 유지 7일) */
-async function startSession(username: string, password: string, rememberMe: boolean): Promise<boolean> {
+async function startSession(username: string, password: string, rememberMe: boolean): Promise<"ok" | "failed" | "suspended"> {
   let token: string;
   try {
     const result = await auth.api.signInUsername({
       body: { username, password, rememberMe },
       headers: await headers(),
     });
-    if (!result?.token) return false;
+    if (!result?.token) return "failed";
     token = result.token;
-  } catch {
-    return false;
+  } catch (e) {
+    // 비밀번호가 맞아도 정지된 회원이면 세션을 만들 때 거절된다 (auth.ts)
+    return e instanceof APIError && (e.body as { code?: string } | undefined)?.code === SUSPENDED_CODE ? "suspended" : "failed";
   }
   await db
     .update(sessions)
     .set(rememberMe ? { rememberMe: true } : { rememberMe: false, expiresAt: sql`now() + interval '2 hours'` })
     .where(eq(sessions.token, token));
   if (rememberMe) await clearDontRememberCookie();
-  return true;
+  return "ok";
 }
 
 /**
@@ -100,7 +103,13 @@ export async function signIn(_prev: AuthFormState, formData: FormData): Promise<
   if (password.length > PASSWORD_MAX || username.length > 64) return { error: AUTH_ERRORS.signInFailed, values };
   if (!(await reserveLoginAttempt(username))) return { error: AUTH_ERRORS.locked, values };
 
-  if (!(await startSession(username, password, rememberMe))) return { error: AUTH_ERRORS.signInFailed, values };
+  const started = await startSession(username, password, rememberMe);
+  if (started === "suspended") {
+    await clearLoginAttempts(username);
+    const [row] = await db.select({ until: users.suspendedUntil, reason: users.suspendReason }).from(users).where(eq(users.username, username));
+    return { error: row?.until ? suspendedMessage(row.until, row.reason) : SOCIAL_MESSAGES.suspended, values };
+  }
+  if (started === "failed") return { error: AUTH_ERRORS.signInFailed, values };
   await clearLoginAttempts(username);
 
   revalidatePath("/", "layout");

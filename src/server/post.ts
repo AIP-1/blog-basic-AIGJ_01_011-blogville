@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { blogs, categories, posts, postTags, profiles, subcategories, tags, users } from "@/db/schema";
 import { extractFileKeys } from "@/lib/attachments";
@@ -13,7 +13,9 @@ import { growForPost } from "./farm";
 import { grantReward } from "./points";
 import { likeCountSql } from "./likes";
 import { resolveCategory } from "./category";
+import { removeEmptySeries, resolveSeries } from "./series";
 import { syncPostTags } from "./tags";
+import { checkBannedWords } from "./banned-words";
 
 export const PAGE_SIZE = 8;
 
@@ -29,11 +31,13 @@ export async function savePost(blogId: number, ownerId: string, input: PostInput
     if (input.postId !== null) {
       // 남의 글에 첨부를 붙이지 않게 먼저 내 글인지 본다
       const [mine] = await tx
-        .select({ id: posts.id })
+        .select({ id: posts.id, blindedAt: posts.blindedAt })
         .from(posts)
         .where(and(eq(posts.id, input.postId), eq(posts.blogId, blogId)))
         .for("update");
       if (!mine) throw new Error("내 글이 아닌 글을 고치려 함");
+      // 관리자가 가린 글은 고쳐도 비공개로 남는다 (예약도 하지 않는다)
+      if (mine.blindedAt) input = { ...input, isPublic: false, publishAt: null };
     }
     // 회원 → 프로필 → 첨부 순서로 잠근다. 회원 행은 보상 원장 외래 키가 나중에 잠그므로 탈퇴(deleteMember: 회원 행 먼저)와 같은 순서로 먼저 잡는다.
     // 프로필은 setProfilePhoto와 같은 순서라 그 사이 프로필 사진이 된 첨부를 본문에 남기지 않는다
@@ -43,10 +47,15 @@ export async function savePost(blogId: number, ownerId: string, input: PostInput
     const contentHtml = sanitizePostHtml(input.contentHtml, known);
     const contentText = htmlToText(contentHtml);
     if (contentText.length === 0) throw new PostSaveError(POST_ERRORS.contentEmpty);
+    // 금지어 (ADM-05): 제목과 본문 글자
+    const banned = await checkBannedWords(input.title, contentText);
+    if (banned) throw new PostSaveError(banned);
 
     const category = await resolveCategory(tx, blogId, input.categoryId, input.subcategoryId);
     if (category === "invalid") throw new PostSaveError(POST_ERRORS.invalid);
-    const values = { title: input.title, contentHtml, contentText, isPublic: input.isPublic, ...category };
+    const seriesId = await resolveSeries(tx, blogId, input.series);
+    if (seriesId === "invalid") throw new PostSaveError(POST_ERRORS.invalid);
+    const values = { title: input.title, contentHtml, contentText, isPublic: input.isPublic, publishAt: input.publishAt, seriesId, ...category };
 
     let postId: number;
     if (input.postId === null) {
@@ -61,13 +70,18 @@ export async function savePost(blogId: number, ownerId: string, input: PostInput
     // 받았으면 키우는 동물이 모두 성장 +10 (TOWN-09)
     if (postEarnsReward(input.postId === null, input.isPublic, contentText.length) && (await grantReward(tx, ownerId, "post", String(postId)))) await growForPost(tx, ownerId);
     await syncPostTags(tx, postId, input.tags);
+    // 이 글을 다른 시리즈로 옮겼으면 비게 된 시리즈를 지운다
+    if (input.postId !== null) await removeEmptySeries(tx, blogId);
     return postId;
   });
 }
 
 /** 내 글이면 지운다. 남의 글·없는 글이면 아무것도 하지 않는다. */
 export async function deletePost(blogId: number, postId: number) {
-  await db.delete(posts).where(and(eq(posts.id, postId), eq(posts.blogId, blogId)));
+  await db.transaction(async (tx) => {
+    await tx.delete(posts).where(and(eq(posts.id, postId), eq(posts.blogId, blogId)));
+    await removeEmptySeries(tx, blogId);
+  });
 }
 
 const postWithCategory = {
@@ -203,10 +217,48 @@ export async function countMyPosts(blogId: number) {
 export async function setPostVisibility(blogId: number, postId: number, isPublic: boolean): Promise<boolean> {
   const rows = await db
     .update(posts)
-    .set({ isPublic, updatedAt: sql`${posts.updatedAt}` })
-    .where(and(eq(posts.id, postId), eq(posts.blogId, blogId)))
+    // 직접 공개·비공개로 바꾸면 예약은 풀린다 (개선 11)
+    .set({ isPublic, publishAt: null, updatedAt: sql`${posts.updatedAt}` })
+    // 관리자가 가린 글은 다시 공개할 수 없다
+    .where(and(eq(posts.id, postId), eq(posts.blogId, blogId), isPublic ? isNull(posts.blindedAt) : undefined))
     .returning({ id: posts.id });
   return rows.length > 0;
+}
+
+/**
+ * 예약 발행 (개선 11): 시각이 된 예약 글을 공개로 바꾼다. 글 날짜는 예약한 시각으로 바꿔 목록 맨 위에 오게 한다.
+ * 공개될 때 새 글 보상 규칙(본문 100자 이상, 하루 3번)을 그대로 적용한다. 공개한 글 수를 돌려준다.
+ * 서버가 둘 떠 있어도(무중단 배포 중) 같은 글을 두 번 공개하지 않게 글마다 잠그고 다시 확인한다.
+ */
+export async function publishDuePosts(now = new Date()): Promise<number> {
+  const due = await db
+    .select({ id: posts.id, ownerId: blogs.ownerId })
+    .from(posts)
+    .innerJoin(blogs, eq(blogs.id, posts.blogId))
+    .where(and(isNotNull(posts.publishAt), lte(posts.publishAt, now)))
+    .orderBy(asc(posts.publishAt))
+    .limit(50);
+  let published = 0;
+  for (const { id, ownerId } of due) {
+    const done = await db.transaction(async (tx) => {
+      // 회원 행을 글보다 먼저 잠근다 (savePost·탈퇴와 같은 순서)
+      await tx.select({ id: users.id }).from(users).where(eq(users.id, ownerId)).for("key share");
+      const [row] = await tx
+        .update(posts)
+        .set({ isPublic: true, publishAt: null, createdAt: sql`${posts.publishAt}`, updatedAt: sql`${posts.publishAt}` })
+        .where(and(eq(posts.id, id), isNotNull(posts.publishAt), lte(posts.publishAt, now), isNull(posts.blindedAt)))
+        .returning({ textLength: sql<number>`char_length(${posts.contentText})` });
+      if (!row) {
+        // 가린 글은 예약을 푼다 (비공개로 남는다)
+        await tx.update(posts).set({ publishAt: null, updatedAt: sql`${posts.updatedAt}` }).where(and(eq(posts.id, id), isNotNull(posts.blindedAt)));
+        return false;
+      }
+      if (postEarnsReward(true, true, row.textLength) && (await grantReward(tx, ownerId, "post", String(id)))) await growForPost(tx, ownerId);
+      return true;
+    });
+    if (done) published++;
+  }
+  return published;
 }
 
 /** RSS (블로그 구독): 그 블로그의 최신 공개 글. 비공개 글은 넣지 않는다 (POST-02). */

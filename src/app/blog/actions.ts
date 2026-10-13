@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { blogs, posts } from "@/db/schema";
 import { createComment, createReply, editComment, editReply, removeComment, removeReply } from "@/server/comments";
+import { checkBannedWords } from "@/server/banned-words";
 import { getSession, requireMember } from "@/server/dal";
 import { toggleFavorite, toggleFollow as storeFollow, unfollow } from "@/server/follows";
 import { FAVORITE_MESSAGES } from "@/lib/social";
@@ -32,6 +33,8 @@ export async function addComment(formData: FormData): Promise<CommentResult> {
   if (postId === null) return { ok: false, error: COMMENT_ERRORS.invalid };
   const checked = checkComment(text(formData, "content"));
   if (!checked.ok) return checked;
+  const banned = await checkBannedWords(checked.content);
+  if (banned) return { ok: false, error: banned };
   const result = await createComment(member.userId, postId, checked.content, secret(formData));
   if (result.ok) revalidatePath("/", "layout");
   return result;
@@ -44,6 +47,8 @@ export async function addReply(formData: FormData): Promise<CommentResult> {
   if (postId === null || commentId === null) return { ok: false, error: COMMENT_ERRORS.invalid };
   const checked = checkComment(text(formData, "content"));
   if (!checked.ok) return checked;
+  const banned = await checkBannedWords(checked.content);
+  if (banned) return { ok: false, error: banned };
   const result = await createReply(member, postId, commentId, checked.content, secret(formData));
   if (result.ok) revalidatePath("/", "layout");
   return result;
@@ -67,6 +72,8 @@ async function update(formData: FormData, store: typeof editComment): Promise<Co
   if (id === null) return { ok: false, error: COMMENT_ERRORS.invalid };
   const checked = checkComment(text(formData, "content"));
   if (!checked.ok) return checked;
+  const banned = await checkBannedWords(checked.content);
+  if (banned) return { ok: false, error: banned };
   const result = await store(member.userId, id, checked.content, secret(formData));
   if (result.ok) revalidatePath("/", "layout");
   return result;

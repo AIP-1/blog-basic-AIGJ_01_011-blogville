@@ -6,24 +6,32 @@ import { normalizeName } from "@/lib/names";
 import { findMemberByUsername, getAdminStats, listRecentMembers, listRecentPosts, RECENT_MEMBERS, RECENT_POST_DAYS } from "@/server/admin";
 import { requireAdmin } from "@/server/dal";
 import { countNewFeedback } from "@/server/feedback";
+import { DailyBarChart } from "@/components/admin/DailyBarChart";
+import { parseStatRange, STAT_RANGES } from "@/lib/admin-rules";
+import { getDailyStats, getModerationCounts, getTopBlogs } from "@/server/admin-tools";
 
 export const metadata = { title: "관리자 | Blogville" };
 
 const PROVIDERS: Record<string, string> = { credential: "아이디", kakao: "카카오", naver: "네이버", google: "Google" };
 
-// 관리자 (AUTH-08). 관리자가 아니면 404.
+// 관리자 대시보드 (AUTH-08, ADM-03). 관리자가 아니면 404.
 export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   await requireAdmin();
   // 회원 찾기 (비밀번호 초기화): 아이디가 정확히 같은 1명. 64자를 넘거나 문자열이 아니면 찾지 않는다
-  const raw = (await searchParams).member;
+  const params = await searchParams;
+  const raw = params.member;
+  const range = parseStatRange(params.range);
   const query = typeof raw === "string" ? normalizeName(raw) : "";
   const searched = query.length > 0 && query.length <= 64;
-  const [stats, members, recent, found, newFeedback] = await Promise.all([
+  const [stats, members, recent, found, newFeedback, daily, topBlogs, moderation] = await Promise.all([
     getAdminStats(),
     listRecentMembers(),
     listRecentPosts(),
     searched ? findMemberByUsername(query) : null,
     countNewFeedback(),
+    getDailyStats(range),
+    getTopBlogs(),
+    getModerationCounts(),
   ]);
   const cards = [
     ["가입 계정", stats.members],
@@ -45,6 +53,54 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
             </p>
           </div>
         ))}
+      </section>
+
+      {/* 활동 통계 (ADM-03): 최근 7·30일 날마다 가입자·글·댓글·방문 */}
+      <section aria-labelledby="admin-activity" className="space-y-3 rounded-2xl border border-line bg-surface p-4" data-activity-range={range}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="admin-activity" className="font-bold">
+            📈 최근 {range}일 활동
+          </h2>
+          <nav aria-label="기간" className="flex gap-1">
+            {STAT_RANGES.map((r) => (
+              <Link key={r} href={r === 7 ? "/admin" : `/admin?range=${r}`} aria-current={r === range ? "page" : undefined} className={`btn ${r === range ? "btn-current" : ""}`}>
+                {r}일
+              </Link>
+            ))}
+          </nav>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <DailyBarChart stats={daily} metric="signups" label="가입자" unit="명" />
+          <DailyBarChart stats={daily} metric="posts" label="글" unit="개" />
+          <DailyBarChart stats={daily} metric="comments" label="댓글·답글" unit="개" />
+          <DailyBarChart stats={daily} metric="visits" label="블로그 방문" unit="회" />
+        </div>
+        <p className="text-sm text-ink-soft">
+          지금 정지된 회원 <Link href="/admin/members?filter=suspended" className="underline">{moderation.suspended.toLocaleString("ko-KR")}명</Link> · 블라인드 글{" "}
+          {moderation.blinded.toLocaleString("ko-KR")}개
+        </p>
+      </section>
+
+      <section aria-labelledby="top-blogs" className="rounded-2xl border border-line bg-surface p-4">
+        <h2 id="top-blogs" className="mb-3 font-bold">
+          🏆 최근 30일 방문 많은 블로그
+        </h2>
+        {topBlogs.length === 0 ? (
+          <p className="text-ink-soft">방문 기록이 없어요</p>
+        ) : (
+          <ol className="list-decimal space-y-1 pl-6 text-sm">
+            {topBlogs.map((b) => (
+              <li key={b.blogId} data-top-blog={b.slug}>
+                <Link href={`/@${b.slug}`} className="font-semibold underline">
+                  {b.title}
+                </Link>{" "}
+                <span className="text-ink-soft">
+                  {b.nickname} · 방문 {b.visits.toLocaleString("ko-KR")}회
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
       </section>
 
       {/* 버그·문의 (SUP-03): 새로 들어온(접수) 문의 수 */}
@@ -108,6 +164,9 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
         <h2 id="recent-members" className="mb-3 font-bold">
           최근 가입 ({RECENT_MEMBERS}명)
         </h2>
+        <Link href="/admin/members" className="mb-2 flex min-h-11 w-fit items-center text-sm text-accent underline">
+          회원 관리에서 찾기·정지·권한 바꾸기
+        </Link>
         <ul className="divide-y divide-line">
           {members.map((m) => (
             <li key={m.username} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm" data-member={m.username}>

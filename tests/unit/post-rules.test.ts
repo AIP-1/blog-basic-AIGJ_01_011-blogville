@@ -31,6 +31,31 @@ describe("checkPostInput", () => {
     const r = checkPostInput({ ...ok, visibility: "private" });
     expect(r.ok && r.value.isPublic).toBe(false);
   });
+  it("예약: 한국 시간으로 읽고, 비공개로 두며, 5분 뒤부터만", () => {
+    const now = new Date("2026-10-13T00:00:00Z");
+    const r = checkPostInput({ ...ok, visibility: "scheduled", publishAt: "2026-10-14T09:00" }, now);
+    expect(r.ok && r.value).toMatchObject({ isPublic: false, publishAt: new Date("2026-10-14T00:00:00Z") });
+    expect(checkPostInput({ ...ok, visibility: "scheduled", publishAt: "" }, now)).toEqual({ ok: false, error: "예약 시간을 골라 주세요" });
+    expect(checkPostInput({ ...ok, visibility: "scheduled", publishAt: "2026-10-13T09:01" }, now)).toEqual({ ok: false, error: "예약은 지금부터 5분 뒤부터 할 수 있어요" });
+    // 공개·비공개면 예약 시간은 무시한다
+    const pub = checkPostInput({ ...ok, publishAt: "2026-10-14T09:00" }, now);
+    expect(pub.ok && pub.value).toMatchObject({ isPublic: true, publishAt: null });
+  });
+});
+
+describe("checkPostInput 시리즈", () => {
+  it("없음·내 시리즈·새 시리즈", () => {
+    const pick = (patch: Partial<RawPostInput>) => {
+      const r = checkPostInput({ ...ok, ...patch });
+      return r.ok ? r.value.series : r.error;
+    };
+    expect(pick({})).toEqual({ kind: "none" });
+    expect(pick({ seriesId: "7" })).toEqual({ kind: "existing", id: 7 });
+    expect(pick({ seriesId: "x" })).toBe(POST_ERRORS.invalid);
+    expect(pick({ seriesId: "new", seriesTitle: "  여행   일기 " })).toEqual({ kind: "new", title: "여행 일기" });
+    expect(pick({ seriesId: "new", seriesTitle: "  " })).toBe("새 시리즈 이름을 적어 주세요");
+    expect(pick({ seriesId: "new", seriesTitle: "가".repeat(41) })).toBe("시리즈 이름은 40자까지예요");
+  });
 });
 
 describe("linkHref (링크 창)", () => {

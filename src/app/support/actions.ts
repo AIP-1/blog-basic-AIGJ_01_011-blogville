@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { checkFeedback, FEEDBACK_SENT, feedbackPagePath, truncateUserAgent } from "@/lib/support-rules";
+import { checkBannedWords } from "@/server/banned-words";
 import { requireMember } from "@/server/dal";
 import { createFeedback } from "@/server/feedback";
 
@@ -15,6 +16,9 @@ export async function sendFeedback(_prev: SupportResult | null, formData: FormDa
   const member = await requireMember();
   const checked = checkFeedback({ kind: formData.get("kind"), title: formData.get("title"), content: formData.get("content") });
   if (!checked.ok) return checked;
+  // 금지어 (ADM-05)
+  const banned = await checkBannedWords(checked.value.title, checked.value.content);
+  if (banned) return { ok: false, error: banned };
   const userAgent = truncateUserAgent((await headers()).get("user-agent"));
   const result = await createFeedback(member.userId, { ...checked.value, pagePath: feedbackPagePath(formData.get("from")), userAgent });
   if (!result.ok) return result;
