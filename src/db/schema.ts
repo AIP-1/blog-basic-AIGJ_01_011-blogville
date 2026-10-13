@@ -652,6 +652,7 @@ export type Attachment = typeof attachments.$inferSelect;
 // 레벨업은 행동한 사람·글이 없고 `level`만 있다 (notifications_shape_check).
 // 방명록 알림(BLOG-10)은 글 대신 방명록 글(`guestbook_entry_id`)이 있다.
 // 문의 답변 알림(SUP-03·04)은 행동한 사람 없이 문의(`feedback_id`)만 있다 (관리자·자동 처리가 답한다).
+// 이웃 새 글 알림(new_post)은 공감·댓글처럼 행동한 사람(글쓴이)과 글이 있다.
 export const notifications = pgTable(
   "notifications",
   {
@@ -681,14 +682,29 @@ export const notifications = pgTable(
     uniqueIndex("notifications_like_uq").on(t.userId, t.actorId, t.postId).where(sql`${t.kind} = 'like'`),
     // 같은 레벨 알림은 한 번만 (GAME-06)
     uniqueIndex("notifications_level_up_uq").on(t.userId, t.level).where(sql`${t.kind} = 'level_up'`),
-    check("notifications_kind_check", sql`${t.kind} in ('like', 'comment', 'reply', 'level_up', 'guestbook', 'guestbook_reply', 'feedback_reply')`),
+    check("notifications_kind_check", sql`${t.kind} in ('like', 'comment', 'reply', 'level_up', 'guestbook', 'guestbook_reply', 'feedback_reply', 'new_post')`),
     check("notifications_not_self_check", sql`${t.actorId} is null or ${t.userId} <> ${t.actorId}`),
     check(
       "notifications_shape_check",
-      sql`(${t.kind} = 'level_up' and ${t.actorId} is null and ${t.postId} is null and ${t.guestbookEntryId} is null and ${t.feedbackId} is null and ${t.level} between 2 and 99) or (${t.kind} in ('like', 'comment', 'reply') and ${t.actorId} is not null and ${t.postId} is not null and ${t.guestbookEntryId} is null and ${t.feedbackId} is null and ${t.level} is null) or (${t.kind} in ('guestbook', 'guestbook_reply') and ${t.actorId} is not null and ${t.postId} is null and ${t.guestbookEntryId} is not null and ${t.feedbackId} is null and ${t.level} is null) or (${t.kind} = 'feedback_reply' and ${t.actorId} is null and ${t.postId} is null and ${t.guestbookEntryId} is null and ${t.feedbackId} is not null and ${t.level} is null)`,
+      sql`(${t.kind} = 'level_up' and ${t.actorId} is null and ${t.postId} is null and ${t.guestbookEntryId} is null and ${t.feedbackId} is null and ${t.level} between 2 and 99) or (${t.kind} in ('like', 'comment', 'reply', 'new_post') and ${t.actorId} is not null and ${t.postId} is not null and ${t.guestbookEntryId} is null and ${t.feedbackId} is null and ${t.level} is null) or (${t.kind} in ('guestbook', 'guestbook_reply') and ${t.actorId} is not null and ${t.postId} is null and ${t.guestbookEntryId} is not null and ${t.feedbackId} is null and ${t.level} is null) or (${t.kind} = 'feedback_reply' and ${t.actorId} is null and ${t.postId} is null and ${t.guestbookEntryId} is null and ${t.feedbackId} is not null and ${t.level} is null)`,
     ),
   ],
 );
+
+// 알림 설정 (🔔 내 정보): 회원이 끈 알림 종류. 행이 없으면 모두 켜짐이다.
+// 문의 답변 알림(feedback_reply)은 끌 수 없어 칸이 없다. 방명록 칸은 방명록 글·방명록 답글 알림을 함께 다룬다.
+export const notificationPrefs = pgTable("notification_prefs", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  like: boolean("like").notNull().default(true),
+  comment: boolean("comment").notNull().default(true),
+  reply: boolean("reply").notNull().default(true),
+  guestbook: boolean("guestbook").notNull().default(true),
+  newPost: boolean("new_post").notNull().default(true),
+  levelUp: boolean("level_up").notNull().default(true),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 /**
  * 경험치·코인 원장 (GAME-02·03·05, ERD 3.5). 레벨·잔액 컬럼은 없고 합계로만 계산한다.
@@ -926,4 +942,34 @@ export const bookmarks = pgTable(
     createdAt: createdAt(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.postId] }), index("bookmarks_user_created_idx").on(t.userId, t.createdAt.desc()), index("bookmarks_post_idx").on(t.postId)],
+);
+
+// 서버 오류 기록 (instrumentation.ts의 onRequestError, server/error-log.ts).
+// 같은 오류(digest, 없으면 메시지)·같은 경로가 1시간 안에 또 나면 새 줄 대신 count·last_seen_at만 올린다.
+// 30일 지난 줄은 기록할 때 가끔(1%) 지운다. 쿼리 문자열·환경 값은 남기지 않는다.
+export const errorLogs = pgTable(
+  "error_logs",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    createdAt: createdAt(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    digest: text("digest"),
+    message: text("message").notNull(),
+    stack: text("stack"),
+    routePath: text("route_path"),
+    routeType: text("route_type"),
+    method: text("method"),
+    /** 경로만 (쿼리 문자열 없이) */
+    url: text("url"),
+    userAgent: text("user_agent"),
+    count: integer("count").notNull().default(1),
+  },
+  (t) => [
+    index("error_logs_last_seen_idx").on(t.lastSeenAt.desc()),
+    index("error_logs_group_idx").on(t.routePath, t.digest, t.lastSeenAt),
+    check("error_logs_message_check", sql`char_length(${t.message}) <= 1000`),
+    check("error_logs_stack_check", sql`${t.stack} is null or char_length(${t.stack}) <= 4000`),
+    check("error_logs_user_agent_check", sql`${t.userAgent} is null or char_length(${t.userAgent}) <= 300`),
+    check("error_logs_count_check", sql`${t.count} >= 1`),
+  ],
 );

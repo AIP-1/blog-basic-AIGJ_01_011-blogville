@@ -299,6 +299,7 @@ export const AUDIT_ACTIONS = {
   banned_words: "금지어 변경",
   feedback: "문의 답변",
   dismiss_reports: "신고 기각",
+  resolve_error: "오류 해결",
 } as const;
 export type AuditAction = keyof typeof AUDIT_ACTIONS;
 
