@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Post } from "@/db/schema";
 import { firstImageUrl } from "@/lib/attachments";
+import { scheduleLabel } from "@/lib/schedule";
 import { excerpt, formatDate } from "@/lib/text";
 import { CategoryBadge } from "../post/CategoryBadge";
 
@@ -37,7 +38,9 @@ export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle,
           <div className="flex flex-wrap items-center gap-2">
             {pinned && <span className="notice-yellow rounded-full px-2 py-0.5 text-sm font-semibold">⭐ 즐겨찾는 이웃</span>}
             <CategoryBadge categoryName={categoryName} subcategoryName={subcategoryName} />
-            {!post.isPublic && <span className="text-sm font-semibold text-ink-soft">🔒 비공개</span>}
+            {!post.isPublic && (
+              <span className="text-sm font-semibold text-ink-soft">{post.publishAt ? `⏰ ${scheduleLabel(post.publishAt)} 공개 예약` : "🔒 비공개"}</span>
+            )}
           </div>
           <h2 className="mt-2 text-lg font-bold">{post.title}</h2>
           <p className="mt-1 line-clamp-2 text-ink-soft">{excerpt(post.contentText)}</p>

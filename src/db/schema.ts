@@ -334,10 +334,14 @@ export const posts = pgTable(
     blindReason: text("blind_reason"),
     /** post_views에서 셀 수 있는 합계를 일부러 저장한 값 (POST-06) */
     viewCount: integer("view_count").notNull().default(0),
+    /** 예약 발행 (개선 11): 이 시각이 되면 공개로 바뀐다. 기다리는 동안은 비공개(작성자만 봄). 공개되면 null */
+    publishAt: timestamp("publish_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
+    index("posts_publish_at_idx").on(t.publishAt).where(sql`${t.publishAt} is not null`),
+    check("posts_scheduled_private", sql`${t.publishAt} is null or not ${t.isPublic}`),
     index("posts_blog_list_idx").on(t.blogId, t.createdAt.desc(), t.id.desc()),
     index("posts_blog_popular_idx").on(t.blogId, t.viewCount.desc()),
     check("posts_view_count_check", sql`${t.viewCount} >= 0`),

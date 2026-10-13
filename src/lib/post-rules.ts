@@ -1,4 +1,5 @@
 import { parseId } from "./ids";
+import { parseKstLocal, scheduleError } from "./schedule";
 
 export const TITLE_MAX = 100;
 export const CONTENT_HTML_MAX = 200_000;
@@ -26,8 +27,11 @@ export type RawPostInput = {
   contentHtml: string;
   categoryId: string;
   subcategoryId: string;
+  /** "public" | "private" | "scheduled" (예약 발행, 개선 11) */
   visibility: string;
   tags: string;
+  /** 예약일 때만: 한국 시간 `2026-10-14T09:00` */
+  publishAt?: string;
 };
 
 export type PostInput = {
@@ -38,6 +42,8 @@ export type PostInput = {
   subcategoryId: number | null;
   isPublic: boolean;
   tags: string[];
+  /** 예약 발행 시각. 예약이면 isPublic은 false */
+  publishAt: Date | null;
 };
 
 export function rawPostInput(formData: FormData): RawPostInput {
@@ -54,6 +60,7 @@ export function rawPostInput(formData: FormData): RawPostInput {
     // 값을 아예 보내지 않으면 공개로 본다 (POST-02)
     visibility: get("visibility") || "public",
     tags: get("tags"),
+    publishAt: get("publishAt"),
   };
 }
 
@@ -64,7 +71,7 @@ const optionalId = (value: string): number | null | undefined =>
  * 검사 순서 = 문구 순서 (contracts/server-actions.md savePost ①~⑦).
  * ⑦ 정화한 본문이 비었는지·⑧ 카테고리 소속은 서버가 따로 본다.
  */
-export function checkPostInput(raw: RawPostInput): { ok: true; value: PostInput } | { ok: false; error: string } {
+export function checkPostInput(raw: RawPostInput, now = new Date()): { ok: true; value: PostInput } | { ok: false; error: string } {
   const postId = optionalId(raw.postId);
   if (postId === undefined) return { ok: false, error: POST_ERRORS.invalid };
   const title = raw.title.trim();
@@ -74,9 +81,15 @@ export function checkPostInput(raw: RawPostInput): { ok: true; value: PostInput 
   const categoryId = optionalId(raw.categoryId);
   const subcategoryId = optionalId(raw.subcategoryId);
   if (categoryId === undefined || subcategoryId === undefined) return { ok: false, error: POST_ERRORS.invalid };
-  if (raw.visibility !== "public" && raw.visibility !== "private") return { ok: false, error: POST_ERRORS.invalid };
+  if (raw.visibility !== "public" && raw.visibility !== "private" && raw.visibility !== "scheduled") return { ok: false, error: POST_ERRORS.invalid };
   if (subcategoryId !== null && categoryId === null) return { ok: false, error: POST_ERRORS.invalid };
   if (raw.tags.length > TAGS_MAX_CHARS) return { ok: false, error: POST_ERRORS.tagsTooLong };
+  let publishAt: Date | null = null;
+  if (raw.visibility === "scheduled") {
+    publishAt = parseKstLocal(raw.publishAt ?? "");
+    const scheduleProblem = scheduleError(publishAt, now);
+    if (scheduleProblem) return { ok: false, error: scheduleProblem };
+  }
   return {
     ok: true,
     value: {
@@ -87,6 +100,7 @@ export function checkPostInput(raw: RawPostInput): { ok: true; value: PostInput 
       subcategoryId,
       isPublic: raw.visibility === "public",
       tags: parseTags(raw.tags),
+      publishAt,
     },
   };
 }

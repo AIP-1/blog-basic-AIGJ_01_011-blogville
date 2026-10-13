@@ -17,6 +17,7 @@ import { parseId } from "@/lib/ids";
 import { hasPostReward } from "@/server/points";
 import { showsPublishNotice } from "@/lib/post-rules";
 import { loginHref } from "@/lib/safe-next";
+import { scheduleLabel } from "@/lib/schedule";
 import { formatDate } from "@/lib/text";
 import { getBlogBySlug } from "@/server/blog";
 import { getSession } from "@/server/dal";
@@ -120,7 +121,7 @@ export default async function PostPage({ params, searchParams }: PageProps<"/blo
           {edited && " · 수정됨"}
           {" · "}
           <ViewCount postId={post.id} initial={post.viewCount + (firstToday ? 1 : 0)} record={countsView} />
-          {!post.isPublic && <span className="ml-2 font-semibold">🔒 비공개</span>}
+          {!post.isPublic && <span className="ml-2 font-semibold">{post.publishAt ? `⏰ ${scheduleLabel(post.publishAt)} 공개 예약` : "🔒 비공개"}</span>}
         </p>
         {/* content_html은 저장할 때 허용 태그만 남긴 HTML이다 (NF-03) */}
         <div className="prose-post mt-6" dangerouslySetInnerHTML={{ __html: post.contentHtml }} />
