@@ -99,4 +99,17 @@ describe("renderPostHtml (보여 줄 때 바꾸기)", () => {
     expect(html).toContain('<img src="/files/abc.png" alt="" />');
     expect(html).toContain('<a href="https://a.com" target="_blank" rel="noopener noreferrer nofollow">x</a>');
   });
+  it("표·정렬·YouTube 틀은 글 화면에서도 남는다 (개선 9)", () => {
+    const yt = '<div data-youtube-video=""><iframe src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ" width="640" height="360"></iframe></div>';
+    const saved =
+      '<h2 style="text-align:center">가운데</h2><p style="text-align:right">오른쪽</p>' +
+      '<table><tbody><tr><th colspan="2"><p>머리</p></th></tr></tbody></table>' + yt;
+    const { html, toc } = renderPostHtml(saved);
+    expect(toc.map((t) => t.id)).toEqual(["가운데"]);
+    expect(html).toContain('<h2 id="가운데" style="text-align:center">가운데</h2>');
+    expect(html).toContain('<p style="text-align:right">오른쪽</p>');
+    expect(html).toContain('<th colspan="2"><p>머리</p></th>');
+    expect(html).toContain('src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"');
+    expect(renderPostHtml('<iframe src="https://evil.com/x"></iframe><p>a</p>').html).toBe("<p>a</p>");
+  });
 });

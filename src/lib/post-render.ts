@@ -15,6 +15,7 @@ import xml from "highlight.js/lib/languages/xml";
 import yaml from "highlight.js/lib/languages/yaml";
 import sanitizeHtml from "sanitize-html";
 import { addHeadingIds, innerText, type TocItem } from "./reader";
+import { dropEmptyFrame, POST_ALLOWED_ATTRIBUTES, POST_ALLOWED_STYLES, POST_ALLOWED_TAGS, youtubeFrame, youtubeWrapper } from "./sanitize";
 
 // 자주 쓰는 언어만 등록한다 (전체를 넣으면 무겁다). 글에는 언어 표시가 없어 자동으로 고른다.
 const LANGUAGES = { bash, c, cpp, css, java, javascript, json, kotlin, python, sql, typescript, xml, yaml };
@@ -41,12 +42,11 @@ function escapeText(s: string): string {
  * 렌더 때 바꾼 결과도 이 목록을 통과한 것만 내보낸다 (NF-03).
  */
 const RENDER_OPTIONS: sanitizeHtml.IOptions = {
-  allowedTags: ["p", "br", "h2", "h3", "strong", "em", "u", "s", "code", "pre", "blockquote", "ul", "ol", "li", "a", "hr", "img", "span"],
+  allowedTags: [...POST_ALLOWED_TAGS, "span"],
   allowedAttributes: {
-    a: ["href", "target", "rel", "data-file", "data-name", "data-size", "data-size-label", "data-ext", "aria-label"],
-    img: ["src", "alt"],
-    h2: ["id"],
-    h3: ["id"],
+    ...POST_ALLOWED_ATTRIBUTES,
+    h2: ["id", "style"],
+    h3: ["id", "style"],
     code: ["class"],
     span: ["class"],
   },
@@ -55,6 +55,10 @@ const RENDER_OPTIONS: sanitizeHtml.IOptions = {
     // hljs-keyword, hljs-title, 그리고 hljs-title 뒤에 붙는 function_·class_ 같은 보조 이름
     span: [/^hljs-[a-z-]+$/, /^[a-z]+_+$/],
   },
+  allowedStyles: POST_ALLOWED_STYLES,
+  allowedIframeHostnames: ["www.youtube-nocookie.com"],
+  exclusiveFilter: dropEmptyFrame,
+  transformTags: { iframe: youtubeFrame, div: youtubeWrapper },
   allowedSchemes: ["http", "https", "mailto"],
   allowedSchemesAppliedToAttributes: ["href", "src"],
   allowProtocolRelative: false,
