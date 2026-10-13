@@ -454,3 +454,167 @@ export function lampArt(): PixelArt {
   frame(g, 1, 0, 4, 4, "n");
   return art(g, { N: "#4a4a4a", n: "#2b2b2b", L: "#ffe28a" });
 }
+
+// 내 정원 (TOWN-20, specs/053-garden)
+const FENCE = { W: "#fdfdf8", w: "#cfcfc4", K: "#8f8f84" };
+
+/** 흰 울타리 한 칸 (가로, 8칸 = 40px): 뾰족한 말뚝 둘과 가로대 두 줄 */
+export function fenceArt(): PixelArt {
+  const g = grid(8, 8);
+  for (const x of [1, 5]) {
+    g[0][x] = "W";
+    fill(g, x - 1, 1, 3, 7, "W");
+    fill(g, x + 1, 1, 1, 7, "w");
+  }
+  fill(g, 0, 3, 8, 1, "W");
+  fill(g, 0, 4, 8, 1, "w");
+  fill(g, 0, 6, 8, 1, "W");
+  fill(g, 0, 7, 8, 1, "K");
+  return art(g, FENCE);
+}
+
+/** 옆 울타리 말뚝 (위에서 비스듬히 본 세로 줄, 4칸 = 20px마다 하나) */
+export function fencePostArt(): PixelArt {
+  const g = grid(3, 8);
+  g[0][1] = "W";
+  fill(g, 0, 1, 3, 7, "W");
+  fill(g, 2, 1, 1, 7, "w");
+  fill(g, 0, 7, 3, 1, "K");
+  return art(g, FENCE);
+}
+
+/** 장미 아치 문 (20칸 = 100px): 흰 기둥 둘과 둥근 아치를 덮은 덩굴장미 */
+export function rosesArchArt(): PixelArt {
+  const g = grid(20, 26);
+  // 기둥
+  fill(g, 0, 8, 2, 18, "W");
+  fill(g, 18, 8, 2, 18, "W");
+  fill(g, 1, 8, 1, 18, "w");
+  fill(g, 19, 8, 1, 18, "w");
+  // 아치 (반원 띠)
+  for (let x = 0; x < 20; x++) {
+    const t = (x - 9.5) / 10;
+    const top = Math.round(8 - 7 * Math.sqrt(Math.max(0, 1 - t * t)));
+    fill(g, x, top, 1, 3, "W");
+  }
+  // 덩굴 잎과 장미
+  for (let x = 0; x < 20; x++) {
+    const t = (x - 9.5) / 10;
+    const top = Math.round(8 - 7 * Math.sqrt(Math.max(0, 1 - t * t)));
+    g[top][x] = x % 2 === 0 ? "L" : "G";
+    if (x % 3 === 1) g[top + 1][x] = "R";
+    if (x % 4 === 2) g[Math.max(0, top - 1)][x] = "P";
+  }
+  for (let y = 10; y < 24; y += 3) {
+    g[y][0] = "G";
+    g[y + 1][1] = "R";
+    g[y][19] = "G";
+    g[y + 1][18] = "P";
+  }
+  fill(g, 0, 25, 2, 1, "K");
+  fill(g, 18, 25, 2, 1, "K");
+  return art(g, { ...FENCE, G: "#3e8e41", L: "#5cb85c", R: "#e63964", P: "#ff8fb1" });
+}
+
+/** 꽃밭 (12칸 = 60px): 흙 테두리 안에 빨강·노랑·분홍·보라 꽃 */
+export function flowerBedArt(variant: number): PixelArt {
+  const g = grid(12, 6);
+  fill(g, 0, 1, 12, 5, "E");
+  fill(g, 1, 2, 10, 3, "e");
+  const colors = variant % 2 === 0 ? ["R", "Y", "P", "V"] : ["P", "V", "Y", "R"];
+  for (let x = 1; x < 11; x += 2) {
+    const ch = colors[(x >> 1) % colors.length];
+    g[1][x] = ch;
+    g[2][x] = "G";
+    g[3][x + 1 < 11 ? x + 1 : x] = colors[((x >> 1) + 2) % colors.length];
+  }
+  return art(g, { E: "#8a5a34", e: "#6b4426", G: "#3e8e41", R: "#e74c3c", Y: "#ffd23f", P: "#ff8fb1", V: "#b39ddb" });
+}
+
+/** 벚나무 (분홍 꽃 나무) */
+export function cherryTreeArt(): PixelArt {
+  const g = grid(14, 18);
+  fill(g, 6, 11, 2, 7, "N");
+  g[12][5] = "N";
+  g[11][8] = "N";
+  for (let y = 0; y < 13; y++) {
+    const t = (y - 6) / 6.5;
+    const half = Math.round(7 * Math.sqrt(Math.max(0, 1 - t * t)));
+    fill(g, 7 - half, y, half * 2, 1, "L");
+  }
+  for (let y = 7; y < 13; y++) {
+    const t = (y - 6) / 6.5;
+    const half = Math.round(7 * Math.sqrt(Math.max(0, 1 - t * t)));
+    fill(g, 7 - half, y, Math.max(1, half - 1), 1, "D");
+  }
+  for (const [x, y] of [
+    [4, 3],
+    [9, 2],
+    [6, 6],
+    [11, 7],
+    [3, 9],
+  ])
+    g[y][x] = "H";
+  return art(g, { N: "#6b4226", L: "#ffb7c5", D: "#f48fb1", H: "#fff0f5" });
+}
+
+// 광장 가게 건물 (SHOP-07·08, specs/053-garden)
+
+/** 꼬까 옷가게: 분홍 벽, 옷걸이 간판, 원피스가 걸린 진열창 */
+export function clothesShopArt(): PixelArt {
+  const g = grid(30, 30);
+  fill(g, 2, 10, 26, 20, "W");
+  fill(g, 2, 10, 1, 20, "w");
+  // 지붕
+  fill(g, 0, 7, 30, 3, "R");
+  for (let x = 0; x < 30; x += 3) g[9][x] = "r";
+  // 옷걸이 간판
+  fill(g, 10, 0, 10, 7, "S");
+  frame(g, 10, 0, 10, 7, "K");
+  g[1][15] = "K";
+  fill(g, 13, 2, 5, 1, "K");
+  g[3][12] = "K";
+  g[3][18] = "K";
+  fill(g, 12, 4, 7, 1, "K");
+  // 진열창과 원피스
+  frame(g, 4, 14, 11, 10, "F");
+  fill(g, 5, 15, 9, 8, "G");
+  fill(g, 8, 16, 3, 2, "P");
+  fill(g, 7, 18, 5, 4, "P");
+  // 문
+  fill(g, 18, 16, 7, 14, "D");
+  fill(g, 19, 18, 5, 4, "G");
+  g[23][23] = "Y";
+  return art(g, { W: "#ffe4ec", w: "#f3c6d3", R: "#d6336c", r: "#a61e4d", S: "#fff9db", K: "#5c3d2e", F: "#7a4a2a", G: "#bfe6ff", P: "#9b59b6", D: "#c2255c", Y: "#f4c430" });
+}
+
+/** 반짝 미용실: 민트 벽, 가위 간판, 빨강·흰 줄무늬 기둥 */
+export function salonArt(): PixelArt {
+  const g = grid(30, 30);
+  fill(g, 2, 10, 26, 20, "W");
+  fill(g, 2, 10, 1, 20, "w");
+  fill(g, 0, 7, 30, 3, "B");
+  for (let x = 1; x < 30; x += 3) g[9][x] = "b";
+  // 가위 간판
+  fill(g, 10, 0, 10, 7, "S");
+  frame(g, 10, 0, 10, 7, "K");
+  for (let i = 0; i < 4; i++) {
+    g[1 + i][12 + i] = "K";
+    g[1 + i][17 - i] = "K";
+  }
+  g[5][12] = "R";
+  g[5][17] = "R";
+  // 줄무늬 기둥
+  for (let y = 12; y < 28; y++) g[y][4] = g[y][5] = (y >> 1) % 2 === 0 ? "R" : "V";
+  fill(g, 3, 11, 4, 1, "K");
+  fill(g, 3, 28, 4, 1, "K");
+  // 진열창 (거울)
+  frame(g, 8, 14, 9, 9, "F");
+  fill(g, 9, 15, 7, 7, "G");
+  fill(g, 10, 16, 2, 4, "L");
+  // 문
+  fill(g, 19, 16, 7, 14, "D");
+  fill(g, 20, 18, 5, 4, "G");
+  g[23][24] = "Y";
+  return art(g, { W: "#e3fafc", w: "#b2f2bb", B: "#12b886", b: "#087f5b", S: "#fff9db", K: "#343a40", R: "#e03131", V: "#ffffff", F: "#7a4a2a", G: "#bfe6ff", L: "#ffffff", D: "#0ca678", Y: "#f4c430" });
+}

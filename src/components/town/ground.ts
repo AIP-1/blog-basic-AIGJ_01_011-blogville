@@ -1,5 +1,5 @@
 // 마을 바닥 (TOWN-02·05): 잔디·흙길·돌광장·절벽 앞면·계단·먼 하늘을 도트(칸 4px)로 한 번만 굽는다. 브라우저에서만 부른다.
-import { CENTER, PLAZA_RADIUS, ROADS, WORLD } from "@/lib/town/layout";
+import { CENTER, GARDEN, PLAZA_RADIUS, ROADS, WORLD } from "@/lib/town/layout";
 import { CLIFF_FACE, CLIFF_LINES, RAIL, SKY_HEIGHT, STAIRS } from "@/lib/town/terrain";
 
 export const GROUND_CELL = 4;
@@ -34,6 +34,11 @@ export function bakeGround(): HTMLCanvasElement {
   for (let i = 0; i < 260; i++) {
     ctx.fillStyle = flowers[i % flowers.length];
     ctx.fillRect(Math.floor(random() * w), Math.floor(random() * h), 1, 1);
+  }
+  // 내 정원 (TOWN-20): 깎은 잔디 줄무늬
+  for (let y = c(GARDEN.y); y < c(GARDEN.y + GARDEN.height); y++) {
+    ctx.fillStyle = Math.floor((y - c(GARDEN.y)) / 6) % 2 === 0 ? "#8ad67a" : "#7fcb6e";
+    ctx.fillRect(c(GARDEN.x), y, c(GARDEN.width), 1);
   }
   // 흙길: 테두리 한 칸 진하게
   ctx.fillStyle = "#b8925f";
