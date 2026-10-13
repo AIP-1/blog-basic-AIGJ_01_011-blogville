@@ -125,5 +125,6 @@ E2E는 DB와 브라우저가 필요하고 전체가 약 25분 걸려서 CI에서
 |---|---|
 | 방금 배포한 버전을 되돌리기 | Actions → **rollback** → Run workflow. 배포 때 이전 색(blue/green) 컨테이너를 멈춰 두므로 몇십 초 안에 이전 버전으로 넘어가요. 한 번 더 돌리면 다시 돌아와요. DB 마이그레이션은 되돌리지 않아요 |
 | DB 백업 | 매일 새벽 3시(KST) 자동, 바로 하려면 Actions → **backup**. 서버 `~/blogville/backups/<시각>/`에 표마다 JSON 줄(`.jsonl.gz`)과 `manifest.json`(행 수), 최근 14개만 남김 (`scripts/backup.mjs`) |
+| 백업 되살리기 | 새(회원이 없는) 스키마에 `DATABASE_URL=… node scripts/migrate.mjs` 뒤 `DATABASE_URL=… node scripts/restore.mjs <백업 폴더>`. 외래 키 순서대로 한 트랜잭션에 넣고 번호를 이어 붙인 뒤 표마다 `manifest.json`의 행 수와 맞는지 확인해요. 회원이 있는 스키마에는 넣지 않아요 (`scripts/restore.mjs`) |
 | 사이트 감시 | 15분마다 첫 화면을 확인하고(Actions → **uptime**), 두 번 연속 응답이 없으면 이슈 `🚨 사이트 응답 없음`을 열어요. 회복하면 저절로 닫혀요. 이슈 알림은 GitHub 알림 설정(Watch)으로 받아요 |
 | 서버 상태 보기 | Actions → **status** (컨테이너, 포트, 관리자 계정 점검, 최근 로그) |

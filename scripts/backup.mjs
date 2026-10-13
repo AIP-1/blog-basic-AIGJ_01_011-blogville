@@ -1,7 +1,7 @@
 // DB 백업 (deploy/backup.sh가 앱 이미지로 띄운 일회용 컨테이너 안에서 부른다).
 // DATABASE_URL의 search_path 스키마(없으면 public)에 있는 모든 표를 표마다 JSON 줄(한 줄에 한 행, gzip)로 BACKUP_DIR에 쓴다.
 // pg_dump 없이 SELECT만 쓰므로 스키마를 만들 권한이 없는 계정으로도 된다. 표 구조는 drizzle/ 마이그레이션이 기록이다.
-// 되살리기: 같은 마이그레이션까지 적용한 빈 스키마에 표마다 줄을 읽어 INSERT (외래 키 순서 주의, manifest.json의 행 수로 확인).
+// 되살리기: scripts/restore.mjs (같은 마이그레이션까지 적용한 새 스키마에 외래 키 순서대로 넣고 manifest.json의 행 수로 확인).
 import { mkdirSync, writeFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 import path from "node:path";
