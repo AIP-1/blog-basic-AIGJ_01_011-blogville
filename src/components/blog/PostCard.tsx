@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Post } from "@/db/schema";
-import { firstImageUrl } from "@/lib/attachments";
+import { firstImageUrl, thumbUrl } from "@/lib/attachments";
 import { scheduleLabel } from "@/lib/schedule";
 import { excerpt, formatDate } from "@/lib/text";
 import { CategoryBadge } from "../post/CategoryBadge";
@@ -55,7 +55,7 @@ export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle,
         </div>
         {cover && (
           // eslint-disable-next-line @next/next/no-img-element -- 우리 저장소(/files) 사진, 크기를 모른다
-          <img src={cover} alt="" loading="lazy" className="size-20 shrink-0 self-center rounded-lg border border-line object-cover sm:size-24" data-post-cover />
+          <img src={thumbUrl(cover, 320)} alt="" loading="lazy" className="size-20 shrink-0 self-center rounded-lg border border-line object-cover sm:size-24" data-post-cover />
         )}
       </Link>
     </article>

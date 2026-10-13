@@ -18,8 +18,9 @@ export function ProfileAvatar({
 }) {
   const style = { width: size, height: size };
   if (photoKey) {
-    // eslint-disable-next-line @next/next/no-img-element -- 권한을 확인하는 /files 주소라 이미지 최적화를 거치지 않는다
-    return <img src={`/files/${photoKey}`} alt={`${nickname} 프로필 사진`} style={style} className="shrink-0 rounded-full border border-line object-cover" />;
+    // 작은 webp(?w=)로 받는다. 권한을 확인하는 /files 주소라 next/image 최적화를 거치지 않는다
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={`/files/${photoKey}?w=${size > 48 ? 320 : 96}`} alt={`${nickname} 프로필 사진`} style={style} className="shrink-0 rounded-full border border-line object-cover" />;
   }
   if (character.length > 0) {
     return (
