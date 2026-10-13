@@ -20,4 +20,4 @@ COPY --from=build /app ./
 RUN mkdir -p storage/uploads && chown -R node:node storage
 USER node
 EXPOSE 8400
-CMD ["sh", "-c", "npx drizzle-kit migrate && exec npx next start -p ${PORT}"]
+CMD ["sh", "-c", "node scripts/migrate.mjs && exec npx next start -p ${PORT}"]
