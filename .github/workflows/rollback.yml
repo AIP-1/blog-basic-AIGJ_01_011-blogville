@@ -1,0 +1,34 @@
+# 바로 전 버전으로 되돌린다 (Actions → rollback → Run workflow). 배포한 버전에 문제가 있을 때 쓴다.
+# 서버의 deploy/rollback.sh가 멈춰 둔 이전 버전을 켜서 확인한 뒤 프록시를 넘긴다. 한 번 더 돌리면 다시 돌아온다.
+name: rollback
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 서버 주소 정리
+        env:
+          SSH_ADDRESS: ${{ secrets.SSH_ADDRESS }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+        run: |
+          h=$(printf '%s' "$SSH_ADDRESS" | tr -d '[:space:]' | sed -E 's#^[a-zA-Z]+://##; s#/.*##; s#.*@##; s#:[0-9]+$##')
+          echo "::add-mask::$h"
+          p=$(printf '%s' "$SSH_PORT" | tr -d '[:space:]')
+          { echo "SSH_HOST=$h"; echo "SSH_PORT=${p:-22}"; } >> "$GITHUB_ENV"
+
+      - name: 이전 버전으로 되돌리기
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ env.SSH_HOST }}
+          port: ${{ env.SSH_PORT }}
+          username: ${{ secrets.SSH_ID }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          command_timeout: 5m
+          script: bash ~/blogville/rollback.sh
