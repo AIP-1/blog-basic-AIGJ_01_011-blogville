@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { signUpOk, writePost } from "./helpers";
+import { signUpOk, sql, writePost } from "./helpers";
 
 test.describe("US2 글쓰기·발행·상세", () => {
   test("발행 → 상세 → 수정 → 삭제", async ({ page }) => {
@@ -8,6 +8,8 @@ test.describe("US2 글쓰기·발행·상세", () => {
     await expect(page.getByRole("heading", { name: "첫 글" })).toBeVisible();
     await expect(page.locator(".prose-post")).toHaveText("안녕하세요");
 
+    // "수정됨"은 쓴 지 1초가 넘어 고친 글에만 붙는다. 빠른 서버에서는 1초 안에 고쳐져 흔들리므로 쓴 시각을 1분 앞당긴다
+    await sql`update posts set created_at = created_at - interval '1 minute', updated_at = updated_at - interval '1 minute' where id = ${id}`;
     await page.getByRole("link", { name: "수정" }).click();
     await expect(page).toHaveURL(`/write/${id}`);
     await page.getByLabel("제목", { exact: true }).fill("고친 글");

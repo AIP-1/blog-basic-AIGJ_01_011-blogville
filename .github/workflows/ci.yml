@@ -1,6 +1,6 @@
 # PR과 develop·main에 올라온 코드를 검사한다: lint, 타입 검사, 단위 테스트, 빌드.
 # 배포(deploy.yml)와 따로 돌고 서버나 시크릿을 건드리지 않는다.
-# E2E(Playwright)는 DB와 브라우저가 필요하고 오래 걸려서(약 25분) 여기서 돌리지 않고, 기능을 만들 때 로컬에서 돌린다.
+# E2E(Playwright)는 오래 걸려서 e2e.yml이 따로 돈다: main으로 가는 PR(release·hotfix)과 `e2e` 꼬리표를 단 PR.
 name: ci
 
 on:
