@@ -253,6 +253,13 @@
       "when": 1791894961566,
       "tag": "0035_error_logs",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1791895383281,
+      "tag": "0036_notify_settings",
+      "breakpoints": true
     }
   ]
 }

@@ -1,20 +1,36 @@
 import "server-only";
 import { and, asc, between, count, desc, eq, inArray, isNull, lte, max, min, or, sql } from "drizzle-orm";
 import { db, type Tx } from "@/db";
-import { blogs, feedback, guestbookEntries, items, notifications, posts, profiles } from "@/db/schema";
+import { blogs, feedback, follows, guestbookEntries, items, notificationPrefs, notifications, posts, profiles } from "@/db/schema";
 import { levelsGained } from "@/lib/game";
 import {
   isActivityKind,
   isGuestbookKind,
+  DEFAULT_NOTIFICATION_PREFS,
   LEVEL_UP_ITEMS_SHOWN,
+  NEW_POST_NOTIFY_CAP,
   NOTIFICATIONS_PAGE_SIZE,
+  prefKeyFor,
   UNREAD_COUNT_CAP,
   type ActivityKind,
   type GuestbookKind,
+  type NotificationKind,
+  type NotificationPrefs,
   type PendingLevelUp,
 } from "@/lib/notifications";
 
 // 알림 (GAME-08의 공감·댓글·답글, specs/017-notifications · GAME-06 레벨업, specs/034-level-up)
+
+/** 알림 설정에서 그 종류를 끈 회원인지. 설정 행이 없거나 끌 수 없는 종류면 false */
+async function isMuted(tx: Tx, userId: string, kind: NotificationKind): Promise<boolean> {
+  const key = prefKeyFor(kind);
+  if (!key) return false;
+  const [row] = await tx
+    .select({ on: notificationPrefs[key] })
+    .from(notificationPrefs)
+    .where(eq(notificationPrefs.userId, userId));
+  return row ? !row.on : false;
+}
 
 /**
  * 공감·댓글·답글을 저장하는 트랜잭션 안에서 부른다.
@@ -26,6 +42,7 @@ export async function notifyActivity(
   n: { kind: ActivityKind; recipientId: string | null; actorId: string; postId: number },
 ): Promise<void> {
   if (!n.recipientId || n.recipientId === n.actorId) return;
+  if (await isMuted(tx, n.recipientId, n.kind)) return;
   await tx
     .insert(notifications)
     .values({ userId: n.recipientId, kind: n.kind, actorId: n.actorId, postId: n.postId })
@@ -41,6 +58,7 @@ export async function notifyGuestbook(
   n: { kind: GuestbookKind; recipientId: string; actorId: string; entryId: number },
 ): Promise<void> {
   if (n.recipientId === n.actorId) return;
+  if (await isMuted(tx, n.recipientId, n.kind)) return;
   await tx.insert(notifications).values({ userId: n.recipientId, kind: n.kind, actorId: n.actorId, guestbookEntryId: n.entryId });
 }
 
@@ -59,10 +77,59 @@ export async function notifyFeedbackReply(tx: Tx, recipientId: string, feedbackI
 export async function notifyLevelUps(tx: Tx, userId: string, before: number, after: number): Promise<void> {
   const levels = levelsGained(before, after);
   if (levels.length === 0) return;
+  if (await isMuted(tx, userId, "level_up")) return;
   await tx
     .insert(notifications)
     .values(levels.map((level) => ({ userId, kind: "level_up", level })))
     .onConflictDoNothing();
+}
+
+/**
+ * 이웃 새 글 알림: 공개된 새 글의 글쓴이를 이웃으로 둔 회원들에게 한 줄씩 (한 번의 INSERT … SELECT).
+ * 먼저 이웃이 된 NEW_POST_NOTIFY_CAP명까지, 새 글 알림을 끈 회원은 뺀다. 같은 글로 두 번 알리지 않는다.
+ * 글이 이미 공개된 뒤(트랜잭션 밖)에 부르고, 실패해도 글 발행은 그대로라 오류는 기록만 한다.
+ */
+export async function notifyNewPost(authorId: string, postId: number): Promise<void> {
+  try {
+    await db.execute(sql`
+      insert into ${notifications} (user_id, kind, actor_id, post_id)
+      select f.follower_id, 'new_post', ${authorId}, ${postId}
+      from (
+        select ${follows.followerId} as follower_id from ${follows}
+        where ${follows.followeeId} = ${authorId}
+          and not exists (select 1 from ${notificationPrefs} np where np.user_id = ${follows.followerId} and not np.new_post)
+          and not exists (select 1 from ${notifications} n where n.user_id = ${follows.followerId} and n.kind = 'new_post' and n.post_id = ${postId})
+        order by ${follows.createdAt}
+        limit ${NEW_POST_NOTIFY_CAP}
+      ) f
+      where exists (select 1 from ${posts} p where p.id = ${postId} and p.is_public)`);
+  } catch (error) {
+    console.error("이웃 새 글 알림 실패", error);
+  }
+}
+
+/** 내 알림 설정 (행이 없으면 모두 켜짐) */
+export async function getNotificationPrefs(userId: string): Promise<NotificationPrefs> {
+  const [row] = await db
+    .select({
+      like: notificationPrefs.like,
+      comment: notificationPrefs.comment,
+      reply: notificationPrefs.reply,
+      guestbook: notificationPrefs.guestbook,
+      newPost: notificationPrefs.newPost,
+      levelUp: notificationPrefs.levelUp,
+    })
+    .from(notificationPrefs)
+    .where(eq(notificationPrefs.userId, userId));
+  return row ?? { ...DEFAULT_NOTIFICATION_PREFS };
+}
+
+/** 알림 설정 저장 (없으면 만들고 있으면 바꾼다) */
+export async function saveNotificationPrefs(userId: string, prefs: NotificationPrefs): Promise<void> {
+  await db
+    .insert(notificationPrefs)
+    .values({ userId, ...prefs })
+    .onConflictDoUpdate({ target: notificationPrefs.userId, set: { ...prefs, updatedAt: sql`now()` } });
 }
 
 /**

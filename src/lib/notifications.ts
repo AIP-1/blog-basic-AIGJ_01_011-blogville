@@ -4,8 +4,8 @@ import { formatDate } from "./text";
 
 // 알림함 문구·주소·시간 (GAME-08, specs/017-notifications · 레벨업 GAME-06, specs/034-level-up). 서버와 화면이 같이 쓴다.
 
-/** 회원이 남긴 활동 알림 (행동한 사람·글이 있다) */
-export type ActivityKind = "like" | "comment" | "reply";
+/** 회원이 남긴 활동 알림 (행동한 사람·글이 있다). new_post는 이웃이 새 글을 올렸을 때 (글쓴이·그 글) */
+export type ActivityKind = "like" | "comment" | "reply" | "new_post";
 /** 방명록 알림 (BLOG-10, specs/056-guestbook): 행동한 사람과 방명록 글이 있다 (글은 없다) */
 export type GuestbookKind = "guestbook" | "guestbook_reply";
 export type NotificationKind = ActivityKind | GuestbookKind | "level_up" | "feedback_reply";
@@ -30,13 +30,15 @@ export function notificationText(kind: ActivityKind, nickname: string, postTitle
       return `💬 ${nickname}님이 「${postTitle}」에 댓글을 달았어요`;
     case "reply":
       return `💬 ${nickname}님이 내 댓글에 답글을 달았어요`;
+    case "new_post":
+      return `📝 ${nickname}님이 새 글을 올렸어요: ${postTitle}`;
   }
 }
 
-/** 누르면 갈 곳: 공감은 그 글, 댓글·답글은 그 글의 댓글 자리 */
+/** 누르면 갈 곳: 공감·새 글은 그 글, 댓글·답글은 그 글의 댓글 자리 */
 export function notificationHref(kind: ActivityKind, blogSlug: string, postId: number): string {
   const post = `/@${blogSlug}/${postId}`;
-  return kind === "like" ? post : `${post}#comments`;
+  return kind === "like" || kind === "new_post" ? post : `${post}#comments`;
 }
 
 /** 방명록 알림 문구: 주인에게는 새 방명록 글, 작성자에게는 주인의 답글 */
@@ -75,7 +77,7 @@ export function notificationTime(createdAt: Date, now: Date = new Date()): strin
 }
 
 export function isActivityKind(value: string): value is ActivityKind {
-  return value === "like" || value === "comment" || value === "reply";
+  return value === "like" || value === "comment" || value === "reply" || value === "new_post";
 }
 
 /** 레벨업 팝업 제목: `Lv.3이 되었어요!`, `Lv.4가 되었어요!`, 최고 레벨이면 `최고 레벨 Lv.99가 되었어요!` */
@@ -99,4 +101,51 @@ export function parseLevel(value: unknown): number | null {
   if (typeof value !== "string" || !/^\d{1,2}$/.test(value)) return null;
   const level = Number(value);
   return level >= 2 && level <= MAX_LEVEL ? level : null;
+}
+
+/** 이웃 새 글 알림은 한 번에 이만큼의 이웃에게만 (먼저 이웃이 된 순) */
+export const NEW_POST_NOTIFY_CAP = 1000;
+
+// 알림 설정 (🔔 내 정보): 끌 수 있는 알림 종류. 문의 답변 알림은 늘 받는다.
+export const NOTIFICATION_PREF_KEYS = ["like", "comment", "reply", "guestbook", "newPost", "levelUp"] as const;
+export type NotificationPrefKey = (typeof NOTIFICATION_PREF_KEYS)[number];
+export type NotificationPrefs = Record<NotificationPrefKey, boolean>;
+
+/** 설정 행이 없으면 모두 켜짐 */
+export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = { like: true, comment: true, reply: true, guestbook: true, newPost: true, levelUp: true };
+
+/** 설정 화면의 이름표 (설정 칸 순서대로) */
+export const NOTIFICATION_PREF_LABELS: Record<NotificationPrefKey, string> = {
+  like: "❤️ 내 글에 공감",
+  comment: "💬 내 글에 댓글",
+  reply: "💬 내 댓글에 답글",
+  guestbook: "📖 방명록 글·답글",
+  newPost: "📝 이웃의 새 글",
+  levelUp: "🎉 레벨업",
+};
+
+export const NOTIFICATION_PREFS_SAVED = "알림 설정을 저장했어요";
+
+/** 알림 종류 → 그 종류를 켜고 끄는 설정 칸. 끌 수 없는 종류(문의 답변)는 null */
+export function prefKeyFor(kind: NotificationKind): NotificationPrefKey | null {
+  switch (kind) {
+    case "like":
+    case "comment":
+    case "reply":
+      return kind;
+    case "guestbook":
+    case "guestbook_reply":
+      return "guestbook";
+    case "new_post":
+      return "newPost";
+    case "level_up":
+      return "levelUp";
+    case "feedback_reply":
+      return null;
+  }
+}
+
+/** 설정 저장 폼: 체크된 칸(값 "on")만 켜짐 */
+export function parseNotificationPrefs(form: { get(name: string): unknown }): NotificationPrefs {
+  return Object.fromEntries(NOTIFICATION_PREF_KEYS.map((key) => [key, form.get(key) === "on"])) as NotificationPrefs;
 }

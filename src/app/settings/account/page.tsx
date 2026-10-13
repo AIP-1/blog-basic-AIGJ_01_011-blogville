@@ -2,10 +2,12 @@ import Link from "next/link";
 import { DeleteAccountForm, NicknameForm, PasswordForm } from "@/components/settings/SettingsForms";
 import { ProfilePhotoForm } from "@/components/settings/ProfilePhotoForm";
 import { SocialAccounts } from "@/components/settings/SocialAccounts";
+import { NotificationPrefsForm } from "@/components/settings/NotificationPrefsForm";
 import { enabledProviders, isSocialProvider, linkErrorMessage, SOCIAL_MESSAGES } from "@/lib/social-login";
 import { listLinkedAccounts } from "@/server/social-login";
 import { getNickname, requireMember } from "@/server/dal";
 import { getProfilePhotoKey } from "@/server/profile";
+import { getNotificationPrefs } from "@/server/notifications";
 
 export const metadata = { title: "내 정보 | Blogville" };
 
@@ -20,10 +22,11 @@ function socialNotice(query: Record<string, string | string[] | undefined>) {
 
 export default async function AccountPage({ searchParams }: PageProps<"/settings/account">) {
   const member = await requireMember();
-  const [nickname, photoKey, linked, query] = await Promise.all([
+  const [nickname, photoKey, linked, prefs, query] = await Promise.all([
     getNickname(member.userId),
     getProfilePhotoKey(member.userId),
     listLinkedAccounts(member.userId),
+    getNotificationPrefs(member.userId),
     searchParams,
   ]);
   const notice = socialNotice(query);
@@ -57,6 +60,12 @@ export default async function AccountPage({ searchParams }: PageProps<"/settings
           message={notice.message}
           error={notice.error}
         />
+      </section>
+      <section aria-labelledby="notify-settings" className="rounded-2xl border border-line bg-surface p-5">
+        <h2 id="notify-settings" className="mb-3 text-lg font-bold">
+          🔔 알림 설정
+        </h2>
+        <NotificationPrefsForm prefs={prefs} />
       </section>
       <section aria-labelledby="password" className="rounded-2xl border border-line bg-surface p-5">
         <h2 id="password" className="mb-3 text-lg font-bold">
