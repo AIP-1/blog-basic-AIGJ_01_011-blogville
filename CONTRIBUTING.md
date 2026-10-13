@@ -47,7 +47,8 @@ gitGraph
 2. 기능 문서(요구사항·spec·plan·tasks)는 문서 저장소 [handsomeguen/docs](https://github.com/handsomeguen/docs)에 같은 이름으로 올립니다.
 3. 로컬에서 확인합니다: `npm run lint`, `npm run typecheck`, `npm test`, 바뀐 부분의 E2E.
 4. PR을 열면 CI(`ci.yml`)가 lint·타입 검사·단위 테스트·빌드를 돌립니다. 초록이 되면 merge합니다.
-5. 배포할 때 `develop`에서 `release/<버전>`을 만들어 `main`으로 PR을 엽니다. merge되면 서버에 배포됩니다.
+5. 배포할 때 `develop`에서 `release/<버전>`을 만들어 `main`으로 PR을 엽니다. 이 브랜치에서 `package.json` 버전을 올리고, 새 화면 그림이 든 릴리스 노트 `docs/releases/v<버전>.md`(그림은 `docs/releases/img/v<버전>/`)와 `CHANGELOG.md` 줄을 씁니다.
+6. merge되면 서버에 배포되고(`deploy.yml`), `release.yml`이 그 노트로 GitHub 릴리스와 `v<버전>` 태그를 만듭니다.
 
 ## 브랜치 보호 (저장소 관리자가 GitHub에서 설정)
 
