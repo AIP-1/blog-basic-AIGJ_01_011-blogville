@@ -147,11 +147,8 @@ if [ -n "${ADMIN_USERNAME:-}" ] && [ -n "${ADMIN_PASSWORD:-}" ]; then
   fi
 fi
 
-# 릴리스 노트를 공지 블로그(/@notice)에 올린다. 이미 올린 버전은 건너뛰고, 공지 블로그가 없으면 하지 않는다
-echo "릴리스 노트 확인"
-if ! "${DOCKER[@]}" exec "$NEXT_NAME" npx tsx scripts/publish-release-notes.ts; then
-  echo "릴리스 노트를 올리지 못했어요(위 문구 확인). 배포는 계속해요." >&2
-fi
+# 릴리스 노트는 아래 막대의 [🆕 업데이트 소식](/updates)에서 보여 준다 (v1.2.0부터 공지 블로그에는 올리지 않음).
+# 공지 블로그에도 올리고 싶으면 서버에서 직접: docker exec <컨테이너> npx tsx scripts/publish-release-notes.ts
 
 # 프록시가 넘길 포트를 바꾼다 (파일을 통째로 바꿔 반쯤 쓴 내용을 읽지 않게)
 printf '%s\n' "$NEXT_PORT" > "$DEPLOY_DIR/state/active-port.tmp"
