@@ -69,7 +69,7 @@ npm install
 npm run db:migrate
 npm run db:seed                # (선택) demo / demo1234, /@demo
 npm run admin:create           # (선택) .env.local의 ADMIN_USERNAME·ADMIN_PASSWORD로 관리자와 /@notice
-npm run release:post           # (선택) docs/releases의 릴리스 노트를 /@notice '업데이트' 글로 올림
+npm run release:post           # (선택, 손으로) docs/releases의 릴리스 노트를 /@notice '업데이트' 글로 올림
 npm run dev                    # http://localhost:3000
 ```
 
@@ -101,7 +101,7 @@ npm run posts:cleanup
 | 언제 | 무엇 | 파일 |
 |---|---|---|
 | `main`·`develop`으로 가는 PR, `develop`에 push | lint → 타입 검사 → 단위 테스트 → 빌드 | `.github/workflows/ci.yml` |
-| `main`에 merge (release·hotfix) | 도커 이미지 → 서버에 올림 → 블루·그린 무중단 교체 → 새 릴리스 노트를 공지 블로그(`/@notice`)의 '업데이트' 글로 올림 | `.github/workflows/deploy.yml` |
+| `main`에 merge (release·hotfix) | 도커 이미지 → 서버에 올림 → 블루·그린 무중단 교체 (릴리스 노트는 아래 막대의 🆕 업데이트 소식 `/updates`에 보임) | `.github/workflows/deploy.yml` |
 | `main`에 새 버전·릴리스 노트가 올라옴 | `docs/releases/v<버전>.md`로 GitHub 릴리스와 태그 만들기 | `.github/workflows/release.yml` |
 | 손으로 (Actions → status) | 서버 컨테이너·포트·로그 보기 (아무것도 바꾸지 않음) | `.github/workflows/status.yml` |
 
