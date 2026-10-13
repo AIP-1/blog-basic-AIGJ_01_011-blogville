@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "./fixtures";
+import { png } from "./files";
 import { signUpOk, sql } from "./helpers";
 
 // 글 상세 이전 글·다음 글, 블로그 이름 링크, 비공개 글 탭 제목 (POST-05, BLOG-02, POST-02), specs/016-post-nav
@@ -98,5 +99,49 @@ test.describe("블로그 이름 링크·탭 제목", () => {
     expect((await homeLink.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     await homeLink.click();
     await expect(page).toHaveURL(new RegExp(`/@${owner}$`));
+  });
+});
+
+test.describe("같은 카테고리의 다른 글·목록 대표 사진", () => {
+  test("글 아래에 같은 대분류의 다른 글 최신 5개, 남에게는 비공개 글을 빼고, [더 보기]는 그 카테고리 목록", async ({ page, browser }) => {
+    const owner = await signUpOk(page);
+    const [blog] = await sql`select b.id from blogs b join users u on u.id = b.owner_id where u.username = ${owner}`;
+    const [cat] = await sql`insert into categories (blog_id, name, position) values (${blog.id}, '여행', 1) returning id`;
+    const ids = await insertSameTime(owner, [{ title: "여행 1" }, { title: "여행 2" }, { title: "여행 비밀", isPublic: false }, { title: "여행 3" }, { title: "여행 4" }, { title: "여행 5" }, { title: "여행 6" }, { title: "다른 글" }]);
+    await sql`update posts set category_id = ${cat.id} where id = any(${ids.slice(0, 7)})`;
+
+    const box = (p: Page) => p.locator("[data-category-posts]");
+    const visitor = await browser.newPage();
+    await visitor.goto(`/@${owner}/${ids[0]}`);
+    await expect(box(visitor).getByRole("heading")).toHaveText("🗂 ‘여행’ 카테고리의 다른 글");
+    await expect(box(visitor).getByRole("listitem")).toHaveCount(5);
+    await expect(box(visitor).getByRole("listitem").first()).toContainText("여행 6");
+    await expect(box(visitor)).not.toContainText("여행 비밀");
+    await expect(box(visitor)).not.toContainText("여행 1");
+    await box(visitor).getByRole("link", { name: "더 보기" }).click();
+    await expect(visitor).toHaveURL(new RegExp(`/@${owner}\\?category=${cat.id}$`));
+
+    // 주인에게는 비공개 글도
+    await page.goto(`/@${owner}/${ids[6]}`);
+    await expect(box(page)).toContainText("여행 비밀");
+    // 카테고리 없는 글엔 없다
+    await page.goto(`/@${owner}/${ids[7]}`);
+    await expect(box(page)).toHaveCount(0);
+  });
+
+  test("본문에 사진이 있으면 목록 카드 오른쪽에 첫 사진", async ({ page }) => {
+    const owner = await signUpOk(page);
+    await page.goto("/write");
+    await page.getByLabel("제목", { exact: true }).fill("사진 글");
+    await page.getByLabel("본문").click();
+    await page.keyboard.type("사진이 있는 글");
+    await page.getByLabel(/^사진 올리기/).setInputFiles([png("표지.png")]);
+    await expect(page.locator(".tiptap img")).toHaveCount(1);
+    await page.getByRole("button", { name: "발행하기" }).click();
+    await expect(page).toHaveURL(/\/@[a-z0-9_]+\/\d+/);
+    await page.goto(`/@${owner}`);
+    const cover = page.locator("article", { hasText: "사진 글" }).locator("[data-post-cover]");
+    await expect(cover).toHaveAttribute("src", /^\/files\/[0-9a-f]{32}$/);
+    expect(await cover.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
   });
 });

@@ -140,6 +140,12 @@ export function keyFromUrl(url: string | undefined): string | null {
   return url ? (FILE_URL.exec(url)?.[1] ?? null) : null;
 }
 
+/** 본문의 첫 사진 주소 (글 목록 대표 사진). 정화된 HTML의 `<img src="/files/키">`만 본다 */
+export function firstImageUrl(html: string): string | null {
+  const m = /<img\b[^>]*\ssrc\s*=\s*["']\/files\/([0-9a-f]{32})["']/i.exec(html);
+  return m ? `/files/${m[1]}` : null;
+}
+
 /** 본문 HTML에 나온 `/files/키`를 모두 (중복 없이, 정렬해서 → 잠그는 순서) */
 export function extractFileKeys(html: string): string[] {
   const keys = new Set<string>();
