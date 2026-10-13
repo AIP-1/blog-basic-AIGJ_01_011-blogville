@@ -140,6 +140,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-dvh flex-col">
         <Header />
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
+        {/* 업데이트 소식 (릴리스 노트, /updates) */}
+        <footer className="site-footer border-t border-line">
+          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm text-ink-soft">
+            <span>Blogville</span>
+            <Link href="/updates" className="inline-flex min-h-11 items-center hover:text-accent" data-updates-link>
+              🆕 업데이트 소식
+            </Link>
+          </div>
+        </footer>
       </body>
     </html>
   );
