@@ -8,7 +8,7 @@ import { listReleases } from "@/server/releases";
 export async function UpdatesNewBadge() {
   if (!hasNewRelease(await listReleases())) return null;
   return (
-    <span className="rounded-full bg-danger px-1.5 text-xs leading-5 font-bold text-white" data-updates-new>
+    <span className="rounded-full bg-danger px-1.5 text-xs leading-5 font-bold text-surface" data-updates-new>
       NEW
     </span>
   );

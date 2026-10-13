@@ -68,7 +68,7 @@ body {
 .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .btn-danger { color: var(--danger); }
 /* 되돌릴 수 없는 일 (회원 탈퇴) */
-.btn-danger-solid { background: var(--danger); border-color: var(--danger); color: #ffffff; }
+.btn-danger-solid { background: var(--danger); border-color: var(--danger); color: var(--surface); } /* 어두운 화면의 밝은 빨강 위에서도 대비가 맞게 */
 /* 이웃 추가 (SOC-04): 하늘색 바탕 흰 글씨, 대비 4.5:1 이상 */
 .btn-sky { background: #0277bd; border-color: #0277bd; color: #ffffff; }
 /* 발행 안내 같은 노란 알림 카드 (POST-01) */
