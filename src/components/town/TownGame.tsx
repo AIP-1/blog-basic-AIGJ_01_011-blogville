@@ -6,7 +6,8 @@ import { findArt } from "@/lib/art";
 import { pixelRects, type PixelArt } from "@/lib/art/characters";
 import { walkDir, walkFrame, WALK_DIRS, WALK_FPS, WALK_FRAMES, type ColorGrid, type WalkDir } from "@/lib/art/walk";
 import { TOWN_CELL } from "@/lib/art/town";
-import { PLAYER_SIZE, SPEED, WORLD, nearestEntrance, normalize, step, type Point } from "@/lib/town/layout";
+import { HOUSE_LOTS, lotFront, PLAYER_SIZE, shortName, SPEED, WORLD, nearestEntrance, normalize, step, type Point } from "@/lib/town/layout";
+import { createNpcs, NPC_TAG_DISTANCE, npcGraph, updateNpcs, type Npc } from "@/lib/town/npc";
 import { artSize, artVisibleHeight, entrancePrompt, lotChoice, mailboxLot, townLayout, type TownEntrance, type TownHouseInput } from "@/lib/town/structures";
 import { onStairs, STAIR_SLOW, stairEnds, STAIRS } from "@/lib/town/terrain";
 import { bakeGround, GROUND_CELL } from "./ground";
@@ -101,6 +102,7 @@ function drawTag(ctx: CanvasRenderingContext2D, text: string, x: number, y: numb
  * 시험용으로 캔버스에 발 위치 `data-feet`를 적고, `bv-teleport` 이벤트(`{x, y}`)로 옮길 수 있다.
  * 우체통 입구는 페이지를 옮기지 않고 창 밖(window)에 `bv-mailbox` 이벤트(`{lot}`)를 보낸다 (TOWN-13, `TownHud`가 연다).
  * 내 마을(`chooseLots`)의 빈 집터는 `bv-lots` 이벤트(`{lot}`)로 자리 고르기 창을 연다 (TOWN-18).
+ * 집이 선 이웃은 흙길을 걸어 다니고(TOWN-19), 누르면 그 집 우체통이 열린다. 시험 훅 `data-npcs`·`data-npc-walking`·`data-npc-at`.
  */
 export function TownGame({
   houses,
@@ -160,12 +162,32 @@ export function TownGame({
     const bodies = [...walls, ...structures.flatMap((s) => (s.body ? [s.body] : []))];
     const sprites = new Map<object, HTMLCanvasElement>();
     for (const s of structures) if (!sprites.has(s.art)) sprites.set(s.art, bake([s.art], TOWN_CELL));
-    const playerArts = layers.map(findArt).filter((a): a is PixelArt => a !== undefined);
     // 걷는 그림 (TOWN-17): 방향마다 서 있기 + 걷기 4칸
-    const walkSheet = new Map<string, HTMLCanvasElement>();
-    if (playerArts.length > 0) {
-      for (const d of WALK_DIRS) for (let f = 0; f <= WALK_FRAMES; f++) walkSheet.set(`${d}:${f}`, bakeGrid(walkFrame(playerArts, d, f), PLAYER_SIZE / 16));
-    }
+    const bakeSheet = (keys: readonly string[]) => {
+      const arts = keys.map(findArt).filter((a): a is PixelArt => a !== undefined);
+      const sheet = new Map<string, HTMLCanvasElement>();
+      if (arts.length > 0) {
+        for (const d of WALK_DIRS) for (let f = 0; f <= WALK_FRAMES; f++) sheet.set(`${d}:${f}`, bakeGrid(walkFrame(arts, d, f), PLAYER_SIZE / 16));
+      }
+      return sheet;
+    };
+    const walkSheet = bakeSheet(layers);
+
+    // 걸어 다니는 이웃 (TOWN-19): 집이 선 이웃(1~10번)이 흙길을 걷는다. 내 집(0번) 앞에는 오지 않는다
+    const graph = npcGraph(bodies, lotFront(0), HOUSE_LOTS.map((_, i) => lotFront(i)));
+    const npcs = createNpcs(
+      graph,
+      houses.filter((h) => h.lot > 0),
+      Math.random,
+    );
+    const npcSheets = new Map<number, Map<string, HTMLCanvasElement>>();
+    for (const h of houses) if (h.lot > 0) npcSheets.set(h.lot, bakeSheet(h.layers && h.layers.length > 0 ? h.layers : ["char.visitor"]));
+    const npcTime = new Map<number, number>();
+    canvas.dataset.npcs = String(npcs.length);
+    // 마우스가 올라간 곳 (이웃 이름표)
+    let hover: Point | null = null;
+    const npcAt = (p: Point): Npc | undefined =>
+      npcs.find((n) => Math.abs(p.x - n.pos.x) <= 22 && p.y >= n.pos.y - PLAYER_SIZE + 8 && p.y <= n.pos.y + 4);
     const ground = bakeGround();
 
     // 시작 자리(?at)가 바뀌었으면 새 자리에서. 환영(?welcome)을 주소에서 지운 뒤 다시 그려도 자리는 그대로
@@ -228,6 +250,12 @@ export function TownGame({
     const onPointer = (event: PointerEvent) => {
       if (event.button !== 0) return;
       const p = toWorld(event);
+      // 걷는 이웃을 누르면 그 집 우체통 (TOWN-19)
+      const npc = npcAt(p);
+      if (npc) {
+        fromNpc(npc.lot);
+        return;
+      }
       // 건물·집을 눌렀으면 그 입구로 (가까우면 바로 들어간다)
       const hit = structures.find((s) => {
         const { width, height } = artSize(s.art);
@@ -242,6 +270,14 @@ export function TownGame({
         target = p;
       }
     };
+    const fromNpc = (lot: number) => window.dispatchEvent(new CustomEvent("bv-mailbox", { detail: { lot } }));
+    const onHover = (event: PointerEvent) => {
+      hover = toWorld(event);
+      canvas.style.cursor = npcAt(hover) ? "pointer" : "";
+    };
+    const onLeave = () => {
+      hover = null;
+    };
     const onTeleport = (event: Event) => {
       const { x, y } = (event as CustomEvent<Point>).detail;
       pos = { x, y };
@@ -253,6 +289,8 @@ export function TownGame({
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("blur", onBlur);
     canvas.addEventListener("pointerdown", onPointer);
+    canvas.addEventListener("pointermove", onHover);
+    canvas.addEventListener("pointerleave", onLeave);
     canvas.addEventListener("bv-teleport", onTeleport);
 
     let last = performance.now();
@@ -293,6 +331,8 @@ export function TownGame({
         walking = false;
         walkTime = 0;
       }
+      updateNpcs(npcs, graph, dt, Math.random);
+      for (const n of npcs) npcTime.set(n.lot, n.walking ? (npcTime.get(n.lot) ?? 0) + dt : 0);
       const pose = `${walking ? "walk" : "idle"}-${facing}`;
       if (canvas.dataset.walk !== pose) canvas.dataset.walk = pose;
 
@@ -355,6 +395,23 @@ export function TownGame({
           if (sprite) ctx.drawImage(sprite, px - PLAYER_SIZE / 2, py - PLAYER_SIZE + 4);
         },
       });
+      for (const n of npcs) {
+        const nx = Math.round(n.pos.x - camera.x);
+        const ny = Math.round(n.pos.y - camera.y);
+        if (nx < -40 || nx > vw + 40 || ny < -10 || ny > vh + PLAYER_SIZE) continue;
+        const frameNo = n.walking ? 1 + (Math.floor((npcTime.get(n.lot) ?? 0) * WALK_FPS) % WALK_FRAMES) : 0;
+        const look = npcSheets.get(n.lot)?.get(`${n.facing}:${frameNo}`);
+        items.push({
+          y: n.pos.y + 8,
+          draw: () => {
+            ctx.fillStyle = "rgba(0,0,0,0.18)";
+            ctx.beginPath();
+            ctx.ellipse(nx, ny, 16, 6, 0, 0, Math.PI * 2);
+            ctx.fill();
+            if (look) ctx.drawImage(look, nx - PLAYER_SIZE / 2, ny - PLAYER_SIZE + 4);
+          },
+        });
+      }
       items.sort((a, b) => a.y - b.y);
       for (const item of items) item.draw();
       // 이름표는 맨 위에
@@ -366,9 +423,24 @@ export function TownGame({
         if (x < -150 || x > vw + 150 || y < -20 || y > vh + 60) continue;
         drawTag(ctx, s.label, x, y, s.id === "house:0", s.sub);
       }
+      // 이웃 이름표: 가까이 가거나 마우스를 올렸을 때만
+      const hovered = hover ? npcAt(hover) : undefined;
+      for (const n of npcs) {
+        if (n !== hovered && Math.hypot(n.pos.x - pos.x, n.pos.y - pos.y) > NPC_TAG_DISTANCE) continue;
+        drawTag(ctx, shortName(n.name), n.pos.x - camera.x, n.pos.y - camera.y - PLAYER_SIZE, false);
+      }
       drawTag(ctx, name, pos.x - camera.x, pos.y - camera.y - PLAYER_SIZE, true);
       lastPos.current = { from, pos };
-      if (frame++ % 3 === 0) canvas.dataset.feet = `${Math.round(pos.x)},${Math.round(pos.y)}`;
+      if (frame++ % 3 === 0) {
+        canvas.dataset.feet = `${Math.round(pos.x)},${Math.round(pos.y)}`;
+        // 시험 훅: 지금 걷는 이웃 수, 화면에 보이는 이웃의 자리 번호와 몸 가운데 (캔버스 안 좌표)
+        canvas.dataset.npcWalking = String(npcs.filter((n) => n.walking).length);
+        canvas.dataset.npcAt = npcs
+          .map((n) => ({ lot: n.lot, x: Math.round(n.pos.x - camera.x), y: Math.round(n.pos.y - camera.y - PLAYER_SIZE / 2) }))
+          .filter((n) => n.x > 0 && n.x < vw && n.y > 0 && n.y < vh)
+          .map((n) => `${n.lot}:${n.x},${n.y}`)
+          .join(" ");
+      }
       raf = requestAnimationFrame(tick);
     };
     let raf = requestAnimationFrame(tick);
@@ -380,6 +452,8 @@ export function TownGame({
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
       canvas.removeEventListener("pointerdown", onPointer);
+      canvas.removeEventListener("pointermove", onHover);
+      canvas.removeEventListener("pointerleave", onLeave);
       canvas.removeEventListener("bv-teleport", onTeleport);
       delete canvas.dataset.ready;
     };

@@ -30,6 +30,8 @@ export type TownHouseInput = {
   stage: number;
   roof: string;
   mine: boolean;
+  /** 집 주인의 입은 모습 (걸어 다니는 이웃, TOWN-19). 없으면 회색 주민 */
+  layers?: string[];
 };
 
 /** 마을에 서는 것 하나: 그림(발밑 기준), 부딪히는 몸체, 이름표 */

@@ -48,6 +48,18 @@ export async function getAvatar(userId: string): Promise<{ layers: string[]; nam
   return { layers: avatarLayers(row?.art, equips.get(userId) ?? {}), name: row?.name ?? null };
 }
 
+/** 여러 회원의 입은 모습 (걸어 다니는 이웃, TOWN-19). 캐릭터가 없으면 빈 배열 */
+export async function avatarLayersOf(userIds: string[]): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  if (userIds.length === 0) return map;
+  const [rows, equips] = await Promise.all([
+    db.select({ userId: profiles.userId, art: items.art }).from(profiles).innerJoin(items, eq(items.id, profiles.characterItemId)).where(inArray(profiles.userId, userIds)),
+    equippedArts(userIds),
+  ]);
+  for (const id of userIds) map.set(id, avatarLayers(rows.find((r) => r.userId === id)?.art, equips.get(id) ?? {}));
+  return map;
+}
+
 export type ClosetItem = { id: number; type: string; name: string; art: string; equipped: boolean };
 
 /** 꾸미기 화면: 가진 아바타·배경·가구와 지금 입은·건 것 */
