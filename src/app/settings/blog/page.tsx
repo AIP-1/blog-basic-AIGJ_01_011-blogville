@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CategoryManager } from "@/components/settings/CategoryManager";
 import { VisitChart } from "@/components/settings/VisitChart";
-import { AccentForm, BlogInfoForm, SlugForm } from "@/components/settings/SettingsForms";
+import { AccentForm, BlogInfoForm, ListStyleForm, SlugForm } from "@/components/settings/SettingsForms";
 import { getCategoryTree } from "@/server/category";
 import { getMyBlog, requireMember } from "@/server/dal";
 import { getBlogVisitDays, getBlogVisitStats, getPopularPosts, getReferrerStats } from "@/server/stats";
@@ -65,6 +65,9 @@ export default async function BlogSettingsPage({ searchParams }: PageProps<"/set
       </Card>
       <Card id="accent" title="🎨 강조색">
         <AccentForm accent={blog.accentColor ?? "green"} />
+      </Card>
+      <Card id="list-style" title="📰 글 목록 모양">
+        <ListStyleForm listStyle={blog.listStyle ?? "card"} />
       </Card>
       <Card title="블로그 주소">
         <SlugForm slug={blog.slug} />

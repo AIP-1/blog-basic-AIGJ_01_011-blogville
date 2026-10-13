@@ -6,6 +6,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { blogs, items, posts, profiles } from "@/db/schema";
 import { likePattern } from "@/lib/blog-search";
 import { DEFAULT_ACCENT, type BlogAccent } from "@/lib/blog-accent";
+import { DEFAULT_LIST_STYLE, type ListStyle } from "@/lib/list-style";
 import { BLOG_ERRORS } from "@/lib/blog-rules";
 import { mayUseSlug, normalizeName, SLUG_RE } from "@/lib/names";
 import { findNameConflict, isUniqueViolation, lockName } from "./names";
@@ -90,5 +91,13 @@ export async function updateBlogAccent(ownerId: string, accent: BlogAccent) {
   await db
     .update(blogs)
     .set({ accentColor: accent === DEFAULT_ACCENT ? null : accent })
+    .where(eq(blogs.ownerId, ownerId));
+}
+
+/** 글 목록 모양 바꾸기 (블로그 꾸미기). 기본 카드형이면 NULL로 */
+export async function updateBlogListStyle(ownerId: string, style: ListStyle) {
+  await db
+    .update(blogs)
+    .set({ listStyle: style === DEFAULT_LIST_STYLE ? null : style })
     .where(eq(blogs.ownerId, ownerId));
 }
