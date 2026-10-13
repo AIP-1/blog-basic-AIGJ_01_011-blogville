@@ -79,7 +79,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
     town && page === 1 ? searchBlogs(town) : [],
     // `전체 글 (N)`은 누가 보든 공개 글 수다
     listBlogPosts(blog.id, { viewerIsOwner: false, page: 1 }),
-    getBlogSidebar(blog.id, isOwner),
+    getBlogSidebar(blog.id, isOwner, member),
     getBlogVisitStats(blog.id),
     isOwner ? countMyPosts(blog.id).then((c) => c.all) : 0,
     countFollowers(blog.ownerId),

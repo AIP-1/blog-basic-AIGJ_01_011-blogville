@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
-import { addComment, addReply, deleteComment, deleteReply, type CommentResult } from "@/app/blog/actions";
-import { COMMENT_MAX, formatDateTime } from "@/lib/comment-rules";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { addComment, addReply, deleteComment, deleteReply, updateComment, updateReply, type CommentResult } from "@/app/blog/actions";
+import { COMMENT_MAX, formatDateTime, SECRET_PLACEHOLDER } from "@/lib/comment-rules";
 import { confirmFirst } from "@/lib/confirm-action";
 import type { CommentLine, CommentThreadItem } from "@/server/comments";
 
@@ -24,7 +24,7 @@ export function CommentSection({ postId, items, count, signedIn, loginHref }: Pr
       <div className="mt-6">
         {signedIn ? (
           <CommentForm
-            send={(content) => addComment(form({ postId, content }))}
+            send={(content, isSecret) => addComment(form({ postId, content, isSecret }))}
             placeholder="따뜻한 댓글을 남겨 주세요 💬"
             label="댓글"
             submitLabel="댓글 등록"
@@ -43,7 +43,7 @@ export function CommentSection({ postId, items, count, signedIn, loginHref }: Pr
   );
 }
 
-function form(values: Record<string, string | number>) {
+function form(values: Record<string, string | number | boolean>) {
   const data = new FormData();
   for (const [k, v] of Object.entries(values)) data.set(k, String(v));
   return data;
@@ -53,7 +53,7 @@ function CommentItem({ postId, item }: { postId: number; item: CommentThreadItem
   const [replying, setReplying] = useState(false);
   return (
     <li>
-      <Line line={item} anchor={`comment-${item.id}`} remove={deleteComment}>
+      <Line line={item} anchor={`comment-${item.id}`} remove={deleteComment} edit={updateComment}>
         {item.canReply && !replying && (
           <button type="button" className="btn btn-ghost px-2" onClick={() => setReplying(true)}>
             답글
@@ -63,13 +63,14 @@ function CommentItem({ postId, item }: { postId: number; item: CommentThreadItem
       {replying && (
         <div className="ml-10 mt-2">
           <CommentForm
-            send={(content) => addReply(form({ postId, commentId: item.id, content }))}
+            send={(content, isSecret) => addReply(form({ postId, commentId: item.id, content, isSecret }))}
             placeholder="답글을 남겨 주세요"
             label="답글"
             submitLabel="답글 등록"
             rows={2}
             onDone={() => setReplying(false)}
             onCancel={() => setReplying(false)}
+            cancelLabel="답글 취소"
           />
         </div>
       )}
@@ -77,7 +78,7 @@ function CommentItem({ postId, item }: { postId: number; item: CommentThreadItem
         <ul aria-label="답글" className="ml-10 mt-3 space-y-3 border-l-2 border-line pl-4">
           {item.replies.map((reply) => (
             <li key={reply.id}>
-              <Line line={reply} anchor={`reply-${reply.id}`} remove={deleteReply} />
+              <Line line={reply} anchor={`reply-${reply.id}`} remove={deleteReply} edit={updateReply} />
             </li>
           ))}
         </ul>
@@ -86,9 +87,30 @@ function CommentItem({ postId, item }: { postId: number; item: CommentThreadItem
   );
 }
 
-type LineProps = { line: CommentLine; anchor: string; remove: (data: FormData) => Promise<void>; children?: React.ReactNode };
+type LineProps = {
+  line: CommentLine;
+  anchor: string;
+  remove: (data: FormData) => Promise<void>;
+  edit: (data: FormData) => Promise<CommentResult>;
+  children?: React.ReactNode;
+};
 
-function Line({ line, anchor, remove, children }: LineProps) {
+function Line({ line, anchor, remove, edit, children }: LineProps) {
+  const [editing, setEditing] = useState(false);
+  // 저장·취소하고 나면 [수정] 버튼으로 초점을 돌려준다 (키보드로 이어서 쓸 수 있게)
+  const editButton = useRef<HTMLButtonElement>(null);
+  const returnFocus = useRef(false);
+  useEffect(() => {
+    if (!editing && returnFocus.current) {
+      returnFocus.current = false;
+      editButton.current?.focus();
+    }
+  }, [editing]);
+  const close = () => {
+    returnFocus.current = true;
+    setEditing(false);
+  };
+
   return (
     // 옆 칸 `💬 최근 댓글`에서 `#comment-ID`·`#reply-ID`로 온다 (BLOG-09)
     <article id={anchor} className="scroll-mt-20" aria-label={line.deleted ? "삭제된 댓글" : `${line.nickname ?? "알 수 없음"}의 댓글`}>
@@ -105,17 +127,53 @@ function Line({ line, anchor, remove, children }: LineProps) {
           <time dateTime={line.createdAt.toISOString()} className="text-ink-soft">
             {formatDateTime(line.createdAt)}
           </time>
+          {line.editedAt && (
+            <span className="text-ink-soft" title={`${formatDateTime(line.editedAt)}에 수정`}>
+              (수정됨)
+            </span>
+          )}
+          {/* 볼 수 있는 사람에게만: 비밀로 쓴 댓글이라는 표시 */}
+          {line.secret && !line.hidden && !line.deleted && (
+            <span className="text-ink-soft" aria-label="비밀 댓글">
+              🔒
+            </span>
+          )}
         </p>
       )}
       {line.deleted ? (
         <p className="italic text-ink-soft">삭제된 댓글이에요</p>
+      ) : line.hidden ? (
+        // 내용은 서버가 비워 보낸다 (specs/055-comment-edit-secret)
+        <p className="italic text-ink-soft">{SECRET_PLACEHOLDER}</p>
+      ) : editing ? (
+        <div className="mt-1">
+          <CommentForm
+            send={(content, isSecret) => edit(form({ id: line.id, content, isSecret }))}
+            placeholder="댓글을 고쳐 주세요"
+            label="댓글 수정"
+            submitLabel="저장"
+            pendingLabel="저장 중..."
+            rows={3}
+            initialContent={line.content}
+            initialSecret={line.secret}
+            autoFocus
+            onDone={close}
+            onCancel={close}
+            cancelLabel="취소"
+          />
+        </div>
       ) : (
         // 글자로만 보여 준다 (HTML로 넣지 않음, NF-03)
         <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{line.content}</p>
       )}
-      {!line.deleted && (children || line.canDelete) && (
+      {!line.deleted && !editing && (children || line.canDelete || line.canEdit) && (
         <div className="mt-1 flex gap-1">
           {children}
+          {line.canEdit && (
+            <button ref={editButton} type="button" className="btn btn-ghost px-2" onClick={() => setEditing(true)}>
+              수정
+            </button>
+          )}
           {line.canDelete && (
             <form action={confirmFirst("댓글을 삭제할까요?", remove)}>
               <input type="hidden" name="id" value={line.id} />
@@ -131,27 +189,48 @@ function Line({ line, anchor, remove, children }: LineProps) {
 }
 
 type FormProps = {
-  send: (content: string) => Promise<CommentResult>;
+  send: (content: string, isSecret: boolean) => Promise<CommentResult>;
   placeholder: string;
   label: string;
   submitLabel: string;
+  pendingLabel?: string;
   rows: number;
+  /** 수정할 때: 지금 내용·비밀 여부를 채워 연다 */
+  initialContent?: string;
+  initialSecret?: boolean;
+  autoFocus?: boolean;
   onDone?: () => void;
   onCancel?: () => void;
+  cancelLabel?: string;
 };
 
-/** 댓글·답글 공용 입력칸. 실패하면 문구만 보이고 쓴 내용은 남는다. */
-function CommentForm({ send, placeholder, label, submitLabel, rows, onDone, onCancel }: FormProps) {
-  const [content, setContent] = useState("");
+/** 댓글·답글·수정 공용 입력칸. 실패하면 문구만 보이고 쓴 내용은 남는다. */
+function CommentForm({
+  send,
+  placeholder,
+  label,
+  submitLabel,
+  pendingLabel = "등록 중...",
+  rows,
+  initialContent = "",
+  initialSecret = false,
+  autoFocus,
+  onDone,
+  onCancel,
+  cancelLabel,
+}: FormProps) {
+  const [content, setContent] = useState(initialContent);
+  const [isSecret, setSecret] = useState(initialSecret);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     startTransition(async () => {
-      const result = await send(content);
+      const result = await send(content, isSecret);
       if (result.ok) {
         setContent("");
+        setSecret(false);
         setError(null);
         onDone?.();
       } else {
@@ -169,7 +248,10 @@ function CommentForm({ send, placeholder, label, submitLabel, rows, onDone, onCa
         rows={rows}
         maxLength={COMMENT_MAX}
         value={content}
+        autoFocus={autoFocus}
         onChange={(e) => setContent(e.target.value)}
+        // 수정 칸에서 Esc는 [취소]와 같다
+        onKeyDown={autoFocus && onCancel ? (e) => e.key === "Escape" && onCancel() : undefined}
       />
       <div className="flex flex-wrap items-center justify-end gap-2">
         {error && (
@@ -177,13 +259,17 @@ function CommentForm({ send, placeholder, label, submitLabel, rows, onDone, onCa
             {error}
           </p>
         )}
+        <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+          <input type="checkbox" className="size-4" checked={isSecret} onChange={(e) => setSecret(e.target.checked)} />
+          🔒 비밀 댓글
+        </label>
         {onCancel && (
           <button type="button" className="btn" onClick={onCancel}>
-            답글 취소
+            {cancelLabel}
           </button>
         )}
         <button type="submit" className="btn btn-primary" disabled={pending}>
-          {pending ? "등록 중..." : submitLabel}
+          {pending ? pendingLabel : submitLabel}
         </button>
       </div>
     </form>

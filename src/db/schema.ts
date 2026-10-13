@@ -411,6 +411,10 @@ export const comments = pgTable(
       .references(() => posts.id, { onDelete: "cascade" }),
     authorId: text("author_id").references(() => users.id, { onDelete: "set null" }),
     content: text("content").notNull(),
+    /** 비밀 댓글: 작성자·블로그 주인·관리자만 내용을 본다 (specs/055-comment-edit-secret) */
+    isSecret: boolean("is_secret").notNull().default(false),
+    /** 작성자가 내용을 마지막으로 고친 시각. 고친 적 없으면 null (`(수정됨)`) */
+    editedAt: timestamp("edited_at", { withTimezone: true }),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
@@ -432,6 +436,9 @@ export const replies = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     content: text("content").notNull(),
+    /** 비밀 답글: 작성자·원댓글 작성자·블로그 주인·관리자만 내용을 본다 */
+    isSecret: boolean("is_secret").notNull().default(false),
+    editedAt: timestamp("edited_at", { withTimezone: true }),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
