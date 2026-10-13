@@ -1,0 +1,68 @@
+/* 어두운 화면 (개선 8). 기기가 어두운 모드면 따라가고, 아래 막대의 [🌙 어둡게]/[☀️ 밝게]로 직접 고를 수도 있다.
+   html[data-theme]이 "dark"면 어둡게, "light"면 밝게, 없으면 기기 설정을 따른다 (components/layout/ThemeToggle.tsx).
+   색 토큰만 바꾸면 대부분이 따라오고, 그 밑은 밝은 색을 직접 적어 둔 곳을 어두운 짝으로 덮는다.
+   Tailwind 유틸리티는 레이어 안에 있어 레이어 밖인 이 파일이 이긴다. 두 덩어리는 같은 내용이다(기기 설정 / 직접 고름). */
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15171a;
+    --surface: #1e2124;
+    --ink: #ece8e1;
+    --ink-soft: #a9a49a;
+    --line: #353a3f;
+    --accent: #5cbf85;
+    --accent-ink: #0c1f14;
+    --danger: #ff7b7b;
+    color-scheme: dark;
+    & .notice-yellow { background: #3a3216; border-color: #8a6d1c; }
+    & :is(.btn-selected, .btn-choice:has(:checked)) { background: #1c3527; }
+    & .btn-sky { background: #0b6aa6; border-color: #0b6aa6; }
+    & .prose-post code { background: #2a2e33; }
+    & .prose-post pre { background: #0f1113; }
+    & .tag-chip { background: #272b2f; }
+    & .tag-chip[aria-current="page"] { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
+    & .like-btn.is-liked { background: #3d1f1f; }
+    & .bg-white { background-color: var(--surface); }
+    & :is(.bg-yellow-50, .bg-amber-50, .bg-\[\#fff3d6\], .bg-\[\#fff8e1\]) { background-color: #3a3216; }
+    & .bg-red-50 { background-color: #3d1f1f; }
+    & :is(.bg-green-50, .bg-green-100, .bg-\[\#e8f2ec\]) { background-color: #1c3527; }
+    & :is(.bg-sky-50, .bg-\[\#e1f5fe\], .bg-\[\#e3f0fb\]) { background-color: #15303e; }
+    & :is(.text-red-700, .text-red-600, .text-\[\#b71c1c\]) { color: #ff8f8f; }
+    & :is(.text-green-800, .text-green-700) { color: #7fd6a0; }
+    & :is(.text-sky-600, .text-\[\#01579b\], .text-\[\#0b5394\]) { color: #74c6ff; }
+    & .text-\[\#7a4d00\] { color: #f2c46b; }
+    & .border-red-300 { border-color: #7a3a3a; }
+    & .border-green-300 { border-color: #2f6b47; }
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #15171a;
+  --surface: #1e2124;
+  --ink: #ece8e1;
+  --ink-soft: #a9a49a;
+  --line: #353a3f;
+  --accent: #5cbf85;
+  --accent-ink: #0c1f14;
+  --danger: #ff7b7b;
+  color-scheme: dark;
+  & .notice-yellow { background: #3a3216; border-color: #8a6d1c; }
+  & :is(.btn-selected, .btn-choice:has(:checked)) { background: #1c3527; }
+  & .btn-sky { background: #0b6aa6; border-color: #0b6aa6; }
+  & .prose-post code { background: #2a2e33; }
+  & .prose-post pre { background: #0f1113; }
+  & .tag-chip { background: #272b2f; }
+  & .tag-chip[aria-current="page"] { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
+  & .like-btn.is-liked { background: #3d1f1f; }
+  & .bg-white { background-color: var(--surface); }
+  & :is(.bg-yellow-50, .bg-amber-50, .bg-\[\#fff3d6\], .bg-\[\#fff8e1\]) { background-color: #3a3216; }
+  & .bg-red-50 { background-color: #3d1f1f; }
+  & :is(.bg-green-50, .bg-green-100, .bg-\[\#e8f2ec\]) { background-color: #1c3527; }
+  & :is(.bg-sky-50, .bg-\[\#e1f5fe\], .bg-\[\#e3f0fb\]) { background-color: #15303e; }
+  & :is(.text-red-700, .text-red-600, .text-\[\#b71c1c\]) { color: #ff8f8f; }
+  & :is(.text-green-800, .text-green-700) { color: #7fd6a0; }
+  & :is(.text-sky-600, .text-\[\#01579b\], .text-\[\#0b5394\]) { color: #74c6ff; }
+  & .text-\[\#7a4d00\] { color: #f2c46b; }
+  & .border-red-300 { border-color: #7a3a3a; }
+  & .border-green-300 { border-color: #2f6b47; }
+}
