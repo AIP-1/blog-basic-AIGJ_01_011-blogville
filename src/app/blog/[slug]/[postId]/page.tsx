@@ -19,6 +19,7 @@ import { loginHref } from "@/lib/safe-next";
 import { formatDate } from "@/lib/text";
 import { getBlogBySlug } from "@/server/blog";
 import { getSession } from "@/server/dal";
+import { BlindNotice } from "@/components/post/BlindNotice";
 import { getAdjacentPosts, getCategoryPosts, getPostForView } from "@/server/post";
 import { getCommentThread } from "@/server/comments";
 import { getLikeState } from "@/server/likes";
@@ -95,6 +96,7 @@ export default async function PostPage({ params, searchParams }: PageProps<"/blo
     <>
       {notice && <PublishNotice rewarded={await hasPostReward(blog.ownerId, post.id)} />}
       <article className="mx-auto max-w-3xl rounded-2xl border border-line bg-surface p-5 md:p-8">
+        {isOwner && post.blindedAt && <BlindNotice reason={post.blindReason} />}
         <Link href={`/@${blog.slug}`} className="-ml-1 flex min-h-11 w-fit max-w-full items-center px-1 font-semibold text-ink-soft hover:text-ink" data-blog-link>
           <span className="truncate">📖 {blog.title}</span>
         </Link>

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { BlindNotice } from "@/components/post/BlindNotice";
 import { PostForm } from "@/components/post/PostForm";
 import { parseId } from "@/lib/ids";
 import { getCategoryOptions } from "@/server/category";
@@ -17,6 +18,7 @@ export default async function EditPage({ params }: PageProps<"/write/[postId]">)
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="sr-only">글 수정</h1>
+      {post.blindedAt && <BlindNotice reason={post.blindReason} />}
       <PostForm
         categories={await getCategoryOptions(blog.id)}
         initial={{
