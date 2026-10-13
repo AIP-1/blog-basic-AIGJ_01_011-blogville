@@ -20,9 +20,11 @@ type Props = {
   author?: { nickname: string; blogTitle: string };
   /** 이웃 새 글 맨 위로 올라온 즐겨찾는 이웃의 글 (TOWN-08) */
   pinned?: boolean;
+  /** 🔥 인기 글의 순위 (1부터) */
+  rank?: number;
 };
 
-export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle, commentCount = 0, likeCount = 0, author, pinned = false }: Props) {
+export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle, commentCount = 0, likeCount = 0, author, pinned = false, rank }: Props) {
   // 대표 사진: 본문의 첫 사진 (비공개 글도 주인에게만 목록에 나오므로 그대로)
   const cover = firstImageUrl(post.contentHtml);
   return (
@@ -35,6 +37,12 @@ export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle,
         </Link>
       )}
       <Link href={`/@${slug}/${post.id}`} className="flex gap-4 rounded-xl border border-line bg-surface p-4 hover:border-accent">
+        {rank !== undefined && (
+          <span className={`w-7 shrink-0 text-center text-2xl font-extrabold ${rank <= 3 ? "text-accent" : "text-ink-soft"}`} data-popular-rank={rank}>
+            {rank}
+            <span className="sr-only">위</span>
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             {pinned && <span className="notice-yellow rounded-full px-2 py-0.5 text-sm font-semibold">⭐ 즐겨찾는 이웃</span>}

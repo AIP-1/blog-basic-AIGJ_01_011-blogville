@@ -44,6 +44,9 @@ export function FeedView({ title, tab, showFollowingTab, feed, page, tags, empty
               {t.label}
             </Link>
           ))}
+          <Link href="/popular" className="btn btn-ghost ml-auto">
+            🔥 인기 글
+          </Link>
         </nav>
         {top}
         {feed.items.length === 0 ? (
