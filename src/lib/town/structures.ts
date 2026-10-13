@@ -1,15 +1,19 @@
 // 마을에 놓을 것과 입구 (TOWN-03·04, specs/038-town). 그림은 `src/lib/art/town.ts`, 좌표는 `layout.ts`.
 import type { PixelArt } from "@/lib/art/characters";
-import { benchArt, boardArt, emptyLotArt, farmArt, pondArt, fountainArt, houseArt, lampArt, mailboxArt, shopArt, TOWN_CELL, treeArt } from "@/lib/art/town";
+import { benchArt, boardArt, cherryTreeArt, clothesShopArt, emptyLotArt, farmArt, fenceArt, fencePostArt, flowerBedArt, pondArt, fountainArt, houseArt, lampArt, mailboxArt, rosesArchArt, salonArt, shopArt, TOWN_CELL, treeArt } from "@/lib/art/town";
 import {
   BOARD_POS,
   CENTER,
+  CLOTHES_POS,
   FOUNTAIN_POS,
+  GARDEN,
+  GARDEN_GATE,
   HILL_ROAD,
   HOUSE_LOTS,
   lotFront,
   PLAZA_RADIUS,
   ROADS,
+  SALON_POS,
   FARM_POS,
   POND_POS,
   SHOP_POS,
@@ -62,6 +66,54 @@ export function lotChoice(href: string): number | null {
 
 /** 우체통은 집 오른쪽 앞 (집 발밑에서) */
 export const MAILBOX_OFFSET = { x: 118, y: 6 } as const;
+
+/**
+ * 내 정원 (TOWN-20): 북쪽 흰 울타리(가운데 장미 아치 문), 서쪽·동쪽 울타리 말뚝, 꽃밭 셋, 뒤쪽 귀퉁이 벚나무 둘.
+ * 남쪽은 절벽이라 울타리가 없다. 몸체는 빈틈없이 이어져 아치 문으로만 들어간다.
+ */
+export function gardenStructures(name: string): Structure[] {
+  const out: Structure[] = [];
+  const fence = fenceArt();
+  const post = fencePostArt();
+  const top = GARDEN.y;
+  const gateLeft = GARDEN_GATE.x - GARDEN_GATE.width / 2;
+  const gateRight = GARDEN_GATE.x + GARDEN_GATE.width / 2;
+  for (const [a, b] of [
+    [GARDEN.x, gateLeft + 10],
+    [gateRight - 10, GARDEN.x + GARDEN.width],
+  ]) {
+    for (let cx = a + 20; cx - 20 < b; cx += 40) {
+      const x = Math.min(cx, b - 20);
+      out.push({ id: `fence:${x}`, art: fence, x, y: top, body: { x: x - 20, y: top - 8, width: 40, height: 8 } });
+    }
+  }
+  for (const x of [GARDEN.x, GARDEN.x + GARDEN.width]) {
+    for (let y = top + 20; y <= GARDEN.y + GARDEN.height; y += 20) {
+      out.push({ id: `fence:${x},${y}`, art: post, x, y, body: { x: x - 4, y: y - 20, width: 8, height: 20 } });
+    }
+  }
+  out.push({
+    id: "garden-arch",
+    art: rosesArchArt(),
+    x: GARDEN_GATE.x,
+    y: top,
+    // 기둥은 양옆 울타리 몸체가 막는다 (문 사이 80px)
+    body: null,
+    label: name,
+  });
+  [
+    [GARDEN_GATE.x - 95, top + 60],
+    [GARDEN_GATE.x + 95, top + 60],
+    [GARDEN.x + 100, 1270],
+  ].forEach(([x, y], i) => out.push({ id: `flowerbed:${i}`, art: flowerBedArt(i), x, y, body: { x: x - 30, y: y - 20, width: 60, height: 20 } }));
+  const cherry = cherryTreeArt();
+  for (const [x, y] of [
+    [GARDEN.x + 45, top + 75],
+    [GARDEN.x + GARDEN.width - 40, top + 80],
+  ])
+    out.push({ id: `cherry:${x}`, art: cherry, x, y, body: { x: x - 10, y: y - 10, width: 20, height: 10 } });
+  return out;
+}
 
 /** `walls`: 걸을 수 없는 땅 (절벽 앞면·하늘, TOWN-05) */
 export type TownLayout = { structures: Structure[]; entrances: TownEntrance[]; walls: readonly Rect[] };
@@ -147,6 +199,15 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean, m
     href: member ? "/shop" : "login",
   });
 
+  // 광장 가게 (SHOP-07·08)
+  for (const shop of [
+    { id: "clothes", art: clothesShopArt(), pos: CLOTHES_POS, label: "꼬까 옷가게", entrance: "👗 옷가게", href: "/clothes" },
+    { id: "salon", art: salonArt(), pos: SALON_POS, label: "반짝 미용실", entrance: "💇 미용실", href: "/salon" },
+  ]) {
+    structures.push({ id: shop.id, art: shop.art, x: shop.pos.x, y: shop.pos.y, body: { x: shop.pos.x - 70, y: shop.pos.y - 50, width: 140, height: 50 }, label: shop.label });
+    entrances.push({ id: shop.id, x: shop.pos.x + 30, y: shop.pos.y + 30, label: shop.entrance, href: member ? shop.href : "login" });
+  }
+
   structures.push({
     id: "farm",
     art: farmArt(),
@@ -162,6 +223,9 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean, m
     label: "🐮 동물 농장",
     href: member ? "/farm" : "login",
   });
+
+  const owner = houses.find((h) => h.lot === 0);
+  structures.push(...gardenStructures(owner && !owner.mine ? `${shortName(owner.nickname)}의 정원` : "내 정원"));
 
   structures.push({
     id: "pond",
@@ -281,6 +345,8 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean, m
     })),
     // 절벽 앞면과 그 위아래 가장자리
     ...CLIFF_LINES.map((line) => ({ x: 0, y: line - 24, width: WORLD.width, height: CLIFF_FACE + 48 })),
+    // 내 정원 (TOWN-20): 숲 나무가 울타리 안팎에 붙지 않게
+    { x: GARDEN.x - 40, y: GARDEN.y - 40, width: GARDEN.width + 80, height: GARDEN.height + 40 },
     {
       x: CENTER.x - PLAZA_RADIUS - 30,
       y: CENTER.y - PLAZA_RADIUS - 30,
@@ -331,7 +397,7 @@ export type TownSpot = { id: string; label: string; sub: string | null; x: numbe
 export const EMPTY_LOT_HINT = "친구 목록에서 ⭐를 누르면 집이 생겨요";
 
 /**
- * 텔레포트 목록: `마을` 5곳(분수·게시판·상점·농장·낚시터) + 집 11자리. 게임과 같은 좌표(입구 앞)를 쓴다.
+ * 텔레포트 목록: `마을` 7곳(분수·게시판·상점·옷가게·미용실·농장·낚시터) + 집 11자리. 게임과 같은 좌표(입구 앞)를 쓴다.
  * 빈 집터의 부제(⭐ 안내)는 회원에게만, 0번 자리는 없다.
  */
 export function townSpots(houses: readonly TownHouseInput[], member: boolean): { places: TownSpot[]; houses: TownSpot[] } {
@@ -339,6 +405,8 @@ export function townSpots(houses: readonly TownHouseInput[], member: boolean): {
     { id: "fountain", label: "⛲ 광장 분수", sub: null, ...START_POS, enabled: true, slug: null },
     { id: "board", label: "📋 마을 게시판", sub: null, x: BOARD_POS.x, y: BOARD_POS.y + 30, enabled: true, slug: null },
     { id: "shop", label: "🏪 상점", sub: null, x: SHOP_POS.x + 40, y: SHOP_POS.y + 30, enabled: true, slug: null },
+    { id: "clothes", label: "👗 옷가게", sub: null, x: CLOTHES_POS.x + 30, y: CLOTHES_POS.y + 30, enabled: true, slug: null },
+    { id: "salon", label: "💇 미용실", sub: null, x: SALON_POS.x + 30, y: SALON_POS.y + 30, enabled: true, slug: null },
     { id: "farm", label: "🐮 동물 농장", sub: null, x: FARM_POS.x, y: FARM_POS.y + 30, enabled: true, slug: null },
     { id: "pond", label: "🎣 낚시터", sub: null, x: POND_POS.x, y: POND_POS.y + 30, enabled: true, slug: null },
   ];

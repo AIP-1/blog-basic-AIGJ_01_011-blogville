@@ -26,7 +26,7 @@ const SOUTH_ROAD = 1500;
 export const HILL_ROAD = 175;
 export const ROAD = 52;
 
-/** 집 자리 11곳 (집 그림의 발밑). 0번은 내 집(광장 아래), 1~4 서쪽, 5~8 동쪽, 9·10 남쪽 */
+/** 집 자리 11곳 (집 그림의 발밑). 0번은 내 집(광장 아래 내 정원), 1~4 서쪽, 5~8 동쪽, 9·10 남쪽 */
 export const HOUSE_LOTS: readonly Point[] = [
   { x: 1000, y: 1250 },
   { x: 300, y: 380 },
@@ -43,11 +43,27 @@ export const HOUSE_LOTS: readonly Point[] = [
 
 export const BOARD_POS = { x: CENTER.x, y: CENTER.y - 300 } as const;
 export const SHOP_POS = { x: CENTER.x + 360, y: CENTER.y - 30 } as const;
-/** 동물 농장 (TOWN-09): 내 집으로 가는 길 오른쪽 */
-export const FARM_POS = { x: CENTER.x + 260, y: CENTER.y + 280 } as const;
+/** 동물 농장 (TOWN-09): 내 정원 안, 내 집 오른쪽 (TOWN-20) */
+export const FARM_POS = { x: CENTER.x + 270, y: 1250 } as const;
 /** 연못 낚시터 (TOWN-14): 광장 왼쪽, 상점 맞은편 */
 export const POND_POS = { x: CENTER.x - 350, y: CENTER.y - 40 } as const;
 export const FOUNTAIN_POS = { x: CENTER.x, y: CENTER.y + 40 } as const;
+/** 광장 북쪽 가게 (SHOP-07·08): 게시판 양옆, 옷가게는 서쪽·미용실은 동쪽 */
+export const CLOTHES_POS = { x: CENTER.x - 200, y: CENTER.y - 260 } as const;
+export const SALON_POS = { x: CENTER.x + 200, y: CENTER.y - 260 } as const;
+
+/**
+ * 내 정원 (TOWN-20, specs/053-garden): 광장 아래, 남쪽 절벽 위에 흰 울타리로 두른 땅. 내 집(0번)·우체통·동물 농장만 있다.
+ * 북쪽 울타리 가운데 장미 아치 문(`GARDEN_GATE`)으로만 들어간다. 남쪽은 절벽이라 울타리가 없다.
+ */
+export const GARDEN: Rect = { x: 760, y: 1050, width: 680, height: 280 };
+/** 아치 문 가운데 (발밑)와 문 폭 */
+export const GARDEN_GATE = { x: CENTER.x, y: GARDEN.y, width: 100 } as const;
+
+/** 점이 정원 울타리 안인가 (`pad`만큼 넓혀서) */
+export function inGarden(p: Point, pad = 0): boolean {
+  return p.x >= GARDEN.x - pad && p.x <= GARDEN.x + GARDEN.width + pad && p.y >= GARDEN.y - pad && p.y <= GARDEN.y + GARDEN.height + pad;
+}
 
 const band = (x1: number, y1: number, x2: number, y2: number): Rect => ({
   x: Math.min(x1, x2) - ROAD / 2,
@@ -67,7 +83,9 @@ export const ROADS: readonly Rect[] = [
   ...[1, 2, 3, 4].map((i) => band(HOUSE_LOTS[i].x, HOUSE_LOTS[i].y + 40, WEST_ROAD, HOUSE_LOTS[i].y + 40)),
   ...[5, 6, 7, 8].map((i) => band(EAST_ROAD, HOUSE_LOTS[i].y + 40, HOUSE_LOTS[i].x, HOUSE_LOTS[i].y + 40)),
   band(SHOP_POS.x, SHOP_POS.y + 30, SHOP_POS.x, CENTER.y),
-  band(CENTER.x, FARM_POS.y + 30, FARM_POS.x, FARM_POS.y + 30), // 농장 앞
+  band(CLOTHES_POS.x, CLOTHES_POS.y + 30, CLOTHES_POS.x, CENTER.y), // 옷가게 앞
+  band(SALON_POS.x, SALON_POS.y + 30, SALON_POS.x, CENTER.y), // 미용실 앞
+  band(CENTER.x, FARM_POS.y + 30, FARM_POS.x, FARM_POS.y + 30), // 내 집 앞 ~ 농장 앞 (정원 안)
   // 북쪽 언덕 (TOWN-05): 서쪽·동쪽 길이 계단으로 올라가 언덕 위 길로 이어진다
   band(WEST_ROAD, HILL_ROAD, WEST_ROAD, HOUSE_LOTS[1].y + 40),
   band(EAST_ROAD, HILL_ROAD, EAST_ROAD, HOUSE_LOTS[5].y + 40),
