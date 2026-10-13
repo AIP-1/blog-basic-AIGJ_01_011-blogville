@@ -39,3 +39,13 @@ export function sanitizeReleaseHtml(html: string): string {
 }
 
 export type Release = { tag: string; name: string; publishedAt: Date; url: string; html: string };
+
+/** 아래 막대의 `NEW` 표시를 붙이는 기간: 최신 릴리스가 나온 지 3일 */
+export const RELEASE_NEW_DAYS = 3;
+
+/** 최신 릴리스가 3일 안에 나왔는지 (SUP-01). 목록이 없거나 비면 false, 앞으로의 날짜도 새것으로 본다 */
+export function hasNewRelease(releases: Pick<Release, "publishedAt">[] | null, now: Date = new Date()): boolean {
+  if (!releases || releases.length === 0) return false;
+  const latest = Math.max(...releases.map((r) => r.publishedAt.getTime()));
+  return now.getTime() - latest < RELEASE_NEW_DAYS * 24 * 60 * 60 * 1000;
+}

@@ -7,7 +7,7 @@ import { houseStage } from "@/lib/house";
 import { NOTICE_SLUG } from "@/lib/names";
 import { assignLots } from "@/lib/town/lots";
 import { currentRoof, ROOF_HEX } from "@/lib/roof";
-import { guestbookNotificationText, levelUpText, notificationText, notificationTime } from "@/lib/notifications";
+import { feedbackNotificationText, guestbookNotificationText, levelUpText, notificationText, notificationTime } from "@/lib/notifications";
 import { getMyBlog, getNickname } from "./dal";
 import { listMyNeighbors } from "./follows";
 import { avatarLayersOf, getAvatar } from "./items";
@@ -181,9 +181,11 @@ export async function getHudMember(userId: string) {
     text:
       n.kind === "level_up"
         ? levelUpText(n.level)
-        : n.kind === "guestbook" || n.kind === "guestbook_reply"
-          ? guestbookNotificationText(n.kind, n.nickname)
-          : notificationText(n.kind, n.nickname, n.postTitle),
+        : n.kind === "feedback_reply"
+          ? feedbackNotificationText(n.feedbackTitle)
+          : n.kind === "guestbook" || n.kind === "guestbook_reply"
+            ? guestbookNotificationText(n.kind, n.nickname)
+            : notificationText(n.kind, n.nickname, n.postTitle),
     time: notificationTime(n.createdAt, now),
     read: n.read,
   }));

@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import { Pagination } from "@/components/blog/Pagination";
 import { parsePage } from "@/lib/ids";
-import { guestbookNotificationText, levelUpText, NOTIFICATION_EMPTY, NOTIFICATIONS_PAGE_SIZE, notificationText, notificationTime } from "@/lib/notifications";
+import { feedbackNotificationText, guestbookNotificationText, levelUpText, NOTIFICATION_EMPTY, NOTIFICATIONS_PAGE_SIZE, notificationText, notificationTime } from "@/lib/notifications";
 import { requireMember } from "@/server/dal";
 import { countUnreadNotifications, listNotifications } from "@/server/notifications";
 import { markAllNotificationsRead, openNotification } from "./actions";
 
 export const metadata: Metadata = { title: "알림함 | Blogville" };
 
-// 알림함 (GAME-08): 내 글에 달린 공감·댓글, 내 댓글에 달린 답글, 방명록(BLOG-10), 레벨업(GAME-06). 최신순 20개씩.
+// 알림함 (GAME-08): 내 글에 달린 공감·댓글, 내 댓글에 달린 답글, 방명록(BLOG-10), 레벨업(GAME-06), 문의 답변(SUP-03). 최신순 20개씩.
 export default async function NotificationsPage({ searchParams }: PageProps<"/notifications">) {
   const member = await requireMember();
   const page = parsePage((await searchParams).page);
@@ -47,7 +47,9 @@ export default async function NotificationsPage({ searchParams }: PageProps<"/no
                     {!n.read && <span className="sr-only">안 읽음, </span>}
                     {n.kind === "level_up"
                       ? levelUpText(n.level)
-                      : n.kind === "guestbook" || n.kind === "guestbook_reply"
+                      : n.kind === "feedback_reply"
+                        ? feedbackNotificationText(n.feedbackTitle)
+                        : n.kind === "guestbook" || n.kind === "guestbook_reply"
                         ? guestbookNotificationText(n.kind, n.nickname)
                         : notificationText(n.kind, n.nickname, n.postTitle)}
                   </span>
