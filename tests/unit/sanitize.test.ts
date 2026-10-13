@@ -28,6 +28,7 @@ describe("sanitizePostHtml (NF-03)", () => {
 describe("htmlToText", () => {
   it("태그를 빼고 블록을 줄로", () => expect(htmlToText("<p>a &amp; b</p><p>c</p>")).toBe("a & b\nc"));
   it("빈 문단·구분선만 있으면 빈 글자", () => expect(htmlToText("<p></p><hr />")).toBe(""));
+  it("표 칸의 글자도 센다", () => expect(htmlToText("<table><tbody><tr><th><p>이름</p></th><th><p>값</p></th></tr></tbody></table>")).toBe("이름\n값"));
 });
 
 describe("sanitizePostHtml 첨부 (002 FR-006)", () => {
@@ -63,5 +64,33 @@ describe("sanitizePostHtml 첨부 (002 FR-006)", () => {
   });
   it("사진·카드는 글자 수에 들어가지 않는다", () => {
     expect(htmlToText(sanitizePostHtml(`<img src="/files/${IMG}"><a href="/files/${FILE}" data-file=""></a>`, known))).toBe("");
+  });
+});
+
+describe("sanitizePostHtml 모르는 파일 카드", () => {
+  it("주소를 지우고, 뒤 문단의 닫는 태그가 깨지지 않는다", () => {
+    expect(sanitizePostHtml('<p>a</p><a data-file href="/files/00000000000000000000000000000000">f</a><p>b</p>')).toBe("<p>a</p><a>f</a><p>b</p>");
+  });
+});
+
+describe("sanitizePostHtml 표·정렬·YouTube (개선 9)", () => {
+  it("표는 칸 합치기만 남긴다", () => {
+    const html = '<table style="width:1px" class="x"><colgroup><col style="min-width:25px"></colgroup><tbody><tr><th colspan="2" onclick="x"><p>머리</p></th></tr><tr><td rowspan="1"><p>칸</p></td></tr></tbody></table>';
+    expect(sanitizePostHtml(html)).toBe('<table><colgroup><col /></colgroup><tbody><tr><th colspan="2"><p>머리</p></th></tr><tr><td rowspan="1"><p>칸</p></td></tr></tbody></table>');
+  });
+  it("정렬은 text-align 왼쪽·가운데·오른쪽만", () => {
+    expect(sanitizePostHtml('<p style="text-align: center; color: red">가</p>')).toBe('<p style="text-align:center">가</p>');
+    expect(sanitizePostHtml('<h2 style="text-align:right">나</h2>')).toBe('<h2 style="text-align:right">나</h2>');
+    expect(sanitizePostHtml('<p style="text-align: expression(alert(1))">다</p>')).toBe("<p>다</p>");
+  });
+  it("YouTube 틀은 쿠키 없는 주소로 다시 쓰고, 다른 틀·div는 버린다", () => {
+    const yt = sanitizePostHtml('<div data-youtube-video="" onclick="x"><iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1" onload="x" width="9999"></iframe></div>');
+    expect(yt).toMatch(/^<div data-youtube-video(="")?><iframe /);
+    expect(yt).toContain('src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"');
+    expect(yt).not.toMatch(/onload|onclick|9999|autoplay/);
+    expect(sanitizePostHtml('<iframe src="https://evil.com/embed/dQw4w9WgXcQ"></iframe>')).toBe("");
+    expect(sanitizePostHtml('<iframe src="javascript:alert(1)"></iframe>')).toBe("");
+    expect(sanitizePostHtml("<div><p>글</p></div><p>b</p>")).toBe("<div><p>글</p></div><p>b</p>");
+    expect(sanitizePostHtml('<div data-youtube-video=""><iframe src="https://evil.com/x"></iframe></div><p>c</p>')).toBe("<p>c</p>");
   });
 });

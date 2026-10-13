@@ -53,19 +53,19 @@ export function headingSlug(text: string): string {
 
 /**
  * 정화된 본문의 h2·h3에 겹치지 않는 id를 달고 목차 항목을 돌려준다.
- * 정화(sanitize.ts)는 h2·h3에 속성을 남기지 않으므로 여는 태그는 늘 `<h2>`·`<h3>`이다.
+ * 정화(sanitize.ts)는 h2·h3에 정렬 style만 남긴다. 그 속성은 그대로 두고 id를 덧붙인다.
  */
 export function addHeadingIds(html: string): { html: string; toc: TocItem[] } {
   const used = new Set(RESERVED_IDS);
   const toc: TocItem[] = [];
-  const out = html.replace(/<h([23])>([\s\S]*?)<\/h\1>/g, (_whole, level: string, inner: string) => {
+  const out = html.replace(/<h([23])((?:\s[^>]*)?)>([\s\S]*?)<\/h\1>/g, (_whole, level: string, attrs: string, inner: string) => {
     const text = innerText(inner).replace(/\s+/g, " ").trim();
     const base = headingSlug(text);
     let id = base;
     for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
     used.add(id);
     if (text) toc.push({ id, text, level: level === "2" ? 2 : 3 });
-    return `<h${level} id="${id}">${inner}</h${level}>`;
+    return `<h${level} id="${id}"${attrs.replace(/\s+id="[^"]*"/g, "")}>${inner}</h${level}>`;
   });
   return { html: out, toc };
 }
