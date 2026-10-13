@@ -68,6 +68,10 @@ body {
 .btn-current { background: var(--ink); border-color: var(--ink); color: var(--surface); }
 /* 지금 고른 버튼 (공개 설정·도구 막대) */
 .btn-selected { border-color: var(--accent); background: #e8f2ec; color: var(--accent); }
+/* 간편 로그인 (AUTH-01): 각 서비스의 버튼 색 */
+.btn-kakao { background: #fee500; border-color: #fee500; color: #191919; }
+.btn-naver { background: #03c75a; border-color: #03c75a; color: #ffffff; }
+.btn-google { background: #ffffff; border-color: #747775; color: #1f1f1f; }
 
 .field {
   width: 100%;

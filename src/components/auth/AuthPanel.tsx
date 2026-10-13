@@ -1,13 +1,28 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { signIn, signUp, type AuthFormState } from "@/app/(auth)/actions";
+import { signIn, signUp, startSocialSignIn, type AuthFormState } from "@/app/(auth)/actions";
 import { defaultBlogTitle } from "@/lib/blog-rules";
+import { SOCIAL_MESSAGES, type SocialProvider } from "@/lib/social-login";
 import type { StarterCharacter } from "@/server/items";
 import { PixelCharacter } from "../game/PixelCharacter";
 
-/** `next`: 로그인하면 돌아갈 이 사이트 안의 주소 (서버가 safeNext로 거른 값, 로그인 액션이 다시 거른다) */
-export function AuthPanel({ next, characters }: { next: string | null; characters: StarterCharacter[] }) {
+/**
+ * `next`: 로그인하면 돌아갈 이 사이트 안의 주소 (서버가 safeNext로 거른 값, 로그인 액션이 다시 거른다)
+ * `providers`: 키가 있는 소셜 로그인 서비스 (AUTH-01). 비어 있으면 간편 로그인 칸을 숨긴다
+ * `socialError`: 소셜 로그인이 실패해 돌아왔을 때의 문구
+ */
+export function AuthPanel({
+  next,
+  characters,
+  providers,
+  socialError,
+}: {
+  next: string | null;
+  characters: StarterCharacter[];
+  providers: SocialProvider[];
+  socialError: string | null;
+}) {
   const [tab, setTab] = useState<"signin" | "signup">("signin");
   return (
     <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
@@ -31,6 +46,12 @@ export function AuthPanel({ next, characters }: { next: string | null; character
         ))}
       </div>
       {tab === "signin" ? <SignInForm next={next} /> : <SignUpForm characters={characters} />}
+      {socialError && (
+        <p role="alert" className="form-error mt-3">
+          {socialError}
+        </p>
+      )}
+      {providers.length > 0 && <SocialButtons providers={providers} form={tab === "signin" ? SIGNIN_FORM : undefined} />}
     </div>
   );
 }
@@ -43,10 +64,48 @@ function Label({ htmlFor, children }: { htmlFor: string; children: React.ReactNo
   );
 }
 
+const SIGNIN_FORM = "signin-form";
+
+
+/**
+ * 간편 로그인 버튼 (AUTH-01). 로그인 탭에서는 로그인 폼(`form`)으로 보내 [로그인 상태 유지]를 함께 넘기고,
+ * 회원가입 탭에서는 자기 폼으로 보낸다. 연동해 둔 계정만 로그인된다.
+ */
+function SocialButtons({ providers, form }: { providers: SocialProvider[]; form?: string }) {
+  const buttons = providers.map((p) => (
+    <button
+      key={p.id}
+      type="submit"
+      form={form}
+      formAction={startSocialSignIn.bind(null, p.id)}
+      formNoValidate
+      className={`btn btn-${p.id} flex-1 font-semibold`}
+      data-social={p.id}
+    >
+      {p.label}
+    </button>
+  ));
+  return (
+    <section aria-labelledby="social-login" className="mt-4 border-t border-line pt-4" data-social-login>
+      <h2 id="social-login" className="mb-2 text-center text-sm font-semibold text-ink-soft">
+        간편 로그인
+      </h2>
+      {form ? (
+        <div className="flex flex-wrap gap-2">{buttons}</div>
+      ) : (
+        <form className="flex flex-wrap gap-2">
+          {buttons}
+        </form>
+      )}
+      <p className="mt-2 text-center text-xs text-ink-soft">{SOCIAL_MESSAGES.firstTime}</p>
+    </section>
+  );
+}
+
 function SignInForm({ next }: { next: string | null }) {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(signIn, null);
   return (
-    <form action={action} className="space-y-3" noValidate>
+    <form id={SIGNIN_FORM} action={action} className="space-y-3" noValidate>
       {next && (
         <>
           <input type="hidden" name="next" value={next} />
