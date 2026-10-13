@@ -1,7 +1,7 @@
 import "server-only";
-import { and, count, eq, gte, lt, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { blogVisits, posts, postViews } from "@/db/schema";
+import { blogReferrers, blogVisits, posts, postViews } from "@/db/schema";
 import { fillDays, lastDays, previousDay, todayKST } from "@/lib/kst";
 
 export type VisitStats = { today: number; yesterday: number; total: number };
@@ -49,9 +49,9 @@ export async function hasViewedToday(postId: number, visitorId: string | null): 
 
 /**
  * 조회 기록 (POST-06): 오늘 처음이면 기록하고 +1. 기록과 +1이 한 트랜잭션이라 빠지는 수가 없다.
- * 조회수가 바뀌어도 글의 수정 시각은 그대로 둔다. 지금 조회수를 돌려준다.
+ * 조회수가 바뀌어도 글의 수정 시각은 그대로 둔다. 지금 조회수와 이번에 셌는지를 돌려준다.
  */
-export async function recordView(postId: number, visitorId: string): Promise<number> {
+export async function recordView(postId: number, visitorId: string): Promise<{ viewCount: number; counted: boolean }> {
   return db.transaction(async (tx) => {
     const inserted = await tx
       .insert(postViews)
@@ -64,10 +64,10 @@ export async function recordView(postId: number, visitorId: string): Promise<num
         .set({ viewCount: sql`${posts.viewCount} + 1`, updatedAt: sql`${posts.updatedAt}` })
         .where(eq(posts.id, postId))
         .returning({ viewCount: posts.viewCount });
-      return row.viewCount;
+      return { viewCount: row.viewCount, counted: true };
     }
     const [row] = await tx.select({ viewCount: posts.viewCount }).from(posts).where(eq(posts.id, postId));
-    return row.viewCount;
+    return { viewCount: row.viewCount, counted: false };
   });
 }
 
@@ -80,4 +80,39 @@ export async function cleanupPostViews({ dryRun }: { dryRun: boolean }): Promise
   }
   const rows = await db.delete(postViews).where(lt(postViews.date, before)).returning({ postId: postViews.postId });
   return rows.length;
+}
+
+/** 글 유입 경로 (통계 상세): 그날 그 출처로 들어온 첫 조회를 1 더한다 */
+export async function recordReferrer(blogId: number, source: string) {
+  await db
+    .insert(blogReferrers)
+    .values({ blogId, date: todayKST(), source, count: 1 })
+    .onConflictDoUpdate({ target: [blogReferrers.blogId, blogReferrers.date, blogReferrers.source], set: { count: sql`${blogReferrers.count} + 1` } });
+}
+
+/** 최근 n일 유입 경로: 많은 순 10개와 전체 합 */
+export async function getReferrerStats(blogId: number, days = 30) {
+  const since = lastDays(todayKST(), days)[0];
+  const where = and(eq(blogReferrers.blogId, blogId), gte(blogReferrers.date, since));
+  const [rows, [{ total }]] = await Promise.all([
+    db
+      .select({ source: blogReferrers.source, count: sql<number>`sum(${blogReferrers.count})::int` })
+      .from(blogReferrers)
+      .where(where)
+      .groupBy(blogReferrers.source)
+      .orderBy(desc(sql`sum(${blogReferrers.count})`), blogReferrers.source)
+      .limit(10),
+    db.select({ total: sql<number>`coalesce(sum(${blogReferrers.count}), 0)::int` }).from(blogReferrers).where(where),
+  ]);
+  return { rows, total };
+}
+
+/** 인기 글: 공개 글 조회수 순 */
+export async function getPopularPosts(blogId: number, limit = 10) {
+  return db
+    .select({ id: posts.id, title: posts.title, viewCount: posts.viewCount })
+    .from(posts)
+    .where(and(eq(posts.blogId, blogId), eq(posts.isPublic, true), sql`${posts.viewCount} > 0`))
+    .orderBy(desc(posts.viewCount), desc(posts.id))
+    .limit(limit);
 }
