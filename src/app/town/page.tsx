@@ -5,7 +5,7 @@ import { TownHud } from "@/components/town/TownHud";
 import { TownWelcome } from "@/components/town/TownWelcome";
 import { lotFront, START_POS } from "@/lib/town/layout";
 import { townSpots } from "@/lib/town/structures";
-import { ensureTodayAttendance } from "@/server/attendance";
+import { ensureTodayAttendanceOnce } from "@/server/attendance";
 import { getSession } from "@/server/dal";
 import { unreadBadge } from "@/lib/notifications";
 import { getGuestHouses, getHudMember, getMemberHouses } from "@/server/town";
@@ -21,7 +21,7 @@ export default async function TownPage({ searchParams }: PageProps<"/town">) {
   const { at, welcome, menu } = await searchParams;
   const member = await getSession();
   // 헤더가 없는 마을에서도 그날 첫 화면이면 자동 출석이 ☰ 내 프로필 코인에 들어가게 먼저 한다 (GAME-04)
-  if (member) await ensureTodayAttendance(member.userId, member.sessionId).catch((error) => console.error("자동 출석 실패", error));
+  if (member) await ensureTodayAttendanceOnce(member.userId, member.sessionId).catch((error) => console.error("자동 출석 실패", error));
   const [houses, hud] = member ? await Promise.all([getMemberHouses(member.userId), getHudMember(member.userId)]) : [await getGuestHouses(), null];
   const greet = hud !== null && welcome === "1";
   const home = greet ? houses.find((h) => h.mine) : typeof at === "string" ? houses.find((h) => h.slug === at) : undefined;
