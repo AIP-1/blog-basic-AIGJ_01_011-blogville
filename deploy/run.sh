@@ -16,6 +16,7 @@
 #   APP_URL       (선택) 사용자가 여는 주소. 없으면 http://<서버 주소>:8400
 #   DEPLOY_DIR    (선택) 기본 ~/blogville
 #   ADMIN_USERNAME, ADMIN_PASSWORD (선택) 있으면 배포할 때 관리자 계정과 공지 블로그(/@notice)를 만들거나 비밀번호를 갱신한다
+#   {KAKAO,NAVER,GOOGLE}_CLIENT_ID, _CLIENT_SECRET (선택) 소셜 로그인 키. 둘 다 있는 서비스만 켜진다
 #
 # 서버에 남는 것 (DEPLOY_DIR 아래)
 #   auth-secret   처음 한 번 만든 로그인 비밀키. 지우면 모든 로그인이 풀린다
@@ -65,6 +66,11 @@ BETTER_AUTH_URL=$APP_URL
 UPLOAD_DIR=storage/uploads
 EOF
 )
+# 소셜 로그인 키 (AUTH-01): 값이 있는 것만 넣는다
+for k in KAKAO_CLIENT_ID KAKAO_CLIENT_SECRET NAVER_CLIENT_ID NAVER_CLIENT_SECRET GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET; do
+  v="${!k:-}"
+  if [ -n "$v" ]; then printf '%s=%s\n' "$k" "$v" >> "$DEPLOY_DIR/app.env"; fi
+done
 
 echo "이미지 불러오기: $IMAGE"
 gunzip -c "$TAR" | "${DOCKER[@]}" load

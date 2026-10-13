@@ -9,6 +9,8 @@ import { BLOG_ERRORS, checkNickname } from "@/lib/blog-rules";
 import { changeMemberPassword, deleteMember, verifyMemberPassword } from "@/server/account";
 import { requireMember } from "@/server/dal";
 import { KEY_PATTERN } from "@/lib/attachments";
+import { enabledProviders, isSocialProvider } from "@/lib/social-login";
+import { isLinked, unlinkAccount } from "@/server/social-login";
 import { PHOTO_ERRORS, removeProfilePhoto, setProfilePhoto, updateNickname as saveNickname } from "@/server/profile";
 import type { SettingsState } from "../blog/actions";
 
@@ -78,4 +80,28 @@ export async function deleteProfilePhoto(): Promise<PhotoState> {
   await removeProfilePhoto(member.userId);
   revalidatePath("/", "layout");
   return { message: PHOTO_ERRORS.removed };
+}
+
+/** 소셜 계정 연동 시작 (AUTH-05). 서비스에 다녀오면 내 정보로 돌아온다 */
+export async function linkSocial(formData: FormData) {
+  const member = await requireMember();
+  const provider = formData.get("provider");
+  if (!isSocialProvider(provider) || !enabledProviders(process.env).some((p) => p.id === provider)) redirect("/settings/account?error=not_ready");
+  if (await isLinked(member.userId, provider)) redirect("/settings/account?error=already_linked");
+  const result = await auth.api.linkSocialAccount({
+    body: { provider, callbackURL: `/settings/account?linked=${provider}`, errorCallbackURL: "/settings/account" },
+    headers: await headers(),
+  });
+  if (!result?.url) redirect("/settings/account?error=link_failed");
+  redirect(result.url);
+}
+
+/** 소셜 계정 연동 해제 (AUTH-05). 아이디 로그인은 해제할 수 없다 */
+export async function unlinkSocial(formData: FormData) {
+  const member = await requireMember();
+  const provider = formData.get("provider");
+  if (!isSocialProvider(provider)) redirect("/settings/account");
+  await unlinkAccount(member.userId, provider);
+  revalidatePath("/settings/account");
+  redirect(`/settings/account?unlinked=${provider}`);
 }
