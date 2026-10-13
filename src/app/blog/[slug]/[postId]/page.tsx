@@ -7,6 +7,8 @@ import { CategoryBadge } from "@/components/post/CategoryBadge";
 import { DeletePostButton } from "@/components/post/DeletePostButton";
 import { CommentSection } from "@/components/post/CommentSection";
 import { LikeButton } from "@/components/post/LikeButton";
+import { BookmarkButton } from "@/components/post/BookmarkButton";
+import { ReportButton } from "@/components/post/ReportButton";
 import { PublishNotice } from "@/components/post/PublishNotice";
 import { PostJsonLd } from "@/components/post/PostJsonLd";
 import { SeriesBox } from "@/components/post/SeriesBox";
@@ -32,6 +34,7 @@ import { BlindNotice } from "@/components/post/BlindNotice";
 import { getAdjacentPosts, getCategoryPosts, getPostForView } from "@/server/post";
 import { getCommentThread } from "@/server/comments";
 import { getLikeState } from "@/server/likes";
+import { getBookmarkState } from "@/server/bookmarks";
 import { hasViewedToday } from "@/server/stats";
 import { getPostTags } from "@/server/tags";
 import { readVisitorId } from "@/server/visitor";
@@ -143,6 +146,15 @@ export default async function PostPage({ params, searchParams }: PageProps<"/blo
         <TagList tags={await getPostTags(post.id)} />
         {post.isPublic && <ShareBar url={`${siteUrl()}${postPath}`} title={post.title} />}
         <LikeButton postId={post.id} {...await getLikeState(post.id, member?.userId ?? null)} canLike={member !== null} loginHref={loginHref(postPath)} />
+        {/* 🔖 스크랩 (공개 글만)·🚨 신고 (남의 글을 볼 수 있는 회원만), specs/059-report-bookmarks */}
+        {(post.isPublic || (member && !isOwner)) && (
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2" data-post-actions>
+            {post.isPublic && (
+              <BookmarkButton postId={post.id} {...await getBookmarkState(post.id, member?.userId ?? null)} canBookmark={member !== null} loginHref={loginHref(postPath)} />
+            )}
+            {member && !isOwner && <ReportButton targetType="post" targetId={post.id} />}
+          </div>
+        )}
         <AdjacentPosts slug={blog.slug} {...adjacent} />
         <footer className={`flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 ${adjacent.older || adjacent.newer ? "" : "mt-8"}`}>
           <Link href={`/@${blog.slug}`} className="btn">

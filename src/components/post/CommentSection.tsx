@@ -6,6 +6,7 @@ import { addComment, addReply, deleteComment, deleteReply, updateComment, update
 import { COMMENT_MAX, formatDateTime, SECRET_PLACEHOLDER } from "@/lib/comment-rules";
 import { confirmFirst } from "@/lib/confirm-action";
 import type { CommentLine, CommentThreadItem } from "@/server/comments";
+import { ReportButton } from "./ReportButton";
 
 type Props = { postId: number; items: CommentThreadItem[]; count: number; signedIn: boolean; loginHref: string };
 
@@ -53,7 +54,7 @@ function CommentItem({ postId, item }: { postId: number; item: CommentThreadItem
   const [replying, setReplying] = useState(false);
   return (
     <li>
-      <Line line={item} anchor={`comment-${item.id}`} remove={deleteComment} edit={updateComment}>
+      <Line line={item} kind="comment" anchor={`comment-${item.id}`} remove={deleteComment} edit={updateComment}>
         {item.canReply && !replying && (
           <button type="button" className="btn btn-ghost px-2" onClick={() => setReplying(true)}>
             답글
@@ -78,7 +79,7 @@ function CommentItem({ postId, item }: { postId: number; item: CommentThreadItem
         <ul aria-label="답글" className="ml-10 mt-3 space-y-3 border-l-2 border-line pl-4">
           {item.replies.map((reply) => (
             <li key={reply.id}>
-              <Line line={reply} anchor={`reply-${reply.id}`} remove={deleteReply} edit={updateReply} />
+              <Line line={reply} kind="reply" anchor={`reply-${reply.id}`} remove={deleteReply} edit={updateReply} />
             </li>
           ))}
         </ul>
@@ -89,13 +90,14 @@ function CommentItem({ postId, item }: { postId: number; item: CommentThreadItem
 
 type LineProps = {
   line: CommentLine;
+  kind: "comment" | "reply";
   anchor: string;
   remove: (data: FormData) => Promise<void>;
   edit: (data: FormData) => Promise<CommentResult>;
   children?: React.ReactNode;
 };
 
-function Line({ line, anchor, remove, edit, children }: LineProps) {
+function Line({ line, kind, anchor, remove, edit, children }: LineProps) {
   const [editing, setEditing] = useState(false);
   // 저장·취소하고 나면 [수정] 버튼으로 초점을 돌려준다 (키보드로 이어서 쓸 수 있게)
   const editButton = useRef<HTMLButtonElement>(null);
@@ -166,7 +168,7 @@ function Line({ line, anchor, remove, edit, children }: LineProps) {
         // 글자로만 보여 준다 (HTML로 넣지 않음, NF-03)
         <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{line.content}</p>
       )}
-      {!line.deleted && !editing && (children || line.canDelete || line.canEdit) && (
+      {!line.deleted && !editing && (children || line.canDelete || line.canEdit || line.canReport) && (
         <div className="mt-1 flex gap-1">
           {children}
           {line.canEdit && (
@@ -182,6 +184,7 @@ function Line({ line, anchor, remove, edit, children }: LineProps) {
               </button>
             </form>
           )}
+          {line.canReport && <ReportButton targetType={kind} targetId={line.id} />}
         </div>
       )}
     </article>

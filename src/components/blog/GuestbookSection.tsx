@@ -10,6 +10,7 @@ import {
   updateGuestbookEntry,
 } from "@/app/blog/guestbook-actions";
 import { CommentForm } from "@/components/post/CommentSection";
+import { ReportButton } from "@/components/post/ReportButton";
 import { formatDateTime } from "@/lib/comment-rules";
 import { confirmFirst } from "@/lib/confirm-action";
 import { GUESTBOOK_SECRET_PLACEHOLDER } from "@/lib/guestbook-rules";
@@ -138,7 +139,7 @@ function Entry({ entry, ownerNickname }: { entry: GuestbookEntry; ownerNickname:
         // 글자로만 보여 준다 (HTML로 넣지 않음, NF-03)
         <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{entry.content}</p>
       )}
-      {!editing && !entry.hidden && (entry.canEdit || entry.canDelete || (entry.canReply && !entry.reply)) && (
+      {!editing && !entry.hidden && (entry.canEdit || entry.canDelete || entry.canReport || (entry.canReply && !entry.reply)) && (
         <div className="mt-1 flex flex-wrap gap-1">
           {entry.canReply && !entry.reply && !replying && (
             <button ref={replyButton} type="button" className="btn btn-ghost px-2" onClick={() => setReplying(true)}>
@@ -151,6 +152,7 @@ function Entry({ entry, ownerNickname }: { entry: GuestbookEntry; ownerNickname:
             </button>
           )}
           {entry.canDelete && <DeleteButton id={entry.id} label="삭제" question="방명록 글을 삭제할까요?" action={deleteGuestbookEntry} />}
+          {entry.canReport && <ReportButton targetType="guestbook" targetId={entry.id} />}
         </div>
       )}
       {/* 볼 수 없는 비밀 방명록에는 버튼이 없다 (볼 수 있는 작성자·주인·관리자만 고치거나 지운다) */}
