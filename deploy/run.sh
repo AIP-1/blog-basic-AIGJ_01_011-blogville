@@ -58,7 +58,7 @@ gunzip -c "$TAR" | "${DOCKER[@]}" load
 
 # drizzle-kit migrate는 접속 오류를 보여 주지 않아서, 띄우기 전에 DB 접속을 따로 확인한다
 echo "DB 접속 확인"
-if ! "${DOCKER[@]}" run --rm --env-file "$DEPLOY_DIR/app.env" "$IMAGE" node -e '
+if ! "${DOCKER[@]}" run --rm --network host --env-file "$DEPLOY_DIR/app.env" "$IMAGE" node -e '
 const postgres = require("postgres");
 const sql = postgres(process.env.DATABASE_URL, { max: 1, connect_timeout: 10 });
 sql`select current_user, current_schema(), version()`
@@ -72,12 +72,14 @@ fi
 echo "이전 컨테이너 정리"
 "${DOCKER[@]}" rm -f "$NAME" >/dev/null 2>&1 || true
 
+# 도커 기본 네트워크(bridge)에서는 이 서버의 공인 IP(DB)로 가는 길이 막혀 있어서(EHOSTUNREACH)
+# 서버 네트워크를 그대로 쓴다. 앱은 서버의 $PORT 포트에서 바로 열린다
 echo "컨테이너 실행 (포트 $PORT)"
 "${DOCKER[@]}" run -d \
   --name "$NAME" \
   --restart unless-stopped \
   --env-file "$DEPLOY_DIR/app.env" \
-  -p "$PORT:$PORT" \
+  --network host \
   -v "$DEPLOY_DIR/uploads:/app/storage/uploads" \
   "$IMAGE" >/dev/null
 
