@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, eq, gt, lt, max, desc, inArray } from "drizzle-orm";
+import { and, asc, count, eq, gt, lt, max, desc } from "drizzle-orm";
 import { db, type Tx } from "@/db";
 import { categories, posts, subcategories } from "@/db/schema";
 import { CATEGORY_ERRORS, checkCategoryName } from "@/lib/category-rules";

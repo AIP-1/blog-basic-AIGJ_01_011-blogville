@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { BLOG_ERRORS, checkBlogIntro, checkBlogTitle } from "@/lib/blog-rules";
 import { parseId } from "@/lib/ids";
 import { getMyBlog, requireMember } from "@/server/dal";
-import { updateBlogInfo as saveInfo, updateBlogSlug as saveSlug } from "@/server/blog";
+import { updateBlogAccent as saveAccent, updateBlogInfo as saveInfo, updateBlogSlug as saveSlug } from "@/server/blog";
+import { ACCENT_ERROR, isBlogAccent } from "@/lib/blog-accent";
 import * as category from "@/server/category";
 
 export type SettingsState = { error?: string; message?: string; values?: Record<string, string> } | null;
@@ -37,6 +38,15 @@ export async function updateBlogSlug(_prev: SettingsState, formData: FormData): 
   refresh(result.oldSlug);
   refresh(result.slug);
   return { message: BLOG_ERRORS.saved, values: { slug: result.slug } };
+}
+
+export async function updateBlogAccent(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
+  const member = await requireMember();
+  const accent = text(formData, "accent");
+  if (!isBlogAccent(accent)) return { error: ACCENT_ERROR };
+  await saveAccent(member.userId, accent);
+  refresh((await getMyBlog(member.userId)).slug);
+  return { message: BLOG_ERRORS.saved, values: { accent } };
 }
 
 // ── 카테고리 (BLOG-05) ──
