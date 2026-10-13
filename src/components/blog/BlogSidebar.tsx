@@ -2,6 +2,7 @@ import Link from "next/link";
 import { SECRET_PLACEHOLDER } from "@/lib/comment-rules";
 import { excerpt } from "@/lib/text";
 import { SEARCH_MAX } from "@/lib/blog-search";
+import { guestbookPath } from "@/lib/guestbook-rules";
 import type { getBlogSidebar } from "@/server/sidebar";
 import type { VisitStats } from "@/server/stats";
 import { VisitCount } from "./VisitCount";
@@ -25,6 +26,11 @@ export function BlogSidebar({ blogId, slug, sidebar, visits, recordVisit, search
   const linkClass = "flex min-h-11 items-center gap-2 rounded-lg px-2 hover:bg-bg";
   return (
     <aside aria-label="옆 칸" className="min-w-0 space-y-4">
+      {/* 방명록 (BLOG-10): 비밀 방명록도 센다 */}
+      <Link href={guestbookPath(slug)} className="widget flex min-h-11 items-center gap-2 font-semibold hover:bg-bg" data-guestbook-link>
+        <span aria-hidden>📖</span> 방명록 <span className="ml-auto text-sm font-normal text-ink-soft">{sidebar.guestbookCount}</span>
+      </Link>
+
       <section className="widget" aria-labelledby="w-search">
         <h2 id="w-search" className="widget-title">
           🔍 블로그 검색

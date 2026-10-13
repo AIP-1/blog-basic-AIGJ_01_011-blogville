@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, gte, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { comments, posts, postTags, profiles, replies, tags } from "@/db/schema";
 import type { Member } from "./dal";
+import { countGuestbook } from "./guestbook";
 
 export const SIDEBAR_POSTS = 5;
 export const SIDEBAR_COMMENTS = 5;
@@ -12,7 +13,7 @@ export const SIDEBAR_TAGS = 30;
 export type SidebarComment = { kind: "comment" | "reply"; id: number; postId: number; content: string; nickname: string | null; hidden: boolean };
 
 /**
- * 블로그 홈 옆 칸 (BLOG-09): 최근 글·인기 글·최근 댓글·태그.
+ * 블로그 홈 옆 칸 (BLOG-09): 최근 글·인기 글·최근 댓글·태그, 방명록 글 수 (BLOG-10).
  * 주인이 아니면 비공개 글, 그 글의 댓글, 비공개 글에만 붙은 태그는 없다.
  * 비밀 댓글·답글은 목록에 남기되, 볼 수 없는 사람에게는 내용을 SQL에서 비워 보낸다 (글 상세와 같은 규칙, canSeeSecret).
  */
@@ -28,7 +29,7 @@ export async function getBlogSidebar(blogId: number, viewerIsOwner: boolean, vie
     ? sql`false`
     : sql`((r.is_secret or c.is_secret) and not (${mine(sql`r.author_id`)} or ${mine(sql`c.author_id`)}))`;
 
-  const [recent, popular, recentComments, blogTags] = await Promise.all([
+  const [recent, popular, recentComments, blogTags, guestbookCount] = await Promise.all([
     db.select(postLink).from(posts).where(visible).orderBy(desc(posts.createdAt), desc(posts.id)).limit(SIDEBAR_POSTS),
     db
       .select({ ...postLink, viewCount: posts.viewCount })
@@ -63,6 +64,7 @@ export async function getBlogSidebar(blogId: number, viewerIsOwner: boolean, vie
       .groupBy(tags.id)
       .orderBy(desc(uses), asc(tags.name))
       .limit(SIDEBAR_TAGS),
+    countGuestbook(blogId),
   ]);
 
   return {
@@ -72,5 +74,6 @@ export async function getBlogSidebar(blogId: number, viewerIsOwner: boolean, vie
       (r): SidebarComment => ({ kind: r.kind, id: r.id, postId: r.post_id, content: r.content, nickname: r.nickname, hidden: r.hidden }),
     ),
     tags: blogTags,
+    guestbookCount,
   };
 }

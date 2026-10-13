@@ -1,9 +1,18 @@
 import "server-only";
-import { and, asc, between, count, desc, eq, isNull, lte, max, min, or, sql } from "drizzle-orm";
+import { and, asc, between, count, desc, eq, inArray, isNull, lte, max, min, or, sql } from "drizzle-orm";
 import { db, type Tx } from "@/db";
-import { blogs, items, notifications, posts, profiles } from "@/db/schema";
+import { blogs, guestbookEntries, items, notifications, posts, profiles } from "@/db/schema";
 import { levelsGained } from "@/lib/game";
-import { isActivityKind, LEVEL_UP_ITEMS_SHOWN, NOTIFICATIONS_PAGE_SIZE, UNREAD_COUNT_CAP, type ActivityKind, type PendingLevelUp } from "@/lib/notifications";
+import {
+  isActivityKind,
+  isGuestbookKind,
+  LEVEL_UP_ITEMS_SHOWN,
+  NOTIFICATIONS_PAGE_SIZE,
+  UNREAD_COUNT_CAP,
+  type ActivityKind,
+  type GuestbookKind,
+  type PendingLevelUp,
+} from "@/lib/notifications";
 
 // 알림 (GAME-08의 공감·댓글·답글, specs/017-notifications · GAME-06 레벨업, specs/034-level-up)
 
@@ -24,6 +33,18 @@ export async function notifyActivity(
 }
 
 /**
+ * 방명록 알림 (BLOG-10, specs/056-guestbook): 방명록 글을 저장하는 트랜잭션 안에서 부른다.
+ * 받는 사람이 나 자신이면(내 방명록에 내가 쓴 글, 내 글에 내가 단 답글) 넣지 않는다.
+ */
+export async function notifyGuestbook(
+  tx: Tx,
+  n: { kind: GuestbookKind; recipientId: string; actorId: string; entryId: number },
+): Promise<void> {
+  if (n.recipientId === n.actorId) return;
+  await tx.insert(notifications).values({ userId: n.recipientId, kind: n.kind, actorId: n.actorId, guestbookEntryId: n.entryId });
+}
+
+/**
  * 레벨업 알림 (GAME-06): 누적 경험치가 before → after가 되며 오른 레벨마다 한 줄. 원장을 넣은 트랜잭션 안에서 부른다.
  * 같은 레벨은 한 번만 (부분 고유 인덱스 notifications_level_up_uq).
  */
@@ -36,9 +57,18 @@ export async function notifyLevelUps(tx: Tx, userId: string, before: number, aft
     .onConflictDoNothing();
 }
 
-/** 받는 사람이 지금 볼 수 있는 알림만: 레벨업, 그리고 글이 공개이거나 내 글인 활동 알림 (답글 알림의 글이 나중에 비공개가 되면 숨긴다) */
+/**
+ * 받는 사람이 지금 볼 수 있는 알림만: 레벨업, 방명록(받는 사람은 블로그 주인이나 그 글 작성자라 늘 본다),
+ * 그리고 글이 공개이거나 내 글인 활동 알림 (답글 알림의 글이 나중에 비공개가 되면 숨긴다)
+ */
 const visibleTo = (userId: string) =>
-  and(eq(notifications.userId, userId), or(eq(notifications.kind, "level_up"), eq(posts.isPublic, true), eq(blogs.ownerId, userId)));
+  and(
+    eq(notifications.userId, userId),
+    or(inArray(notifications.kind, ["level_up", "guestbook", "guestbook_reply"]), eq(posts.isPublic, true), eq(blogs.ownerId, userId)),
+  );
+
+/** 알림의 블로그: 활동 알림은 글의 블로그, 방명록 알림은 방명록 글의 블로그 */
+const notificationBlog = eq(blogs.id, sql`coalesce(${posts.blogId}, ${guestbookEntries.blogId})`);
 
 /** 헤더 🔔: 안 읽은 알림 수. UNREAD_COUNT_CAP에서 멈춘다 (`9+`) */
 export async function countUnreadNotifications(userId: string): Promise<number> {
@@ -46,7 +76,8 @@ export async function countUnreadNotifications(userId: string): Promise<number> 
     .select({ one: sql`1` })
     .from(notifications)
     .leftJoin(posts, eq(posts.id, notifications.postId))
-    .leftJoin(blogs, eq(blogs.id, posts.blogId))
+    .leftJoin(guestbookEntries, eq(guestbookEntries.id, notifications.guestbookEntryId))
+    .leftJoin(blogs, notificationBlog)
     .where(and(visibleTo(userId), isNull(notifications.readAt)))
     .limit(UNREAD_COUNT_CAP)
     .as("unread");
@@ -87,6 +118,7 @@ export async function dismissLevelUps(userId: string, level: number): Promise<vo
 
 export type NotificationItem = { id: number; createdAt: Date; read: boolean } & (
   | { kind: ActivityKind; nickname: string; postId: number; postTitle: string; blogSlug: string }
+  | { [K in GuestbookKind]: { kind: K; nickname: string; blogSlug: string } }[GuestbookKind]
   | { kind: "level_up"; level: number }
 );
 
@@ -108,7 +140,8 @@ export async function listNotifications(userId: string, page: number): Promise<{
       })
       .from(notifications)
       .leftJoin(posts, eq(posts.id, notifications.postId))
-      .leftJoin(blogs, eq(blogs.id, posts.blogId))
+      .leftJoin(guestbookEntries, eq(guestbookEntries.id, notifications.guestbookEntryId))
+      .leftJoin(blogs, notificationBlog)
       .leftJoin(profiles, eq(profiles.userId, notifications.actorId))
       .where(where)
       .orderBy(desc(notifications.createdAt), desc(notifications.id))
@@ -118,7 +151,8 @@ export async function listNotifications(userId: string, page: number): Promise<{
       .select({ total: count() })
       .from(notifications)
       .leftJoin(posts, eq(posts.id, notifications.postId))
-      .leftJoin(blogs, eq(blogs.id, posts.blogId))
+      .leftJoin(guestbookEntries, eq(guestbookEntries.id, notifications.guestbookEntryId))
+      .leftJoin(blogs, notificationBlog)
       .where(where),
   ]);
   const items = rows.flatMap(({ id, kind, level, nickname, postId, postTitle, blogSlug, createdAt, readAt }): NotificationItem[] => {
@@ -127,12 +161,16 @@ export async function listNotifications(userId: string, page: number): Promise<{
     if (isActivityKind(kind) && nickname !== null && postId !== null && postTitle !== null && blogSlug !== null) {
       return [{ ...base, kind, nickname, postId, postTitle, blogSlug }];
     }
+    if (isGuestbookKind(kind) && nickname !== null && blogSlug !== null) return [{ ...base, kind, nickname, blogSlug }];
     return [];
   });
   return { items, total };
 }
 
-export type NotificationTarget = { kind: ActivityKind; blogSlug: string; postId: number } | { kind: "level_up" };
+export type NotificationTarget =
+  | { kind: ActivityKind; blogSlug: string; postId: number }
+  | { [K in GuestbookKind]: { kind: K; blogSlug: string } }[GuestbookKind]
+  | { kind: "level_up" };
 
 /** 내 알림 하나를 읽음으로 하고 갈 곳을 돌려준다. 남의 알림·없는 알림·볼 수 없는 글이면 null (아무것도 바꾸지 않음) */
 export async function readNotification(userId: string, id: number): Promise<NotificationTarget | null> {
@@ -140,12 +178,14 @@ export async function readNotification(userId: string, id: number): Promise<Noti
     .select({ kind: notifications.kind, blogSlug: blogs.slug, postId: posts.id })
     .from(notifications)
     .leftJoin(posts, eq(posts.id, notifications.postId))
-    .leftJoin(blogs, eq(blogs.id, posts.blogId))
+    .leftJoin(guestbookEntries, eq(guestbookEntries.id, notifications.guestbookEntryId))
+    .leftJoin(blogs, notificationBlog)
     .where(and(eq(notifications.id, id), visibleTo(userId)));
   if (!row) return null;
   let target: NotificationTarget;
   if (row.kind === "level_up") target = { kind: "level_up" };
   else if (isActivityKind(row.kind) && row.blogSlug !== null && row.postId !== null) target = { kind: row.kind, blogSlug: row.blogSlug, postId: row.postId };
+  else if (isGuestbookKind(row.kind) && row.blogSlug !== null) target = { kind: row.kind, blogSlug: row.blogSlug };
   else return null;
   await db
     .update(notifications)
