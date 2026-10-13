@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+/* dark: 유틸리티가 기기 설정뿐 아니라 직접 고른 화면 밝기(html[data-theme])도 따르게 (theme-dark.css) */
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+  &:where([data-theme="dark"] *) {
+    @slot;
+  }
+}
+
 :root {
   --bg: #fbfaf7;
   --surface: #ffffff;
@@ -20,7 +32,7 @@
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
   --color-danger: var(--danger);
-  --font-sans: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  --font-sans: "Pretendard Variable", "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
 }
 
 body {
