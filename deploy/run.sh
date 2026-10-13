@@ -17,6 +17,7 @@
 #   DEPLOY_DIR    (선택) 기본 ~/blogville
 #   ADMIN_USERNAME, ADMIN_PASSWORD (선택) 있으면 배포할 때 관리자 계정과 공지 블로그(/@notice)를 만들거나 비밀번호를 갱신한다
 #   {KAKAO,NAVER,GOOGLE}_CLIENT_ID, _CLIENT_SECRET (선택) 소셜 로그인 키. 둘 다 있는 서비스만 켜진다
+#   FEEDBACK_BOT_TOKEN (선택) 버그·문의 자동 처리 API(/api/feedback)의 열쇠. 32자 이상이면 켜진다
 #
 # 서버에 남는 것 (DEPLOY_DIR 아래)
 #   auth-secret   처음 한 번 만든 로그인 비밀키. 지우면 모든 로그인이 풀린다
@@ -71,6 +72,8 @@ for k in KAKAO_CLIENT_ID KAKAO_CLIENT_SECRET NAVER_CLIENT_ID NAVER_CLIENT_SECRET
   v="${!k:-}"
   if [ -n "$v" ]; then printf '%s=%s\n' "$k" "$v" >> "$DEPLOY_DIR/app.env"; fi
 done
+# 버그·문의 자동 처리 API 열쇠 (SUP-04): 있을 때만 넣는다
+if [ -n "${FEEDBACK_BOT_TOKEN:-}" ]; then printf 'FEEDBACK_BOT_TOKEN=%s\n' "$FEEDBACK_BOT_TOKEN" >> "$DEPLOY_DIR/app.env"; fi
 
 echo "이미지 불러오기: $IMAGE"
 gunzip -c "$TAR" | "${DOCKER[@]}" load
@@ -144,11 +147,8 @@ if [ -n "${ADMIN_USERNAME:-}" ] && [ -n "${ADMIN_PASSWORD:-}" ]; then
   fi
 fi
 
-# 릴리스 노트를 공지 블로그(/@notice)에 올린다. 이미 올린 버전은 건너뛰고, 공지 블로그가 없으면 하지 않는다
-echo "릴리스 노트 확인"
-if ! "${DOCKER[@]}" exec "$NEXT_NAME" npx tsx scripts/publish-release-notes.ts; then
-  echo "릴리스 노트를 올리지 못했어요(위 문구 확인). 배포는 계속해요." >&2
-fi
+# 릴리스 노트는 아래 막대의 [🆕 업데이트 소식](/updates)에서 보여 준다 (v1.2.0부터 공지 블로그에는 올리지 않음).
+# 공지 블로그에도 올리고 싶으면 서버에서 직접: docker exec <컨테이너> npx tsx scripts/publish-release-notes.ts
 
 # 프록시가 넘길 포트를 바꾼다 (파일을 통째로 바꿔 반쯤 쓴 내용을 읽지 않게)
 printf '%s\n' "$NEXT_PORT" > "$DEPLOY_DIR/state/active-port.tmp"

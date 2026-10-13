@@ -8,7 +8,7 @@ import { formatDate } from "./text";
 export type ActivityKind = "like" | "comment" | "reply";
 /** 방명록 알림 (BLOG-10, specs/056-guestbook): 행동한 사람과 방명록 글이 있다 (글은 없다) */
 export type GuestbookKind = "guestbook" | "guestbook_reply";
-export type NotificationKind = ActivityKind | GuestbookKind | "level_up";
+export type NotificationKind = ActivityKind | GuestbookKind | "level_up" | "feedback_reply";
 
 export const NOTIFICATIONS_PAGE_SIZE = 20;
 /** 헤더 숫자는 10개까지만 센다 (`9+`) */
@@ -48,6 +48,14 @@ export function guestbookNotificationText(kind: GuestbookKind, nickname: string)
 export function guestbookNotificationHref(blogSlug: string): string {
   return `/@${blogSlug}/guestbook`;
 }
+
+/** 문의 답변 알림 (SUP-03·04, specs/057-support): 관리자·자동 처리가 내 문의에 답하거나 처리했을 때 */
+export function feedbackNotificationText(title: string): string {
+  return `🐞 문의에 답변이 달렸어요: ${title}`;
+}
+
+/** 문의 답변 알림을 누르면 내 문의가 있는 버그·문의 화면으로 */
+export const FEEDBACK_NOTIFICATION_HREF = "/support";
 
 export function isGuestbookKind(value: string): value is GuestbookKind {
   return value === "guestbook" || value === "guestbook_reply";
