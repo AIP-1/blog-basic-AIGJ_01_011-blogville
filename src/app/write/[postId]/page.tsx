@@ -5,6 +5,7 @@ import { parseId } from "@/lib/ids";
 import { getCategoryOptions } from "@/server/category";
 import { getSeriesOptions } from "@/server/series";
 import { getMyBlog, requireMember } from "@/server/dal";
+import { trendEnabled } from "@/server/keyword-trend";
 import { getPostForEdit } from "@/server/post";
 import { getPostTags } from "@/server/tags";
 
@@ -20,7 +21,7 @@ export default async function EditPage({ params }: PageProps<"/write/[postId]">)
     <div className="mx-auto max-w-3xl">
       <h1 className="sr-only">글 수정</h1>
       {post.blindedAt && <BlindNotice reason={post.blindReason} />}
-      <PostForm
+      <PostForm keywordHelper={trendEnabled()}
         categories={await getCategoryOptions(blog.id)}
         seriesOptions={await getSeriesOptions(blog.id)}
         initial={{
