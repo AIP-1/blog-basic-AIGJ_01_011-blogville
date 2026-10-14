@@ -185,8 +185,42 @@ export type RankedPlace = FoodPlace & {
   recent: number;
   interest: number | null;
   rising: boolean;
+  /** 요즘 2주 검색 ÷ 그 전 4주 (모르면 null) */
+  growth?: number | null;
   kind: FoodKind;
 };
+
+/** 요즘 2주 검색이 그 전보다 몇 배인지. 그 전이 거의 없으면 null */
+export function interestGrowth(i: InterestPoint): number | null {
+  return i.before >= 1 ? i.recent / i.before : null;
+}
+
+export const REGION_SORTS = [
+  { key: "best", label: "종합 순" },
+  { key: "rising", label: "🚀 요즘 뜨는 순" },
+  { key: "reviews", label: "📝 후기 많은 순" },
+] as const;
+export type RegionSort = (typeof REGION_SORTS)[number]["key"];
+
+export function isRegionSort(v: unknown): v is RegionSort {
+  return REGION_SORTS.some((s) => s.key === v);
+}
+
+/** 이미 종합 순인 목록을 다른 기준으로 (같으면 종합 순서) */
+export function sortRegion(
+  list: RankedPlace[],
+  sort: RegionSort,
+): RankedPlace[] {
+  if (sort === "best") return list;
+  const key = (p: RankedPlace) =>
+    sort === "reviews"
+      ? p.recent
+      : (p.growth ?? 0) * (p.recent > 0 || (p.interest ?? 0) > 0 ? 1 : 0);
+  return list
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => key(b.p) - key(a.p) || a.i - b.i)
+    .map((x) => x.p);
+}
 
 /**
  * 지역 인기 순위: 최근 한 달 진짜 후기 수와 네이버 검색 관심도를 반씩 섞는다.
@@ -204,4 +238,38 @@ export function rankRegion(list: RankedPlace[]): RankedPlace[] {
     .map((p, i) => ({ p, i, s: score(p) }))
     .sort((a, b) => b.s - a.s || a.i - b.i)
     .map((x) => x.p);
+}
+
+/** 카카오 좌표→법정동 응답에서 동네 이름: "성수동1가" → "성수동", 동이 없으면 시군구("수지구") */
+export function dongFromRegion(
+  json: unknown,
+): { dong: string; city: string } | null {
+  const docs = (
+    json as {
+      documents?: {
+        region_type?: string;
+        region_1depth_name?: string;
+        region_2depth_name?: string;
+        region_3depth_name?: string;
+      }[];
+    }
+  )?.documents;
+  const d = docs?.find((x) => x.region_type === "B") ?? docs?.[0];
+  if (!d) return null;
+  const three = (d.region_3depth_name ?? "")
+    .replace(/\d+가$/, "")
+    .replace(/(\D)\d+동$/, "$1동")
+    .trim();
+  const dong =
+    three.length >= 2
+      ? three
+      : ((d.region_2depth_name ?? "").split(" ").pop() ?? "");
+  if (!/^[가-힣]{2,10}$/.test(dong)) return null;
+  return {
+    dong,
+    city: (d.region_1depth_name ?? "").replace(
+      /(특별시|광역시|특별자치시|특별자치도|도)$/,
+      "",
+    ),
+  };
 }

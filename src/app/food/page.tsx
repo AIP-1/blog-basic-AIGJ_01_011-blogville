@@ -15,6 +15,13 @@ import {
   FoodMap,
   type MapProvider,
 } from "@/components/food/FoodMap";
+import {
+  isRegionSort,
+  REGION_SORTS,
+  sortRegion,
+  type RegionSort,
+} from "@/lib/food-quality";
+import { MyAreaButton } from "@/components/food/MyAreaButton";
 import { InterestSpark } from "@/components/food/InterestSpark";
 import { PlaceCard } from "@/components/food/PlaceCard";
 import { ReviewCards } from "@/components/food/ReviewCards";
@@ -48,6 +55,7 @@ import {
   nearbyPlaces,
   placeDetail,
   placeInterest,
+  myDong,
   regionHot,
   searchPlaces,
   type FoodResult,
@@ -185,6 +193,10 @@ export default async function FoodPage({ searchParams }: PageProps<"/food">) {
             isFoodRegion(one(sp.region)) ? one(sp.region)! : DEFAULT_REGION
           }
           area={one(sp.area)}
+          at={parseCoords(one(sp.lat), one(sp.lng))}
+          sort={
+            isRegionSort(one(sp.sort)) ? (one(sp.sort) as RegionSort) : "best"
+          }
           kind={
             isFoodKind(one(sp.kind)) ? (one(sp.kind) as FoodKindFilter) : "all"
           }
@@ -221,7 +233,12 @@ async function NearTab({
   if (!kakaoEnabled()) return <Notice>{FOOD_MESSAGES.nearOff}</Notice>;
   const at = parseCoords(lat, lng);
   const result = at ? await nearbyPlaces(at, sort, radius, kind, page) : null;
-  const href = (o: { sort?: string; r?: number; kind?: string; p?: number }) => {
+  const href = (o: {
+    sort?: string;
+    r?: number;
+    kind?: string;
+    p?: number;
+  }) => {
     const q = new URLSearchParams({
       tab: "near",
       lat: String(at!.lat),
@@ -319,7 +336,8 @@ async function NearTab({
                 ? "가게"
                 : FOOD_KINDS.find((k) => k.key === kind)!.label}{" "}
               {list!.total}곳{list!.total >= 200 ? " (가까운 200곳까지)" : ""}
-              {list!.pages > 1 && ` · ${(list!.page - 1) * 20 + 1}~${(list!.page - 1) * 20 + list!.items.length}번째`}
+              {list!.pages > 1 &&
+                ` · ${(list!.page - 1) * 20 + 1}~${(list!.page - 1) * 20 + list!.items.length}번째`}
             </p>
             {mapProviders() && (
               <FoodMap
@@ -335,7 +353,9 @@ async function NearTab({
                 <li key={p.id}>
                   <PlaceCard
                     place={p}
-                    rank={mapProviders() ? (list!.page - 1) * 20 + i + 1 : undefined}
+                    rank={
+                      mapProviders() ? (list!.page - 1) * 20 + i + 1 : undefined
+                    }
                     recent={naverFoodEnabled() ? p.recent : undefined}
                     detailHref={detailHref(p.name, p)}
                     actions={save(p)}
@@ -347,17 +367,23 @@ async function NearTab({
               ))}
             </ol>
             {list!.pages > 1 && (
-              <nav aria-label="쪽" className="flex flex-wrap justify-center gap-1" data-near-pages>
-                {Array.from({ length: list!.pages }, (_, i) => i + 1).map((n) => (
-                  <Link
-                    key={n}
-                    href={href({ p: n })}
-                    aria-current={n === list!.page ? "page" : undefined}
-                    className={`inline-flex size-9 items-center justify-center rounded-lg text-sm ${n === list!.page ? "bg-ink font-bold text-surface" : "hover:bg-bg"}`}
-                  >
-                    {n}
-                  </Link>
-                ))}
+              <nav
+                aria-label="쪽"
+                className="flex flex-wrap justify-center gap-1"
+                data-near-pages
+              >
+                {Array.from({ length: list!.pages }, (_, i) => i + 1).map(
+                  (n) => (
+                    <Link
+                      key={n}
+                      href={href({ p: n })}
+                      aria-current={n === list!.page ? "page" : undefined}
+                      className={`inline-flex size-9 items-center justify-center rounded-lg text-sm ${n === list!.page ? "bg-ink font-bold text-surface" : "hover:bg-bg"}`}
+                    >
+                      {n}
+                    </Link>
+                  ),
+                )}
               </nav>
             )}
           </>
@@ -367,27 +393,47 @@ async function NearTab({
 }
 
 async function RegionTab({
-  region,
+  region: pickedRegion,
   area: rawArea,
+  at,
+  sort,
   kind,
 }: {
   region: string;
   area?: string;
+  at: { lat: number; lng: number } | null;
+  sort: RegionSort;
   kind: FoodKindFilter;
 }) {
   if (!naverFoodEnabled()) return <Notice>{FOOD_MESSAGES.off}</Notice>;
-  const area = isFoodArea(region, rawArea) ? rawArea : null;
-  const place = area ?? region;
+  // 📍 내 동네: 위치가 있으면 그 법정동으로 (도시 칩은 그 도시에 불을 켠다)
+  const mine = at ? await myDong(at) : null;
+  const region = mine && isFoodRegion(mine.city) ? mine.city : pickedRegion;
+  const area = mine ? null : isFoodArea(region, rawArea) ? rawArea : null;
+  const place = mine?.dong ?? area ?? region;
   const result = await regionHot(place);
   const list =
     result.status === "ok"
-      ? result.value
-          .filter((p) => kind === "all" || p.kind === kind)
-          .slice(0, FOOD_REGION_TOP)
+      ? sortRegion(
+          result.value.filter((p) => kind === "all" || p.kind === kind),
+          sort,
+        ).slice(0, FOOD_REGION_TOP)
       : [];
   const save = await saveButtons(list);
-  const href = (r: string, k: FoodKindFilter, a: string | null = null) =>
-    `/food?tab=region&region=${encodeURIComponent(r)}${a ? `&area=${encodeURIComponent(a)}` : ""}${k === "all" ? "" : `&kind=${k}`}`;
+  const tail = (k: FoodKindFilter, o: RegionSort) =>
+    `${k === "all" ? "" : `&kind=${k}`}${o === "best" ? "" : `&sort=${o}`}`;
+  const href = (
+    r: string,
+    k: FoodKindFilter,
+    a: string | null = null,
+    o: RegionSort = sort,
+  ) =>
+    `/food?tab=region&region=${encodeURIComponent(r)}${a ? `&area=${encodeURIComponent(a)}` : ""}${tail(k, o)}`;
+  // 분류·정렬을 바꿀 때는 지금 보고 있는 곳(내 동네 / 도시·동네)을 그대로 둔다
+  const hereHref = (k: FoodKindFilter, o: RegionSort) =>
+    mine && at
+      ? `/food?tab=region&lat=${at.lat}&lng=${at.lng}${tail(k, o)}`
+      : href(region, k, area, o);
   return (
     <div className="mt-4 space-y-3">
       <nav aria-label="지역" className="flex flex-wrap gap-1.5">
@@ -402,13 +448,23 @@ async function RegionTab({
           </Link>
         ))}
       </nav>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {kakaoEnabled() && (
+          <MyAreaButton kind={kind} current={mine?.dong ?? null} />
+        )}
+        {at && !mine && (
+          <span className="text-sm text-ink-soft">
+            동네 이름을 못 찾았어요. 아래에서 골라 주세요.
+          </span>
+        )}
+      </div>
       {isFoodRegion(region) && (
         <Chips
           label="동네"
           items={[null, ...FOOD_AREAS[region]].map((a) => ({
             href: href(region, kind, a),
             text: a ? `📍 ${a}` : `${region} 전체`,
-            on: a === area,
+            on: !mine && a === area,
             data: `area-${a ?? "all"}`,
           }))}
         />
@@ -416,19 +472,32 @@ async function RegionTab({
       <Chips
         label="분류"
         items={FOOD_KINDS.map((k) => ({
-          href: href(region, k.key, area),
+          href: hereHref(k.key, sort),
           text: `${k.icon} ${k.label}`,
           on: k.key === kind,
           data: `kind-${k.key}`,
         }))}
       />
+      <Chips
+        label="정렬"
+        items={REGION_SORTS.map((o) => ({
+          href: hereHref(kind, o.key),
+          text: o.label,
+          on: o.key === sort,
+          data: `sort-${o.key}`,
+        }))}
+      />
       <p className="text-sm text-ink-soft">
         {place}에서 후기가 많은 식당·카페를 모아{" "}
         <strong className="text-ink">
-          최근 한 달 진짜 후기 수와 네이버 검색 관심도
+          {sort === "rising"
+            ? "요즘 2주 네이버 검색이 그 전보다 많이 늘어난 순"
+            : sort === "reviews"
+              ? "최근 한 달 진짜 후기가 많은 순"
+              : "최근 한 달 진짜 후기 수와 네이버 검색 관심도를 반씩 섞은 순"}
         </strong>
-        를 반씩 섞은 순으로 보여 줘요. 백화점·쇼핑몰·큰 체인점은 빼고,
-        체험단·협찬 글과 가게 이야기가 아닌 글은 세지 않아요.
+        으로 보여 줘요. 백화점·쇼핑몰·큰 체인점은 빼고, 체험단·협찬 글과 가게
+        이야기가 아닌 글은 세지 않아요.
       </p>
       {result.status !== "ok" ? (
         <Notice>{failText(result)}</Notice>
@@ -641,13 +710,26 @@ async function PlaceDetailView({
             </p>
             <ReviewCards reviews={d.reviews.value} />
             {d.hiddenSample.length > 0 && (
-              <details className="mt-3 rounded-lg bg-bg px-3 py-2 text-sm" data-hidden-reviews>
-                <summary className="cursor-pointer text-ink-soft">뺀 글 {d.reviewHidden}편 중 {d.hiddenSample.length}편 보기 (왜 뺐는지)</summary>
+              <details
+                className="mt-3 rounded-lg bg-bg px-3 py-2 text-sm"
+                data-hidden-reviews
+              >
+                <summary className="cursor-pointer text-ink-soft">
+                  뺀 글 {d.reviewHidden}편 중 {d.hiddenSample.length}편 보기 (왜
+                  뺐는지)
+                </summary>
                 <ul className="mt-2 space-y-1">
                   {d.hiddenSample.map((h) => (
                     <li key={h.url} className="flex items-center gap-2">
-                      <span className="shrink-0 rounded-full border border-line px-1.5 text-xs text-ink-soft">{VERDICT_LABELS[h.reason]}</span>
-                      <a href={h.url} target="_blank" rel="noopener noreferrer nofollow" className="min-w-0 truncate hover:underline">
+                      <span className="shrink-0 rounded-full border border-line px-1.5 text-xs text-ink-soft">
+                        {VERDICT_LABELS[h.reason]}
+                      </span>
+                      <a
+                        href={h.url}
+                        target="_blank"
+                        rel="noopener noreferrer nofollow"
+                        className="min-w-0 truncate hover:underline"
+                      >
                         {h.title}
                       </a>
                     </li>

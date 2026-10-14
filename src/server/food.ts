@@ -3,7 +3,7 @@ import { and, desc, eq, ilike, or } from "drizzle-orm";
 import { db } from "@/db";
 import { blogs, posts, profiles } from "@/db/schema";
 import { likePattern } from "@/lib/blog-search";
-import { countBuzz, interestKeywords, isRegionCandidate, isRising, rankRegion, summarizeInterest, type RankedPlace } from "@/lib/food-quality";
+import { countBuzz, dongFromRegion, interestGrowth, interestKeywords, isRegionCandidate, isRising, rankRegion, summarizeInterest, type RankedPlace } from "@/lib/food-quality";
 import { detectSponsor, pickOgImage, reviewFetchUrl } from "@/lib/food-sponsor";
 import { placeKind, type FoodKind, type FoodKindFilter } from "@/lib/food-kind";
 import { relevantReviews, reviewVerdict, REVIEW_PAGE_MAX, REVIEW_PAGE_SIZE } from "@/lib/food-relevance";
@@ -261,7 +261,7 @@ async function trendSeries(groups: { groupName: string; keywords: string[] }[], 
   return new Map((json.results ?? []).map((r) => [r.title ?? "", (r.data ?? []).map((d) => Number(d.ratio) || 0)]));
 }
 
-async function searchInterest(region: string, places: FoodPlace[]): Promise<Map<string, { value: number; rising: boolean }> | null> {
+async function searchInterest(region: string, places: FoodPlace[]): Promise<Map<string, { value: number; rising: boolean; growth: number | null }> | null> {
   if (!naverFoodEnabled() || places.length === 0) return null;
   const today = todayKST();
   const anchor = { groupName: "__anchor", keywords: [`${region} 맛집`] };
@@ -276,7 +276,7 @@ async function searchInterest(region: string, places: FoodPlace[]): Promise<Map<
           const base = summarizeInterest(series.get("__anchor") ?? []).average || 1;
           return batch.map((p) => {
             const s = summarizeInterest(series.get(p.id) ?? []);
-            return [p.id, { value: s.average / base, rising: isRising(s) }] as const;
+            return [p.id, { value: s.average / base, rising: isRising(s), growth: interestGrowth(s) }] as const;
           });
         },
         TREND_TTL_MS,
@@ -333,9 +333,16 @@ export function regionHot(region: string): Promise<FoodResult<RankedPlace[]>> {
         kind: placeKind(p.category, p.name),
         interest: interest?.get(p.id)?.value ?? null,
         rising: interest?.get(p.id)?.rising ?? false,
+        growth: interest?.get(p.id)?.growth ?? null,
       })),
     );
   }, "지역 인기 식당");
+}
+
+/** 📍 내 동네: 좌표 → 법정동 이름 (카카오). 위치는 저장하지 않고 동 이름만 하루 기억한다 */
+export function myDong(at: { lat: number; lng: number }): Promise<{ dong: string; city: string } | null> {
+  if (!kakaoEnabled()) return Promise.resolve(null);
+  return remember(`dong|${at.lat},${at.lng}`, async () => dongFromRegion(await kakao("/v2/local/geo/coord2regioncode.json", { x: at.lng, y: at.lat }))).catch(() => null);
 }
 
 /** 🔎 식당 찾기: 카카오(음식점+카페 각 15곳, 분류로 거름), 카카오 열쇠가 없으면 네이버 지역 검색 5곳 */
