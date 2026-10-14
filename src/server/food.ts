@@ -3,6 +3,7 @@ import { and, desc, eq, ilike, or } from "drizzle-orm";
 import { db } from "@/db";
 import { blogs, posts, profiles } from "@/db/schema";
 import { likePattern } from "@/lib/blog-search";
+import { detectSponsor, pickOgImage, reviewFetchUrl } from "@/lib/food-sponsor";
 import { todayKST } from "@/lib/kst";
 import {
   FOOD_RADIUS_M,
@@ -29,6 +30,8 @@ const NAVER = () => process.env.FOOD_NAVER_BASE ?? "https://naverapihub.apigw.nt
 const TTL_MS = 6 * 3_600_000;
 const FAIL_TTL_MS = 60_000;
 const TIMEOUT_MS = 5_000;
+const PAGE_TTL_MS = 24 * 3_600_000;
+const PAGE_MAX_BYTES = 1_500_000;
 // 지역 인기 후보를 모으는 검색어 (네이버 지역 검색은 한 번에 5곳까지라 여러 번 묻는다)
 const REGION_QUERIES = ["맛집", "한식 맛집", "고기 맛집", "일식 맛집", "중식 맛집", "양식 맛집"];
 
@@ -173,6 +176,37 @@ export function searchPlaces(q: string): Promise<FoodResult<FoodPlace[]>> {
   return Promise.resolve({ status: "off" });
 }
 
+const pageCache = new Map<string, { at: number; value: Promise<{ image: string | null; sponsor: FoodReview["sponsor"] }> }>();
+
+/** 블로그 글 한 편을 열어 대표 사진과 협찬 표시를 읽는다 (24시간 기억). 못 읽으면 둘 다 null */
+function readReviewPage(url: string): Promise<{ image: string | null; sponsor: FoodReview["sponsor"] }> {
+  const target = reviewFetchUrl(url);
+  if (!target) return Promise.resolve({ image: null, sponsor: null });
+  const hit = pageCache.get(target);
+  if (hit && Date.now() - hit.at < PAGE_TTL_MS) return hit.value;
+  const value = (async () => {
+    // 시험은 FOOD_PAGE_BASE로 가짜 서버를 가리킨다
+    const res = await fetch(process.env.FOOD_PAGE_BASE ? `${process.env.FOOD_PAGE_BASE}/page?u=${encodeURIComponent(target)}` : target, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; BlogvilleBot/1.0; +https://unqiuepcg.java21.net)", Accept: "text/html" },
+      redirect: "follow",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      cache: "no-store",
+    });
+    // 다른 사이트로 넘어가면 읽지 않는다
+    if (!res.ok || (!process.env.FOOD_PAGE_BASE && !reviewFetchUrl(res.url || target))) return { image: null, sponsor: null };
+    const buf = await res.arrayBuffer();
+    const html = new TextDecoder().decode(buf.byteLength > PAGE_MAX_BYTES ? buf.slice(0, PAGE_MAX_BYTES) : buf);
+    return { image: pickOgImage(html), sponsor: detectSponsor(html) };
+  })().catch(() => ({ image: null, sponsor: null }) as const);
+  pageCache.set(target, { at: Date.now(), value });
+  if (pageCache.size > 3_000) for (const [k, v] of pageCache) if (Date.now() - v.at >= PAGE_TTL_MS) pageCache.delete(k);
+  return value;
+}
+
+function enrichReviews(list: FoodReview[]): Promise<FoodReview[]> {
+  return mapLimit(list, 4, async (r) => ({ ...r, ...(await readReviewPage(r.url)) }));
+}
+
 export type PlaceDetail = {
   place: FoodPlace;
   reviews: FoodResult<FoodReview[]>;
@@ -184,7 +218,12 @@ export type PlaceDetail = {
 export async function placeDetail(place: FoodPlace): Promise<PlaceDetail> {
   const reviews: FoodResult<FoodReview[]> = naverFoodEnabled()
     ? await settle(
-        () => remember(`reviews|${reviewQuery(place)}`, async () => parseReviews(await naver("/search/v1/blog", { query: reviewQuery(place), display: 10, sort: "sim" }))),
+        async () =>
+          enrichReviews(
+            await remember(`reviews|${reviewQuery(place)}`, async () =>
+              parseReviews(await naver("/search/v1/blog", { query: reviewQuery(place), display: 10, sort: "sim" })),
+            ),
+          ),
         "블로그 후기",
       )
     : { status: "off" };

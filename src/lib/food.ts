@@ -21,6 +21,8 @@ export type FoodReview = {
   url: string;
   blogger: string;
   date: string; // YYYY-MM-DD
+  image?: string | null; // 글 대표 사진 (og:image)
+  sponsor?: "sponsored" | "self" | null; // 협찬 표시 / 내돈내산 / 모름
 };
 
 export const FOOD_TABS = [
