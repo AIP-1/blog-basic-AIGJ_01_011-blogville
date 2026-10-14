@@ -2,33 +2,83 @@ import Link from "next/link";
 import { BlogCoverForm } from "@/components/settings/BlogCoverForm";
 import { StockManager } from "@/components/settings/StockManager";
 import { WidgetManager } from "@/components/settings/WidgetManager";
+import { TagTrend } from "@/components/settings/TagTrend";
+import { getMyTagTrend } from "@/server/tag-trend";
+import { trendEnabled } from "@/server/keyword-trend";
+import { Suspense } from "react";
 import { layoutOf } from "@/lib/widgets";
 import { listBlogStocks } from "@/server/stocks";
 import { CategoryManager } from "@/components/settings/CategoryManager";
 import { VisitChart } from "@/components/settings/VisitChart";
-import { AccentForm, BlogInfoForm, ListStyleForm, SlugForm } from "@/components/settings/SettingsForms";
+import {
+  AccentForm,
+  BlogInfoForm,
+  ListStyleForm,
+  SlugForm,
+} from "@/components/settings/SettingsForms";
 import { getCategoryTree } from "@/server/category";
 import { getMyBlog, requireMember } from "@/server/dal";
-import { getBlogVisitDays, getBlogVisitStats, getPopularPosts, getReferrerStats } from "@/server/stats";
+import {
+  getBlogVisitDays,
+  getBlogVisitStats,
+  getPopularPosts,
+  getReferrerStats,
+} from "@/server/stats";
 import { PopularPosts, ReferrerList } from "@/components/settings/BlogInsights";
 import { EXPORT_MESSAGES } from "@/lib/export";
+import { todayKST } from "@/lib/kst";
 
 export const metadata = { title: "블로그 관리 | Blogville" };
 
-function Card({ id, title, children }: { id?: string; title: string; children: React.ReactNode }) {
+function Card({
+  id,
+  title,
+  children,
+}: {
+  id?: string;
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
-    <section id={id} className="scroll-mt-20 rounded-2xl border border-line bg-surface p-5">
+    <section
+      id={id}
+      className="scroll-mt-20 rounded-2xl border border-line bg-surface p-5"
+    >
       <h2 className="mb-4 text-lg font-bold">{title}</h2>
       {children}
     </section>
   );
 }
 
-export default async function BlogSettingsPage({ searchParams }: PageProps<"/settings/blog">) {
+/** 네이버를 기다리는 동안 나머지 블로그 관리 화면을 막지 않게 따로 그린다 */
+async function TagTrendSection({
+  blogId,
+  slug,
+}: {
+  blogId: number;
+  slug: string;
+}) {
+  const { tags, trend } = await getMyTagTrend(blogId);
+  return (
+    <TagTrend
+      slug={slug}
+      tags={tags}
+      trend={trend}
+      thisMonth={Number(todayKST().slice(5, 7))}
+    />
+  );
+}
+
+export default async function BlogSettingsPage({
+  searchParams,
+}: PageProps<"/settings/blog">) {
   const member = await requireMember();
   const query = await searchParams;
   // 내보내기를 10분 안에 다시 누르면 라우트 핸들러가 ?export=wait&min=N으로 돌려보낸다
-  const waitMin = query.export === "wait" ? Math.min(10, Math.max(1, Number(query.min) || 10)) : null;
+  const waitMin =
+    query.export === "wait"
+      ? Math.min(10, Math.max(1, Number(query.min) || 10))
+      : null;
   const blog = await getMyBlog(member.userId);
   const [tree, stats, days, referrers, popular, stocks] = await Promise.all([
     getCategoryTree(blog.id, true),
@@ -66,6 +116,19 @@ export default async function BlogSettingsPage({ searchParams }: PageProps<"/set
       <Card id="popular" title="🏆 인기 글">
         <PopularPosts slug={blog.slug} posts={popular} />
       </Card>
+      {trendEnabled() && (
+        <Card id="tag-trend" title="📊 내 태그 인기 흐름">
+          <Suspense
+            fallback={
+              <p className="text-sm text-ink-soft">
+                네이버에서 검색 흐름을 받는 중…
+              </p>
+            }
+          >
+            <TagTrendSection blogId={blog.id} slug={blog.slug} />
+          </Suspense>
+        </Card>
+      )}
       <Card title="블로그 정보">
         <BlogInfoForm title={blog.title} intro={blog.intro} />
       </Card>
@@ -92,7 +155,9 @@ export default async function BlogSettingsPage({ searchParams }: PageProps<"/set
       </Card>
       <Card id="export" title="📦 내보내기">
         <p className="mb-3 text-sm text-ink-soft">
-          글(비공개·예약 글 포함)·사진과 파일·카테고리·댓글·방명록을 .zip 파일 하나로 내려받아요. 압축을 풀면 브라우저로 글을 읽을 수 있고, Markdown 파일로 다른 곳에 옮길 수도 있어요.
+          글(비공개·예약 글 포함)·사진과 파일·카테고리·댓글·방명록을 .zip 파일
+          하나로 내려받아요. 압축을 풀면 브라우저로 글을 읽을 수 있고, Markdown
+          파일로 다른 곳에 옮길 수도 있어요.
         </p>
         {waitMin !== null && (
           <p role="alert" className="form-error mb-3">
@@ -103,7 +168,10 @@ export default async function BlogSettingsPage({ searchParams }: PageProps<"/set
         <a href={`/settings/export?blog=${blog.slug}`} className="btn">
           내 블로그 내려받기 (.zip)
         </a>
-        <p className="mt-2 text-xs text-ink-soft">10분에 한 번 내려받을 수 있어요. 글과 첨부가 많으면 시간이 조금 걸려요.</p>
+        <p className="mt-2 text-xs text-ink-soft">
+          10분에 한 번 내려받을 수 있어요. 글과 첨부가 많으면 시간이 조금
+          걸려요.
+        </p>
       </Card>
     </div>
   );

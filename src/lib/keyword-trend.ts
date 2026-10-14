@@ -121,3 +121,38 @@ export function bestKeyword(summary: TrendSummary[]): string | null {
   const top = [...summary].sort((a, b) => b.average - a.average)[0];
   return top && top.average > 0 ? top.keyword : null;
 }
+
+/** 1년 흐름에서 가장 많이 찾은 달 (1~12). 자료가 없거나 모두 0이면 null */
+export function peakMonth(points: { period: string; ratio: number }[]): number | null {
+  const byMonth = new Map<number, number[]>();
+  for (const p of points) {
+    const m = Number(p.period.slice(5, 7));
+    if (!m) continue;
+    byMonth.set(m, [...(byMonth.get(m) ?? []), p.ratio]);
+  }
+  let best: number | null = null;
+  let bestAvg = 0;
+  for (const [m, xs] of byMonth) {
+    const a = xs.reduce((s, v) => s + v, 0) / xs.length;
+    if (a > bestAvg) [best, bestAvg] = [m, a];
+  }
+  return best;
+}
+
+/** 내 태그 글감 알림: 가장 많이 찾는 달이 이번 달이면 "지금", 다음 달이면 "곧". 그 밖은 null */
+export function seasonHint(peak: number | null, thisMonth: number): "now" | "soon" | null {
+  if (peak === null) return null;
+  if (peak === thisMonth) return "now";
+  if (peak === (thisMonth % 12) + 1) return "soon";
+  return null;
+}
+
+/** 요즘 흐름: 마지막 n개 평균 vs 그 앞 n개 평균 (1년 주 단위면 최근 4주 vs 그 전 4주). 20% 넘게 달라야 오름·내림 */
+export function recentChange(points: { ratio: number }[], n = 4): { change: "up" | "down" | "flat"; changePct: number | null } {
+  const avg = (xs: { ratio: number }[]) => (xs.length ? xs.reduce((a, b) => a + b.ratio, 0) / xs.length : 0);
+  const last = avg(points.slice(-n));
+  const before = avg(points.slice(-2 * n, -n));
+  const changePct = before > 0 ? Math.round(((last - before) / before) * 100) : null;
+  const change = changePct === null ? (last > 0 ? "up" : "flat") : changePct > 20 ? "up" : changePct < -20 ? "down" : "flat";
+  return { change, changePct };
+}
