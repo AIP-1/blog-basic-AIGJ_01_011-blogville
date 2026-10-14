@@ -99,6 +99,19 @@ async function naverAdapter(key: string, box: HTMLElement, start: LL, onAuthFail
   const { maps } = naver;
   const ll = (p: LL) => new maps.LatLng(p.lat, p.lng);
   const map = new maps.Map(box, { center: ll(start), zoom: 16, zoomControl: true, zoomControlOptions: { position: maps.Position.RIGHT_CENTER } });
+  // 인증이 통과해야 "init"이 온다. 열쇠·주소가 틀리면 authFailure도 init도 안 오고 "인증 실패" 그림만 깔리는 때가 있어 6초 안에 안 오면 실패로 본다
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("naver init timeout")), 6_000);
+    window.navermap_authFailure = () => {
+      clearTimeout(timer);
+      onAuthFail();
+      reject(new Error("naver auth"));
+    };
+    maps.Event.once(map, "init", () => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
   const info = new maps.InfoWindow({ content: "", borderWidth: 0, backgroundColor: "transparent", disableAnchor: true, pixelOffset: new maps.Point(0, -8) });
   return {
     add(at, el, z, onClick) {
