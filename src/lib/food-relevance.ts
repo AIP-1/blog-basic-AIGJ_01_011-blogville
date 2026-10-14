@@ -19,7 +19,9 @@ export function areaWords(address: string): string[] {
     .filter((w) => /[가-힣]/.test(w) && !/^\d/.test(w))
     .map((w) => w.replace(/\d+.*$/, ""))
     .filter((w) => w.length >= 2)
-    .slice(0, 3);
+    .slice(0, 3)
+    // "목포시"·"해남군"은 블로그에 "목포"·"해남"으로 많이 쓴다
+    .flatMap((w) => (/^[가-힣]{2,}(시|군)$/.test(w) ? [w, w.slice(0, -1)] : [w]));
   // 블로그는 "광주 ○○ 맛집"처럼 도시 이름을 많이 쓴다 (짧은 도시 이름일 때만)
   const city = parts[0] ?? "";
   return /^[가-힣]{2}$/.test(city) ? [...words, city] : words;
