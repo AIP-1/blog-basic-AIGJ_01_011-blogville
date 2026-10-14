@@ -1,95 +1,162 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import type { FoodPlace } from "@/lib/food";
 
-type Pin = { id: string; name: string; lat: number; lng: number; hot?: boolean };
+// 🗺 맛집 지도 (카카오맵 JavaScript SDK). 열쇠(KAKAO_JS_KEY)는 원래 웹페이지에 드러나는 키라 서버가 화면에 넘겨 주고,
+// 카카오 개발자 센터의 [플랫폼 > Web 사이트 도메인]으로 우리 주소에서만 쓰이게 막는다.
+// 내 위치는 파란 점, 식당은 번호 핀. 핀을 누르면 말풍선, 목록의 [🗺 지도에서 보기]를 누르면 그 식당으로 옮긴다.
 
-type KakaoMaps = {
-  load: (cb: () => void) => void;
-  LatLng: new (lat: number, lng: number) => unknown;
-  LatLngBounds: new () => { extend: (p: unknown) => void };
-  Map: new (el: HTMLElement, opts: { center: unknown; level: number }) => { setBounds: (b: unknown) => void; relayout: () => void };
-  Marker: new (opts: { map: unknown; position: unknown; title?: string }) => unknown;
-  CustomOverlay: new (opts: { map: unknown; position: unknown; content: HTMLElement | string; yAnchor?: number; zIndex?: number }) => unknown;
-  Circle: new (opts: Record<string, unknown>) => unknown;
-  event: { addListener: (target: unknown, type: string, cb: () => void) => void };
-};
-
+/* eslint-disable @typescript-eslint/no-explicit-any -- 카카오 SDK는 타입이 없다 */
 declare global {
   interface Window {
-    kakao?: { maps: KakaoMaps };
+    kakao?: any;
   }
 }
 
-let loading: Promise<KakaoMaps> | null = null;
+export const FOOD_MAP_FOCUS = "food-map-focus";
 
-/** 카카오 지도 SDK를 한 번만 불러온다 (autoload=false → kakao.maps.load) */
-function loadKakao(jsKey: string): Promise<KakaoMaps> {
-  if (window.kakao?.maps?.LatLng) return Promise.resolve(window.kakao.maps);
-  loading ??= new Promise<KakaoMaps>((resolve, reject) => {
+let sdk: Promise<any> | null = null;
+function loadKakao(key: string): Promise<any> {
+  if (sdk) return sdk;
+  sdk = new Promise((resolve, reject) => {
     const s = document.createElement("script");
-    s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(jsKey)}&autoload=false`;
+    s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(key)}&autoload=false`;
     s.async = true;
-    s.onload = () => (window.kakao ? window.kakao.maps.load(() => resolve(window.kakao!.maps)) : reject(new Error("kakao")));
-    s.onerror = () => {
-      loading = null;
-      reject(new Error("kakao sdk"));
-    };
+    s.onload = () => (window.kakao?.maps ? window.kakao.maps.load(() => resolve(window.kakao)) : reject(new Error("kakao")));
+    s.onerror = () => reject(new Error("kakao script"));
     document.head.appendChild(s);
+  }).catch((e) => {
+    sdk = null;
+    throw e;
   });
-  return loading;
+  return sdk;
 }
 
-function label(text: string, hot: boolean): HTMLElement {
-  const el = document.createElement("div");
-  el.textContent = (hot ? "🔥 " : "") + text;
-  el.style.cssText =
-    "padding:2px 8px;border-radius:999px;background:#fff;color:#1f2937;border:1px solid #d1d5db;font-size:12px;font-weight:600;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.15);transform:translateY(-44px)";
-  return el;
-}
+const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
-/**
- * 🗺 카카오 지도: 내 위치(파란 점, 반경 원)와 식당 핀. 핀을 누르면 아래 식당 카드로 내려간다.
- * JavaScript 키(KAKAO_JS_KEY)는 등록한 사이트 도메인에서만 동작한다.
- */
-export function FoodMap({ jsKey, me, radius, pins }: { jsKey: string; me?: { lat: number; lng: number } | null; radius?: number; pins: Pin[] }) {
+type Props = {
+  jsKey: string;
+  places: FoodPlace[];
+  /** 내 위치 (파란 점). 없으면 식당들이 다 보이게 */
+  me?: { lat: number; lng: number } | null;
+  /** 지도를 옮긴 뒤 [이 지역에서 다시 찾기] (내 주변 탭) */
+  researchSort?: "distance" | "buzz";
+  className?: string;
+};
+
+export function FoodMap({ jsKey, places, me = null, researchSort, className = "" }: Props) {
   const box = useRef<HTMLDivElement>(null);
-  const [failed, setFailed] = useState(false);
+  const api = useRef<{ map: any; kakao: any; overlays: any[]; info: any } | null>(null);
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [moved, setMoved] = useState(false);
+  const router = useRouter();
+  // 번호는 목록 순서 그대로 (좌표가 없는 곳은 핀만 빠진다)
+  const pins = places.map((p, i) => ({ ...p, n: i + 1 })).filter((p) => p.lat !== null && p.lng !== null);
+  const key = pins.map((p) => p.id).join(",") + (me ? `|${me.lat},${me.lng}` : "");
 
   useEffect(() => {
-    let gone = false;
+    let alive = true;
     loadKakao(jsKey)
-      .then((maps) => {
-        if (gone || !box.current) return;
-        box.current.innerHTML = "";
+      .then((kakao) => {
+        if (!alive || !box.current) return;
+        const { maps } = kakao;
         const center = me ? new maps.LatLng(me.lat, me.lng) : pins[0] ? new maps.LatLng(pins[0].lat, pins[0].lng) : new maps.LatLng(37.5665, 126.978);
-        const map = new maps.Map(box.current, { center, level: 5 });
+        const map = new maps.Map(box.current, { center, level: 4 });
+        map.addControl(new maps.ZoomControl(), maps.ControlPosition.RIGHT);
+        const overlays: any[] = [];
+        const info = new maps.CustomOverlay({ yAnchor: 1.45, zIndex: 20 });
         const bounds = new maps.LatLngBounds();
         if (me) {
           const dot = document.createElement("div");
+          dot.className = "food-map-me";
           dot.title = "내 위치";
-          dot.style.cssText = "width:16px;height:16px;border-radius:50%;background:#2a78d6;border:3px solid #fff;box-shadow:0 0 0 2px rgba(42,120,214,.35)";
-          new maps.CustomOverlay({ map, position: center, content: dot, yAnchor: 0.5, zIndex: 3 });
-          if (radius) new maps.Circle({ map, center, radius, strokeWeight: 1, strokeColor: "#2a78d6", strokeOpacity: 0.6, fillColor: "#2a78d6", fillOpacity: 0.06 });
+          overlays.push(new maps.CustomOverlay({ position: center, content: dot, zIndex: 10, map }));
           bounds.extend(center);
         }
-        for (const p of pins) {
+        pins.forEach((p, i) => {
           const pos = new maps.LatLng(p.lat, p.lng);
-          const marker = new maps.Marker({ map, position: pos, title: p.name });
-          new maps.CustomOverlay({ map, position: pos, content: label(p.name, !!p.hot), yAnchor: 0, zIndex: 2 });
-          maps.event.addListener(marker, "click", () => {
-            document.getElementById(`place-${p.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-          });
           bounds.extend(pos);
+          const pin = document.createElement("button");
+          pin.type = "button";
+          pin.className = "food-map-pin";
+          pin.textContent = String(p.n);
+          pin.setAttribute("aria-label", `${p.n}. ${p.name}`);
+          pin.dataset.foodPin = p.id;
+          pin.onclick = () => open(i);
+          overlays.push(new maps.CustomOverlay({ position: pos, content: pin, yAnchor: 1, zIndex: 5, map }));
+        });
+        function open(i: number) {
+          const p = pins[i];
+          const el = document.createElement("div");
+          el.className = "food-map-info";
+          el.innerHTML = `<strong>${p.n}. ${esc(p.name)}</strong><span>${esc(p.category)}${p.distance !== null ? ` · ${p.distance >= 1000 ? (p.distance / 1000).toFixed(1) + "km" : p.distance + "m"}` : ""}</span><a href="${esc(p.mapUrl)}" target="_blank" rel="noopener noreferrer">카카오맵에서 보기 ›</a>`;
+          info.setContent(el);
+          info.setPosition(new maps.LatLng(p.lat, p.lng));
+          info.setMap(map);
+          map.panTo(new maps.LatLng(p.lat, p.lng));
         }
-        if (pins.length > 0) map.setBounds(bounds);
+        if (pins.length + (me ? 1 : 0) > 1) map.setBounds(bounds, 40, 40, 40, 40);
+        maps.event.addListener(map, "dragend", () => setMoved(true));
+        maps.event.addListener(map, "click", () => info.setMap(null));
+        api.current = { map, kakao, overlays, info };
+        (api.current as any).open = open;
+        setState("ready");
       })
-      .catch(() => !gone && setFailed(true));
+      .catch(() => alive && setState("error"));
     return () => {
-      gone = true;
+      alive = false;
+      api.current?.overlays.forEach((o) => o.setMap(null));
+      api.current?.info.setMap(null);
+      api.current = null;
     };
-  }, [jsKey, me, radius, pins]);
+    // 장소·내 위치가 바뀔 때만 다시 그린다
+  }, [jsKey, key]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (failed) return <p className="rounded-xl border border-dashed border-line p-4 text-center text-sm text-ink-soft">지도를 불러오지 못했어요. 아래 목록으로 봐 주세요.</p>;
-  return <div ref={box} role="img" aria-label="식당 지도" className="h-72 w-full overflow-hidden rounded-xl border border-line bg-bg sm:h-96" data-food-map />;
+  // 목록의 [🗺 지도에서 보기]
+  useEffect(() => {
+    const onFocus = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      const i = pins.findIndex((p) => p.id === id);
+      if (i < 0 || !api.current) return;
+      (api.current as any).open(i);
+      box.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+    window.addEventListener(FOOD_MAP_FOCUS, onFocus);
+    return () => window.removeEventListener(FOOD_MAP_FOCUS, onFocus);
+  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function researchHere() {
+    const c = api.current?.map.getCenter();
+    if (!c) return;
+    router.push(`/food?tab=near&lat=${c.getLat().toFixed(3)}&lng=${c.getLng().toFixed(3)}${researchSort === "buzz" ? "&sort=buzz" : ""}`);
+    setMoved(false);
+  }
+
+  return (
+    <div className={`relative overflow-hidden rounded-2xl border border-line ${className}`} data-food-map={state}>
+      <div ref={box} className="h-72 w-full bg-bg sm:h-96" role="application" aria-label="맛집 지도" />
+      {state === "loading" && <p className="absolute inset-0 flex items-center justify-center text-sm text-ink-soft">지도를 불러오는 중…</p>}
+      {state === "error" && (
+        <p className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-ink-soft">
+          지도를 불러오지 못했어요 (카카오 JavaScript 키·사이트 도메인 설정을 확인해 주세요). 아래 목록은 그대로 볼 수 있어요.
+        </p>
+      )}
+      {state === "ready" && researchSort && moved && (
+        <button type="button" onClick={researchHere} className="btn btn-primary absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-full px-4 text-sm shadow-lg" data-food-research>
+          🔄 이 지역에서 다시 찾기
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** 목록 카드 옆 [🗺 지도에서 보기]: 지도가 그 식당으로 옮겨 말풍선을 연다 */
+export function FocusOnMapButton({ id }: { id: string }) {
+  return (
+    <button type="button" className="btn btn-ghost px-2 text-sm" onClick={() => window.dispatchEvent(new CustomEvent(FOOD_MAP_FOCUS, { detail: id }))} data-food-focus={id}>
+      🗺 지도에서 보기
+    </button>
+  );
 }

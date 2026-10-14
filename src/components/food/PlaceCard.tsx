@@ -17,7 +17,7 @@ export function PlaceCard({
 }) {
   const hot = recent != null && recent >= FOOD_HOT;
   return (
-    <article id={`place-${place.id}`} className="flex scroll-mt-20 gap-3 rounded-xl border border-line bg-surface p-4" data-food-place={place.id}>
+    <article className="flex gap-3 rounded-xl border border-line bg-surface p-4" data-food-place={place.id}>
       {rank != null && (
         <span aria-label={`${rank}위`} className={`mt-0.5 w-6 shrink-0 text-center text-lg font-extrabold ${rank <= 3 ? "text-accent" : "text-ink-soft"}`}>
           {rank}

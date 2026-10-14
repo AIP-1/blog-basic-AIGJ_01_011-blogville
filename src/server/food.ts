@@ -44,11 +44,6 @@ export function naverFoodEnabled(): boolean {
   return !!(process.env.NAVER_SEARCH_CLIENT_ID && process.env.NAVER_SEARCH_CLIENT_SECRET);
 }
 
-/** 🗺 지도용 JavaScript 키 (공개돼도 되는 키, 등록한 사이트 도메인에서만 동작). 없으면 지도 없이 목록만 */
-export function kakaoMapKey(): string | null {
-  return process.env.KAKAO_JS_KEY || null;
-}
-
 export function foodEnabled(): boolean {
   return kakaoEnabled() || naverFoodEnabled();
 }
