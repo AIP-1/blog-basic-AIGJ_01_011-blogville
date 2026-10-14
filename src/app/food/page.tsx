@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { NearbyLocator } from "@/components/food/NearbyLocator";
+import { VERDICT_LABELS } from "@/lib/food-relevance";
 import {
   FOOD_KINDS,
   FOOD_RADII,
@@ -633,6 +634,21 @@ async function PlaceDetailView({
                 ` · 이름만 같거나 광고로 보이는 글 ${d.reviewHidden}편은 뺐어요`}
             </p>
             <ReviewCards reviews={d.reviews.value} />
+            {d.hiddenSample.length > 0 && (
+              <details className="mt-3 rounded-lg bg-bg px-3 py-2 text-sm" data-hidden-reviews>
+                <summary className="cursor-pointer text-ink-soft">뺀 글 {d.reviewHidden}편 중 {d.hiddenSample.length}편 보기 (왜 뺐는지)</summary>
+                <ul className="mt-2 space-y-1">
+                  {d.hiddenSample.map((h) => (
+                    <li key={h.url} className="flex items-center gap-2">
+                      <span className="shrink-0 rounded-full border border-line px-1.5 text-xs text-ink-soft">{VERDICT_LABELS[h.reason]}</span>
+                      <a href={h.url} target="_blank" rel="noopener noreferrer nofollow" className="min-w-0 truncate hover:underline">
+                        {h.title}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
             {d.reviewPages > 1 && (
               <nav
                 aria-label="후기 쪽"

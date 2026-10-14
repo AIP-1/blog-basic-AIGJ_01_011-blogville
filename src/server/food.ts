@@ -6,7 +6,7 @@ import { likePattern } from "@/lib/blog-search";
 import { countBuzz, interestKeywords, isRegionCandidate, isRising, rankRegion, summarizeInterest, type RankedPlace } from "@/lib/food-quality";
 import { detectSponsor, pickOgImage, reviewFetchUrl } from "@/lib/food-sponsor";
 import { placeKind, type FoodKind, type FoodKindFilter } from "@/lib/food-kind";
-import { relevantReviews, REVIEW_PAGE_MAX, REVIEW_PAGE_SIZE } from "@/lib/food-relevance";
+import { relevantReviews, reviewVerdict, REVIEW_PAGE_MAX, REVIEW_PAGE_SIZE } from "@/lib/food-relevance";
 import { todayKST } from "@/lib/kst";
 import {
   FOOD_RADIUS_M,
@@ -380,6 +380,8 @@ export type PlaceDetail = {
   reviewPages: number;
   /** 이름만 같고 다른 이야기라 뺀 글 수 */
   reviewHidden: number;
+  /** 뺀 글 몇 편과 그 까닭 (확인용, 많아야 10편) */
+  hiddenSample: { title: string; url: string; reason: "spam" | "no-name" | "off-topic" }[];
   recent: number;
   local: { id: number; title: string; slug: string; nickname: string; createdAt: Date }[];
 };
@@ -388,6 +390,7 @@ export type PlaceDetail = {
 export async function placeDetail(place: FoodPlace, page = 1): Promise<PlaceDetail> {
   let reviewTotal = 0;
   let reviewHidden = 0;
+  let hiddenSample: PlaceDetail["hiddenSample"] = [];
   let reviewPage = 1;
   let reviewPages = 1;
   const reviews: FoodResult<FoodReview[]> = naverFoodEnabled()
@@ -397,6 +400,10 @@ export async function placeDetail(place: FoodPlace, page = 1): Promise<PlaceDeta
         );
         const kept = relevantReviews(all, place);
         reviewHidden = all.length - kept.length;
+        hiddenSample = all
+          .map((r) => ({ r, v: reviewVerdict(r, place) }))
+          .flatMap(({ r, v }) => (v.keep ? [] : [{ title: r.title, url: r.url, reason: v.reason }]))
+          .slice(0, 10);
         reviewTotal = kept.length;
         reviewPages = Math.max(1, Math.min(REVIEW_PAGE_MAX, Math.ceil(kept.length / REVIEW_PAGE_SIZE)));
         reviewPage = Math.min(Math.max(1, Math.floor(page) || 1), reviewPages);
@@ -404,7 +411,7 @@ export async function placeDetail(place: FoodPlace, page = 1): Promise<PlaceDeta
       }, "블로그 후기")
     : { status: "off" };
   const [recent, local] = await Promise.all([recentCount(place), blogvillePosts(place.name)]);
-  return { place, reviews, reviewTotal, reviewPage, reviewPages, reviewHidden, recent, local };
+  return { place, reviews, reviewTotal, reviewPage, reviewPages, reviewHidden, hiddenSample, recent, local };
 }
 
 /** Blogville 공개 글 중 식당 이름이 든 글 (최신 5편) */
