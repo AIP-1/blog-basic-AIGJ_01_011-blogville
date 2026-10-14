@@ -7,7 +7,7 @@
 | Gradle | npm (이 저장소) | 설명 |
 |---|---|---|
 | `build.gradle`의 `dependencies { }` | `package.json`의 `dependencies`·`devDependencies` | 쓰는 라이브러리 목록. `devDependencies`는 개발·시험에만 필요 |
-| `gradle build` (컴파일+검사+테스트+jar) | `npm run verify` | 한 번에 전부 확인. 클라우드 쪽에서 추가 중인 스크립트로, lint → typecheck → test → build를 차례로 돕니다 |
+| `gradle build` (컴파일+검사+테스트+jar) | `npm run verify` | 한 번에 전부 확인. lint → typecheck → 커버리지를 재는 단위 테스트(`test:coverage`) → build를 차례로 돌립니다 |
 | `gradle compileJava` | `npm run typecheck` | 타입 오류 확인 (`tsc --noEmit`) |
 | `gradle check` / Checkstyle | `npm run lint` | 코드 규칙 검사 (ESLint, `eslint.config.mjs`) |
 | `gradle test` (JUnit) | `npm test` | 단위 테스트 (Vitest, `vitest.config.mts`) |
@@ -42,4 +42,4 @@ npm start              # 빌드한 결과를 http://localhost:3000 에서 실행
 1. `npm ls zod`로 의존성이 어떤 버전으로 깔렸는지 봅니다(`gradle dependencies`와 비슷).
 2. `npm outdated`로 새 버전이 나온 라이브러리를 봅니다.
 3. 일부러 타입 오류를 하나 넣고 `npm run typecheck`가 실패하는지 확인한 뒤 되돌립니다.
-4. `npm run verify`가 추가되면 위 네 명령 대신 그것 하나로 돌려 봅니다.
+4. 위 네 명령 대신 `npm run verify` 하나로 돌려 보고, 끝에 나오는 커버리지 요약(Statements·Lines %)을 읽어 봅니다.

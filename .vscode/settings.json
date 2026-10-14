@@ -1,0 +1,8 @@
+{
+  "editor.codeActionsOnSave": { "source.fixAll.eslint": "explicit" },
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "sonarlint.connectedMode.project": {
+    "connectionId": "handsomeguen",
+    "projectKey": "handsomeguen_blogville"
+  }
+}

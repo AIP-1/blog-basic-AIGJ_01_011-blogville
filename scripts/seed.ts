@@ -35,4 +35,9 @@ async function main() {
   console.log("demo / demo1234 회원과 글 20개를 만들었어요. /@demo");
 }
 
-main().finally(() => sql.end());
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exitCode = 1;
+  })
+  .finally(() => sql.end());

@@ -1,3 +1,10 @@
+# 로컬 개발·실습용 도커 구성. 운영 서버의 블루·그린 구성은 deploy/compose.yml이다.
+#
+#   docker compose up -d db                 # PostgreSQL만 (npm run dev와 같이 쓸 때)
+#   docker compose --profile app up --build # 운영과 같은 이미지(Dockerfile)로 앱까지 → http://localhost:8400
+#   docker compose --profile sonar up -d    # SonarQube 품질 검사 서버 → http://localhost:9000 (docs/learning/03-sonar.md)
+#
+# 자세한 설명: docs/learning/04-docker.md
 services:
   db:
     image: postgres:16
@@ -9,5 +16,45 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blog -d blogville"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  app:
+    profiles: [app]
+    build: .
+    image: blogville:local
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # 컨테이너끼리는 서비스 이름(db)으로 찾아간다
+      DATABASE_URL: postgres://blog:blog@db:5432/blogville
+      BETTER_AUTH_URL: http://localhost:8400
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-local-docker-secret-change-me-0123456789}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    ports:
+      - "8400:8400"
+    volumes:
+      - uploads:/app/storage/uploads
+
+  sonarqube:
+    profiles: [sonar]
+    image: sonarqube:community
+    environment:
+      # 실습용이라 디스크 검사(Elasticsearch bootstrap check)를 끈다
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonar-data:/opt/sonarqube/data
+      - sonar-extensions:/opt/sonarqube/extensions
+
 volumes:
   pgdata:
+  uploads:
+  sonar-data:
+  sonar-extensions:
