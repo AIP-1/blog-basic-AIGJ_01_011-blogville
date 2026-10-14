@@ -33,7 +33,7 @@ const FAIL_TTL_MS = 60_000;
 const TIMEOUT_MS = 5_000;
 const PAGE_TTL_MS = 24 * 3_600_000;
 const PAGE_MAX_BYTES = 1_500_000;
-const NEAR_MAX = 30;
+const NEAR_MAX = 200;
 // 지역 인기 후보를 모으는 검색어 (네이버 지역 검색은 한 번에 5곳까지라 여러 번 묻는다).
 // 백화점·체인을 거르고도 열 곳이 넘게 남도록 식사·카페·술집을 고루 묻는다.
 const REGION_QUERIES = ["맛집", "현지인 맛집", "한식 맛집", "고기 맛집", "일식 맛집", "중식 맛집", "양식 맛집", "술집", "카페", "디저트", "빵집", "브런치"];
@@ -152,41 +152,86 @@ async function kakaoPages(path: string, params: Record<string, string | number>,
   return out;
 }
 
-/** 분류마다 카카오에 묻는 방법: 식당은 음식점(FD6), 카페·디저트는 카페(CE7)+베이커리, 술집은 "술집" 키워드 */
-function nearSources(kind: FoodKindFilter, at: { lat: number; lng: number }, radius: number, sort: NearSort) {
-  // 가까운 순은 가까운 곳부터, 인기 순은 반경 안에서 고르게 (카카오 정확도 순) 받아 블로그 글 수로 다시 줄 세운다
-  const base = { x: at.lng, y: at.lat, radius, sort: sort === "distance" ? "distance" : "accuracy" };
-  const cat = (code: string, pages: number) => () => kakaoPages("/v2/local/search/category.json", { ...base, category_group_code: code }, pages);
-  const kw = (query: string, pages: number) => () => kakaoPages("/v2/local/search/keyword.json", { ...base, query, category_group_code: "FD6" }, pages);
-  if (kind === "meal") return [cat("FD6", 3)];
-  if (kind === "cafe") return [cat("CE7", 3), kw("베이커리", 1), kw("디저트", 1)];
-  if (kind === "bar") return [kw("술집", 3), kw("포차", 1)];
-  return [cat("FD6", 3), cat("CE7", 2)];
+/** 반경을 n×n 칸으로 나눈 사각형들 ("왼쪽 아래 경도,위도,오른쪽 위 경도,위도") — 카카오는 한 번에 45곳까지라 넓은 반경은 나눠 묻는다 */
+export function gridRects(at: { lat: number; lng: number }, radius: number, n: number): string[] {
+  const dLat = radius / 111_000;
+  const dLng = radius / (111_000 * Math.cos((at.lat * Math.PI) / 180));
+  const out: string[] = [];
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < n; j++) {
+      const x1 = at.lng - dLng + (2 * dLng * i) / n;
+      const y1 = at.lat - dLat + (2 * dLat * j) / n;
+      out.push(`${x1.toFixed(6)},${y1.toFixed(6)},${(x1 + (2 * dLng) / n).toFixed(6)},${(y1 + (2 * dLat) / n).toFixed(6)}`);
+    }
+  return out;
 }
 
-/** 📍 내 주변: 고른 거리(300m~2km)·분류(식당·카페/디저트·술집) 안의 가게 (가까운 순, 또는 최근 블로그 글 많은 순). 많아야 30곳 */
+/** 두 점 사이 거리 (m) */
+function meters(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const r = 6_371_000;
+  const p1 = (a.lat * Math.PI) / 180;
+  const p2 = (b.lat * Math.PI) / 180;
+  const dl = ((b.lng - a.lng) * Math.PI) / 180;
+  const h = Math.sin((p2 - p1) / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+  return Math.round(2 * r * Math.asin(Math.sqrt(h)));
+}
+
+/** 분류마다 카카오에 묻는 방법: 식당은 음식점(FD6), 카페·디저트는 카페(CE7)+베이커리, 술집은 "술집" 키워드.
+ *  1km 넘게 가까운 순으로 볼 때는 반경을 칸으로 나눠(1km 2×2, 2km 3×3) 칸마다 묻는다 */
+function nearSources(kind: FoodKindFilter, at: { lat: number; lng: number }, radius: number, sort: NearSort) {
+  // 인기 순은 반경 안에서 고르게 (카카오 정확도 순) 받아 블로그 글 수로 다시 줄 세운다
+  const areas: Record<string, string | number>[] =
+    sort === "distance" && radius >= 1000
+      ? gridRects(at, radius, radius >= 2000 ? 3 : 2).map((rect) => ({ x: at.lng, y: at.lat, rect, sort: "distance" }))
+      : [{ x: at.lng, y: at.lat, radius, sort: sort === "distance" ? "distance" : "accuracy" }];
+  const cat = (code: string, pages: number) => areas.map((a) => () => kakaoPages("/v2/local/search/category.json", { ...a, category_group_code: code }, pages));
+  const kw = (query: string, pages: number) => areas.map((a) => () => kakaoPages("/v2/local/search/keyword.json", { ...a, query, category_group_code: "FD6" }, pages));
+  if (kind === "meal") return cat("FD6", 3);
+  if (kind === "cafe") return [...cat("CE7", 3), ...kw("베이커리", 1), ...kw("디저트", 1)];
+  if (kind === "bar") return [...kw("술집", 3), ...kw("포차", 1)];
+  return [...cat("FD6", 3), ...cat("CE7", 2)];
+}
+
+export const NEAR_PAGE_SIZE = 20;
+
+function paged<T>(list: T[], page: number) {
+  const pages = Math.max(1, Math.ceil(list.length / NEAR_PAGE_SIZE));
+  const p = Math.min(Math.max(1, Math.floor(page) || 1), pages);
+  return { items: list.slice((p - 1) * NEAR_PAGE_SIZE, p * NEAR_PAGE_SIZE), total: list.length, page: p, pages };
+}
+
+type NearPlace = BuzzPlace & { kind: FoodKind };
+
+/** 📍 내 주변: 고른 거리(300m~2km)·분류(식당·카페/디저트·술집) 안의 가게 (가까운 순, 또는 최근 블로그 글 많은 순). 20곳씩 쪽 */
 export function nearbyPlaces(
   at: { lat: number; lng: number },
   sort: NearSort,
   radius: number = FOOD_RADIUS_M,
   kind: FoodKindFilter = "all",
-): Promise<FoodResult<(BuzzPlace & { kind: FoodKind })[]>> {
+  page = 1,
+): Promise<FoodResult<{ items: NearPlace[]; total: number; page: number; pages: number }>> {
   if (!kakaoEnabled()) return Promise.resolve({ status: "off" });
   return settle(async () => {
-    const found = await remember(`near2|${at.lat},${at.lng}|${radius}|${kind}|${sort}`, async () => {
-      const lists = await Promise.all(nearSources(kind, at, radius, sort).map((load) => load()));
+    const found = await remember(`near3|${at.lat},${at.lng}|${radius}|${kind}|${sort}`, async () => {
+      const lists = await mapLimit(nearSources(kind, at, radius, sort), 6, (load) => load());
       const seen = new Set<string>();
       return lists
         .flat()
         .filter((p) => !seen.has(p.id) && !!seen.add(p.id))
+        // 카카오가 준 거리(x,y 기준)를 쓰고, 없으면 직접 잰다
+        .map((p) => ({ ...p, distance: p.distance ?? (p.lat !== null && p.lng !== null ? meters(at, { lat: p.lat, lng: p.lng }) : null) }))
         .filter((p) => p.distance === null || p.distance <= radius)
         .map((p) => ({ ...p, kind: placeKind(p.category, p.name) }))
         .filter((p) => kind === "all" || p.kind === kind)
         .sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0))
         .slice(0, NEAR_MAX);
     });
-    const buzz = (await withBuzz(found)) as (BuzzPlace & { kind: FoodKind })[];
-    return (sort === "buzz" ? rankByBuzz(buzz) : buzz) as (BuzzPlace & { kind: FoodKind })[];
+    if (sort === "buzz") {
+      // 인기 순: 후보(많아야 45곳 남짓) 모두의 블로그 글 수를 세어 줄 세운 뒤 쪽을 자른다
+      return paged(rankByBuzz((await withBuzz(found)) as BuzzPlace[]) as NearPlace[], page);
+    }
+    const pg = paged(found, page);
+    return { ...pg, items: (await withBuzz(pg.items)) as NearPlace[] };
   }, "주변 식당");
 }
 

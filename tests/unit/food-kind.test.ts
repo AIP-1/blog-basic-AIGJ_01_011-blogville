@@ -48,3 +48,17 @@ describe("후기 거르기 (isRelevantReview)", () => {
     expect(isRelevantReview(r("스타벅스 금남로 신메뉴", "커피 마심"), place)).toBe(true);
   });
 });
+
+describe("넓은 반경 나누기 (gridRects)", () => {
+  it("n×n 칸, 칸은 반경을 덮는다", async () => {
+    const { gridRects } = await import("@/server/food");
+    const rects = gridRects({ lat: 35.147, lng: 126.915 }, 2000, 3);
+    expect(rects).toHaveLength(9);
+    const [x1, y1] = rects[0].split(",").map(Number);
+    const [, , x2, y2] = rects[8].split(",").map(Number);
+    expect(y1).toBeCloseTo(35.147 - 2000 / 111000, 4);
+    expect(y2).toBeCloseTo(35.147 + 2000 / 111000, 4);
+    expect(x1).toBeLessThan(126.915);
+    expect(x2).toBeGreaterThan(126.915);
+  });
+});
