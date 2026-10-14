@@ -153,10 +153,12 @@ type Props = {
   me?: { lat: number; lng: number } | null;
   /** 지도를 옮긴 뒤 [이 지역에서 다시 찾기] (내 주변 탭) */
   researchSort?: "distance" | "buzz";
+  /** 핀 번호의 첫 번호 (목록 2쪽이면 21) */
+  firstNumber?: number;
   className?: string;
 };
 
-export function FoodMap({ providers, places, me = null, researchSort, className = "" }: Props) {
+export function FoodMap({ providers, places, me = null, researchSort, firstNumber = 1, className = "" }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const api = useRef<{ map: Adapter; open: (i: number) => void } | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -186,7 +188,7 @@ export function FoodMap({ providers, places, me = null, researchSort, className 
   }
   const router = useRouter();
   // 번호는 목록 순서 그대로 (좌표가 없는 곳은 핀만 빠진다)
-  const pins = places.map((p, i) => ({ ...p, n: i + 1 })).filter((p) => p.lat !== null && p.lng !== null) as (FoodPlace & { n: number; lat: number; lng: number })[];
+  const pins = places.map((p, i) => ({ ...p, n: firstNumber + i })).filter((p) => p.lat !== null && p.lng !== null) as (FoodPlace & { n: number; lat: number; lng: number })[];
   const key = pins.map((p) => p.id).join(",") + (me ? `|${me.lat},${me.lng}` : "");
 
   useEffect(() => {
@@ -270,6 +272,7 @@ export function FoodMap({ providers, places, me = null, researchSort, className 
     q.set("tab", "near");
     q.set("lat", c.lat.toFixed(3));
     q.set("lng", c.lng.toFixed(3));
+    q.delete("p");
     if (researchSort === "buzz") q.set("sort", "buzz");
     router.push(`/food?${q}`);
     setMoved(false);
