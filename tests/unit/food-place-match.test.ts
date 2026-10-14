@@ -74,3 +74,13 @@ describe("식당 이름 속 지역 낱말", () => {
     expect(otherRegionTitle("세종한정식 점심 후기", p, ["북구", "우치로", "광주"])).toBe(false);
   });
 });
+
+describe("서울 동네 이름 글", () => {
+  it("광주 식당인데 '신촌 연세대 맛집'은 다른 지역", async () => {
+    const { otherRegionTitle } = await import("@/lib/food-place-match");
+    const { areaWords } = await import("@/lib/food-relevance");
+    const p = { name: "상무초밥", address: "광주 서구 상무중앙로 1" };
+    expect(otherRegionTitle("신촌 연세대 맛집 초밥 상무초밥", p, areaWords(p.address))).toBe(true);
+    expect(otherRegionTitle("건대 맛집 상무초밥", p, areaWords(p.address))).toBe(true);
+  });
+});
