@@ -31,7 +31,8 @@
 | 역할 | 지금 쓰는 것 |
 |---|---|
 | 에디터 안 즉시 검사 | SonarQube for IDE + ESLint |
-| PR마다 자동 검사 | `ci.yml`(lint·typecheck·test·build) + `sonar.yml`(품질 게이트) |
+| PR마다 자동 검사 | `ci.yml`(lint·typecheck·단위 테스트+커버리지·build) + `sonar.yml`(품질 게이트) |
+| 커버리지 최소선 | `ci.yml`의 `npm run test:coverage`가 [vitest.config.mts](../../vitest.config.mts)의 `thresholds`(문장 50·분기 50·함수 45·줄 50%)보다 낮으면 실패합니다. Sonar 열쇠가 없어도 도는 가장 작은 품질 게이트이고, 숫자는 Actions 실행 요약에 표로 남습니다 |
 | merge 막기 | 브랜치 보호 필수 검사 `check`(`main`은 `e2e`도) (품질 게이트 `sonar`를 필수로 더할 수 있음, 아래 8단계) |
 
 ## SonarCloud 연결하기 (저장소 관리자가 한 번)
