@@ -52,3 +52,18 @@ test("식당 후기는 1년 안 글을 출처별로 골라 볼 수 있다", asyn
     await expect(page.locator('[data-food-reviews] [data-review-source="daum"]').first()).toBeVisible();
   }
 });
+
+test("📍로 찾은 위치는 이 브라우저에 기억해 다음에 [지난 위치로 보기]로 바로", async ({ browser }) => {
+  const context = await browser.newContext({ geolocation: { latitude: 35.147, longitude: 126.915 }, permissions: ["geolocation"] });
+  const page = await context.newPage();
+  await page.goto("/food?tab=near");
+  const locate = page.locator("[data-food-locate]");
+  test.skip((await locate.count()) === 0, "열쇠가 없는 시험 서버");
+  await expect(page.locator("[data-food-last]")).toHaveCount(0);
+  await locate.click();
+  await expect(page).toHaveURL(/lat=35\.147&lng=126\.915/);
+  await page.goto("/food?tab=near");
+  await page.locator("[data-food-last]").click();
+  await expect(page).toHaveURL(/lat=35\.147&lng=126\.915/);
+  await context.close();
+});
