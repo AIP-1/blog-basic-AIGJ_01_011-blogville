@@ -578,7 +578,7 @@ async function RegionTab({
         }))}
       />
       <p className="text-sm text-ink-soft">
-        {place}에서 후기가 많은 식당·카페를 모아{" "}
+        {place}에서 네이버·다음·티스토리 블로그 후기가 많은 식당·카페를 모아{" "}
         <strong className="text-ink">
           {sort === "rising"
             ? "요즘 2주 네이버 검색이 그 전보다 많이 늘어난 순"

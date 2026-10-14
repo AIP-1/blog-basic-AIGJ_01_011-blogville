@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  parseDaumBlogs,
   countBuzz,
   countsAsBuzz,
   coreName,
@@ -65,11 +66,7 @@ const review = (
   blogger,
   url: `https://x/${blogger}/${title}`,
 });
-const mafia = place(
-  "마피아 본점",
-  "양식>이탈리아음식",
-  "서울 성동구 성수동 1",
-);
+const mafia = place("마피아 본점", "양식>이탈리아음식", "서울 성동구 성수동 1");
 
 describe("후기 수 세기", () => {
   it("지점 이름을 떼고 비교한다", () => {
@@ -175,40 +172,149 @@ describe("지역 인기 동네", () => {
     expect(isFoodArea("부산", "성수")).toBe(false);
     expect(isFoodArea("서울", "<script>")).toBe(false);
     expect(isFoodArea("없는도시", "성수")).toBe(false);
-    for (const r of FOOD_REGIONS) expect(FOOD_AREAS[r].length).toBeGreaterThan(0);
+    for (const r of FOOD_REGIONS)
+      expect(FOOD_AREAS[r].length).toBeGreaterThan(0);
   });
 });
 
 describe("내 동네 이름", async () => {
   const { dongFromRegion } = await import("@/lib/food-quality");
-  const doc = (three: string, two = "성동구", one = "서울특별시") => ({ documents: [{ region_type: "H", region_1depth_name: one, region_2depth_name: two, region_3depth_name: "성수1가1동" }, { region_type: "B", region_1depth_name: one, region_2depth_name: two, region_3depth_name: three }] });
+  const doc = (three: string, two = "성동구", one = "서울특별시") => ({
+    documents: [
+      {
+        region_type: "H",
+        region_1depth_name: one,
+        region_2depth_name: two,
+        region_3depth_name: "성수1가1동",
+      },
+      {
+        region_type: "B",
+        region_1depth_name: one,
+        region_2depth_name: two,
+        region_3depth_name: three,
+      },
+    ],
+  });
   it("법정동에서 번지·가를 뗀다", () => {
-    expect(dongFromRegion(doc("성수동1가"))).toEqual({ dong: "성수동", city: "서울" });
-    expect(dongFromRegion(doc("역삼동", "강남구"))).toEqual({ dong: "역삼동", city: "서울" });
-    expect(dongFromRegion(doc("동명동", "동구", "광주광역시"))).toEqual({ dong: "동명동", city: "광주" });
+    expect(dongFromRegion(doc("성수동1가"))).toEqual({
+      dong: "성수동",
+      city: "서울",
+    });
+    expect(dongFromRegion(doc("역삼동", "강남구"))).toEqual({
+      dong: "역삼동",
+      city: "서울",
+    });
+    expect(dongFromRegion(doc("동명동", "동구", "광주광역시"))).toEqual({
+      dong: "동명동",
+      city: "광주",
+    });
   });
   it("동이 없으면 시군구, 이상한 값은 null", () => {
-    expect(dongFromRegion(doc("", "용인시 수지구", "경기도"))?.dong).toBe("수지구");
+    expect(dongFromRegion(doc("", "용인시 수지구", "경기도"))?.dong).toBe(
+      "수지구",
+    );
     expect(dongFromRegion({ documents: [] })).toBeNull();
     expect(dongFromRegion(null)).toBeNull();
   });
 });
 
 describe("지역 인기 정렬", async () => {
-  const { sortRegion, interestGrowth, isRegionSort } = await import("@/lib/food-quality");
-  const p = (id: string, recent: number, growth: number | null): RankedPlace => ({
-    id, name: id, category: "", address: "", phone: "", mapUrl: "", lat: null, lng: null, distance: null, recent, interest: 1, rising: false, growth, kind: "meal",
+  const { sortRegion, interestGrowth, isRegionSort } =
+    await import("@/lib/food-quality");
+  const p = (
+    id: string,
+    recent: number,
+    growth: number | null,
+  ): RankedPlace => ({
+    id,
+    name: id,
+    category: "",
+    address: "",
+    phone: "",
+    mapUrl: "",
+    lat: null,
+    lng: null,
+    distance: null,
+    recent,
+    interest: 1,
+    rising: false,
+    growth,
+    kind: "meal",
   });
   const list = [p("a", 5, 1), p("b", 20, 0.8), p("c", 3, 2.5)];
   it("종합·뜨는·후기 순", () => {
     expect(sortRegion(list, "best").map((x) => x.id)).toEqual(["a", "b", "c"]);
-    expect(sortRegion(list, "rising").map((x) => x.id)).toEqual(["c", "a", "b"]);
-    expect(sortRegion(list, "reviews").map((x) => x.id)).toEqual(["b", "a", "c"]);
+    expect(sortRegion(list, "rising").map((x) => x.id)).toEqual([
+      "c",
+      "a",
+      "b",
+    ]);
+    expect(sortRegion(list, "reviews").map((x) => x.id)).toEqual([
+      "b",
+      "a",
+      "c",
+    ]);
   });
   it("그 전 검색이 없으면 성장률을 모른다", () => {
     expect(interestGrowth({ average: 5, recent: 10, before: 0 })).toBeNull();
     expect(interestGrowth({ average: 5, recent: 10, before: 5 })).toBe(2);
     expect(isRegionSort("rising")).toBe(true);
     expect(isRegionSort("x")).toBe(false);
+  });
+});
+
+describe("parseDaumBlogs", () => {
+  it("카카오 블로그 검색 결과를 후기로 바꾸고 글쓴이를 네이버와 나눈다", () => {
+    const out = parseDaumBlogs({
+      documents: [
+        {
+          title: "<b>영미오리탕</b> 다녀왔어요",
+          contents: "광주 &amp; 오리탕",
+          url: "https://abc.tistory.com/12",
+          blogname: "맛기록",
+          datetime: "2026-10-10T12:00:00.000+09:00",
+        },
+        { title: "주소 없음", url: "javascript:alert(1)" },
+      ],
+    });
+    expect(out).toEqual([
+      {
+        title: "영미오리탕 다녀왔어요",
+        summary: "광주 & 오리탕",
+        url: "https://abc.tistory.com/12",
+        blogger: "d:맛기록",
+        date: "2026-10-10",
+      },
+    ]);
+    expect(parseDaumBlogs(null)).toEqual([]);
+  });
+
+  it("네이버와 다음에 같은 이름 블로거가 있어도 따로 센다", () => {
+    const p = {
+      name: "영미오리탕",
+      address: "광주 북구 경양로 126",
+      category: "한식 > 오리",
+    };
+    const nav = [
+      {
+        title: "영미오리탕 후기",
+        summary: "광주 오리탕 맛집",
+        url: "https://blog.naver.com/a/1",
+        blogger: "맛기록",
+        date: "2026-10-10",
+      },
+    ];
+    const daum = parseDaumBlogs({
+      documents: [
+        {
+          title: "영미오리탕 후기",
+          contents: "광주 오리탕 맛집",
+          url: "https://b.tistory.com/1",
+          blogname: "맛기록",
+          datetime: "2026-10-11T00:00:00.000+09:00",
+        },
+      ],
+    });
+    expect(countBuzz([...nav, ...daum], p, "2026-10-14")).toBe(2);
   });
 });

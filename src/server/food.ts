@@ -3,7 +3,7 @@ import { and, desc, eq, ilike, or } from "drizzle-orm";
 import { db } from "@/db";
 import { blogs, posts, profiles } from "@/db/schema";
 import { likePattern } from "@/lib/blog-search";
-import { countBuzz, dongFromRegion, interestGrowth, interestKeywords, isRegionCandidate, isRising, rankRegion, summarizeInterest, type RankedPlace } from "@/lib/food-quality";
+import { countBuzz, dongFromRegion, parseDaumBlogs, interestGrowth, interestKeywords, isRegionCandidate, isRising, rankRegion, summarizeInterest, type RankedPlace } from "@/lib/food-quality";
 import { detectSponsor, pickOgImage, reviewFetchUrl } from "@/lib/food-sponsor";
 import { placeKind, type FoodKind, type FoodKindFilter } from "@/lib/food-kind";
 import { relevantReviews, reviewVerdict, REVIEW_PAGE_MAX, REVIEW_PAGE_SIZE } from "@/lib/food-relevance";
@@ -130,15 +130,27 @@ function reviewQuery(p: Pick<FoodPlace, "name" | "address">): string {
 }
 
 /**
- * 최근 30일 진짜 후기 수 (최신순 100편 중). 그 가게 이야기가 아닌 글, 체험단·협찬 글은 빼고
+ * 최근 30일 진짜 후기 수 (네이버 최신 100편 + 다음·티스토리 최신 50편 중). 그 가게 이야기가 아닌 글, 체험단·협찬 글은 빼고
  * 같은 블로거는 한 번만 센다. 네이버 열쇠가 없거나 못 받으면 0
  */
 function recentCount(p: FoodPlace): Promise<number> {
-  if (!naverFoodEnabled()) return Promise.resolve(0);
+  if (!naverFoodEnabled() && !kakaoEnabled()) return Promise.resolve(0);
   const today = todayKST();
-  return remember(`buzz|${today}|${reviewQuery(p)}`, async () => {
-    const json = await naver("/search/v1/blog", { query: reviewQuery(p), display: FOOD_RECENT_CAP, sort: "date" });
-    return countBuzz(parseReviews(json), p, today);
+  return remember(`buzz2|${today}|${reviewQuery(p)}`, async () => {
+    // 네이버 블로그 + 다음·티스토리·브런치(카카오 블로그 검색). 한쪽이 안 되면 되는 쪽만 센다
+    const [nav, daum] = await Promise.all([
+      naverFoodEnabled()
+        ? naver("/search/v1/blog", { query: reviewQuery(p), display: FOOD_RECENT_CAP, sort: "date" })
+            .then(parseReviews)
+            .catch(() => [])
+        : Promise.resolve([]),
+      kakaoEnabled()
+        ? kakao("/v2/search/blog", { query: reviewQuery(p), sort: "recency", size: 50 })
+            .then(parseDaumBlogs)
+            .catch(() => [])
+        : Promise.resolve([]),
+    ]);
+    return countBuzz([...nav, ...daum], p, today);
   }).catch(() => 0);
 }
 
