@@ -205,3 +205,14 @@ export function rankRegion(list: RankedPlace[]): RankedPlace[] {
     .sort((a, b) => b.s - a.s || a.i - b.i)
     .map((x) => x.p);
 }
+
+/** 카카오 좌표→법정동 응답에서 동네 이름: "성수동1가" → "성수동", 동이 없으면 시군구("수지구") */
+export function dongFromRegion(json: unknown): { dong: string; city: string } | null {
+  const docs = (json as { documents?: { region_type?: string; region_1depth_name?: string; region_2depth_name?: string; region_3depth_name?: string }[] })?.documents;
+  const d = docs?.find((x) => x.region_type === "B") ?? docs?.[0];
+  if (!d) return null;
+  const three = (d.region_3depth_name ?? "").replace(/\d+가$/, "").replace(/(\D)\d+동$/, "$1동").trim();
+  const dong = three.length >= 2 ? three : (d.region_2depth_name ?? "").split(" ").pop() ?? "";
+  if (!/^[가-힣]{2,10}$/.test(dong)) return null;
+  return { dong, city: (d.region_1depth_name ?? "").replace(/(특별시|광역시|특별자치시|특별자치도|도)$/, "") };
+}
