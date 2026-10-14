@@ -100,7 +100,19 @@ async function saveButtons(
 }
 
 /** 쪽 번호: 처음·끝과 지금 쪽 앞뒤 2쪽만, 사이는 … (쪽이 많아도 한 줄) */
-function PageLinks({ page, pages, href, label = "쪽", data = "near" }: { page: number; pages: number; href: (n: number) => string; label?: string; data?: string }) {
+function PageLinks({
+  page,
+  pages,
+  href,
+  label = "쪽",
+  data = "near",
+}: {
+  page: number;
+  pages: number;
+  href: (n: number) => string;
+  label?: string;
+  data?: string;
+}) {
   const nums = [
     ...new Set([1, page - 2, page - 1, page, page + 1, page + 2, pages]),
   ]
@@ -133,7 +145,8 @@ function PageLinks({ page, pages, href, label = "쪽", data = "near" }: { page: 
             aria-current={n === page ? "page" : undefined}
             className={`${cell} ${n === page ? "bg-ink font-bold text-surface" : "hover:bg-bg"}`}
           >
-            {n}<PendingHint />
+            {n}
+            <PendingHint />
           </Link>
         </span>
       ))}
@@ -168,7 +181,8 @@ function Chips({
           data-chip={it.data}
           className={`inline-flex min-h-9 items-center rounded-full border px-3 text-sm ${it.on ? "border-ink bg-ink font-bold text-surface" : "border-line hover:border-accent"}`}
         >
-          {it.text}<PendingHint />
+          {it.text}
+          <PendingHint />
         </Link>
       ))}
     </nav>
@@ -239,7 +253,8 @@ export default async function FoodPage({ searchParams }: PageProps<"/food">) {
             aria-current={t.key === tab ? "page" : undefined}
             className={`btn ${t.key === tab ? "btn-current" : ""}`}
           >
-            {t.label}<PendingHint />
+            {t.label}
+            <PendingHint />
           </Link>
         ))}
       </nav>
@@ -303,7 +318,7 @@ export default async function FoodPage({ searchParams }: PageProps<"/food">) {
   );
 }
 
-async function NearTab({
+function NearTab({
   lat,
   lng,
   sort,
@@ -320,7 +335,6 @@ async function NearTab({
 }) {
   if (!kakaoEnabled()) return <Notice>{FOOD_MESSAGES.nearOff}</Notice>;
   const at = parseCoords(lat, lng);
-  const result = at ? await nearbyPlaces(at, sort, radius, kind, page) : null;
   const href = (o: {
     sort?: string;
     r?: number;
@@ -342,8 +356,6 @@ async function NearTab({
     return `/food?${q}`;
   };
   const base = at ? href({ sort: "distance" }) : "";
-  const list = result?.status === "ok" ? result.value : null;
-  const save = await saveButtons(list?.items ?? []);
   return (
     <div className="mt-4 space-y-3">
       <NearbyLocator sort={sort} located={!!at} radius={radius} kind={kind} />
@@ -392,86 +404,131 @@ async function NearTab({
           )}
         </nav>
       )}
-      {result &&
-        (result.status !== "ok" ? (
-          <Notice>{failText(result)}</Notice>
-        ) : list!.total === 0 ? (
-          <Notice>
-            {radiusLabel(radius)} 안에{" "}
+      {at && (
+        <Suspense
+          key={`${at.lat},${at.lng}|${radius}|${kind}|${sort}|${page}`}
+          fallback={
+            <div className="space-y-3" aria-busy="true" data-near-loading>
+              <p className="animate-pulse text-sm text-ink-soft">
+                {radiusLabel(radius)} 안 가게를 찾는 중…
+              </p>
+              <div className="h-72 animate-pulse rounded-2xl bg-bg sm:h-96" />
+            </div>
+          }
+        >
+          <NearList
+            at={at}
+            sort={sort}
+            radius={radius}
+            kind={kind}
+            page={page}
+            href={href}
+          />
+        </Suspense>
+      )}
+    </div>
+  );
+}
+
+/** 내 주변 목록·지도 (카카오·블로그 수를 받느라 처음엔 몇 초 걸려 거리·분류 단추와 따로 그린다) */
+async function NearList({
+  at,
+  sort,
+  radius,
+  kind,
+  page,
+  href,
+}: {
+  at: { lat: number; lng: number };
+  sort: "distance" | "buzz";
+  radius: number;
+  kind: FoodKindFilter;
+  page: number;
+  href: (o: { sort?: string; r?: number; kind?: string; p?: number }) => string;
+}) {
+  const result = await nearbyPlaces(at, sort, radius, kind, page);
+  const list = result.status === "ok" ? result.value : null;
+  const save = await saveButtons(list?.items ?? []);
+  return (
+    <div className="space-y-3">
+      {result.status !== "ok" ? (
+        <Notice>{failText(result)}</Notice>
+      ) : list!.total === 0 ? (
+        <Notice>
+          {radiusLabel(radius)} 안에{" "}
+          {kind === "all"
+            ? "가게"
+            : FOOD_KINDS.find((k) => k.key === kind)!.label}
+          가 안 보여요.{" "}
+          {radius < 2000 && (
+            <Link
+              href={href({
+                r: FOOD_RADII[
+                  FOOD_RADII.indexOf(radius as (typeof FOOD_RADII)[number]) + 1
+                ],
+              })}
+              className="underline"
+            >
+              더 넓게 찾기
+            </Link>
+          )}
+        </Notice>
+      ) : (
+        <>
+          <p className="text-sm text-ink-soft" data-near-count>
+            {radiusLabel(radius)} 안{" "}
             {kind === "all"
               ? "가게"
-              : FOOD_KINDS.find((k) => k.key === kind)!.label}
-            가 안 보여요.{" "}
-            {radius < 2000 && (
-              <Link
-                href={href({
-                  r: FOOD_RADII[
-                    FOOD_RADII.indexOf(radius as (typeof FOOD_RADII)[number]) +
-                      1
-                  ],
-                })}
-                className="underline"
+              : FOOD_KINDS.find((k) => k.key === kind)!.label}{" "}
+            {list!.total}곳
+            {list!.total >=
+            (
+              { 300: 120, 500: 200, 1000: 300, 2000: 500 } as Record<
+                number,
+                number
               >
-                더 넓게 찾기
-              </Link>
-            )}
-          </Notice>
-        ) : (
-          <>
-            <p className="text-sm text-ink-soft" data-near-count>
-              {radiusLabel(radius)} 안{" "}
-              {kind === "all"
-                ? "가게"
-                : FOOD_KINDS.find((k) => k.key === kind)!.label}{" "}
-              {list!.total}곳
-              {list!.total >=
-              (
-                { 300: 120, 500: 200, 1000: 300, 2000: 500 } as Record<
-                  number,
-                  number
-                >
-              )[radius]
-                ? ` (가까운 ${list!.total}곳까지)`
-                : ""}
-              {list!.pages > 1 &&
-                ` · ${(list!.page - 1) * 20 + 1}~${(list!.page - 1) * 20 + list!.items.length}번째`}
-            </p>
-            {mapProviders() && (
-              <FoodMap
-                providers={mapProviders()!}
-                places={list!.items}
-                me={at}
-                researchSort={sort}
-                firstNumber={(list!.page - 1) * 20 + 1}
-              />
-            )}
-            <ol className="space-y-3" data-food-list="near">
-              {list!.items.map((p, i) => (
-                <li key={p.id}>
-                  <PlaceCard
-                    place={p}
-                    rank={
-                      mapProviders() ? (list!.page - 1) * 20 + i + 1 : undefined
-                    }
-                    recent={naverFoodEnabled() ? p.recent : undefined}
-                    detailHref={detailHref(p.name, p)}
-                    actions={save(p)}
-                  />
-                  {mapProviders() && p.lat !== null && (
-                    <FocusOnMapButton id={p.id} />
-                  )}
-                </li>
-              ))}
-            </ol>
-            {list!.pages > 1 && (
-              <PageLinks
-                page={list!.page}
-                pages={list!.pages}
-                href={(n) => href({ p: n })}
-              />
-            )}
-          </>
-        ))}
+            )[radius]
+              ? ` (가까운 ${list!.total}곳까지)`
+              : ""}
+            {list!.pages > 1 &&
+              ` · ${(list!.page - 1) * 20 + 1}~${(list!.page - 1) * 20 + list!.items.length}번째`}
+          </p>
+          {mapProviders() && (
+            <FoodMap
+              providers={mapProviders()!}
+              places={list!.items}
+              me={at}
+              researchSort={sort}
+              firstNumber={(list!.page - 1) * 20 + 1}
+            />
+          )}
+          <ol className="space-y-3" data-food-list="near">
+            {list!.items.map((p, i) => (
+              <li key={p.id}>
+                <PlaceCard
+                  place={p}
+                  rank={
+                    mapProviders() ? (list!.page - 1) * 20 + i + 1 : undefined
+                  }
+                  recent={naverFoodEnabled() ? p.recent : undefined}
+                  detailHref={detailHref(p.name, p)}
+                  actions={save(p)}
+                />
+                {mapProviders() && p.lat !== null && (
+                  <FocusOnMapButton id={p.id} />
+                )}
+              </li>
+            ))}
+          </ol>
+          {list!.pages > 1 && (
+            <PageLinks
+              page={list!.page}
+              pages={list!.pages}
+              href={(n) => href({ p: n })}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -528,7 +585,8 @@ async function RegionTab({
             aria-current={r === region ? "page" : undefined}
             className={`rounded-full border px-3 py-1 text-sm ${r === region ? "border-ink bg-ink font-bold text-surface" : "border-line hover:border-accent"}`}
           >
-            {r}<PendingHint />
+            {r}
+            <PendingHint />
           </Link>
         ))}
       </nav>
@@ -671,7 +729,11 @@ async function SearchTab({
           backHref={`/food?tab=search&q=${encodeURIComponent(q!)}`}
           actions={save(picked)}
           page={reviewPage}
-          source={REVIEW_SOURCES.some((x) => x.key === reviewSource) ? (reviewSource as ReviewSource) : "all"}
+          source={
+            REVIEW_SOURCES.some((x) => x.key === reviewSource)
+              ? (reviewSource as ReviewSource)
+              : "all"
+          }
         />
       ) : (
         result &&
@@ -725,12 +787,20 @@ function PlaceDetailView(props: DetailProps) {
         ← 검색 결과로
       </Link>
       <PlaceCard place={place} actions={actions} />
-      {mapProviders() && place.lat !== null && <FoodMap providers={mapProviders()!} places={[place]} />}
+      {mapProviders() && place.lat !== null && (
+        <FoodMap providers={mapProviders()!} places={[place]} />
+      )}
       <Suspense
         fallback={
-          <section className="rounded-xl border border-line bg-surface p-4" aria-busy="true" data-reviews-loading>
+          <section
+            className="rounded-xl border border-line bg-surface p-4"
+            aria-busy="true"
+            data-reviews-loading
+          >
             <h2 className="font-bold">📝 블로그·카페 후기</h2>
-            <p className="mt-2 animate-pulse text-sm text-ink-soft">최근 1년 후기를 네이버·티스토리·다음에서 모으는 중이에요…</p>
+            <p className="mt-2 animate-pulse text-sm text-ink-soft">
+              최근 1년 후기를 네이버·티스토리·다음에서 모으는 중이에요…
+            </p>
           </section>
         }
       >
@@ -747,7 +817,8 @@ async function PlaceDetailRest({ place, page, source, backHref }: DetailProps) {
   ]);
   const pageHref = (n: number, src: string = source) =>
     `${backHref}&place=${encodeURIComponent(place.id)}${src !== "all" ? `&rs=${src}` : ""}${n > 1 ? `&rp=${n}` : ""}#food-reviews`;
-  const totalKept = d.sourceCounts.naver + d.sourceCounts.daum + d.sourceCounts.cafe;
+  const totalKept =
+    d.sourceCounts.naver + d.sourceCounts.daum + d.sourceCounts.cafe;
   return (
     <>
       {interest && <InterestSpark interest={interest} />}
@@ -810,8 +881,15 @@ async function PlaceDetailRest({ place, page, source, backHref }: DetailProps) {
               <Chips
                 label="후기 출처"
                 items={[
-                  { href: pageHref(1, "all"), text: `전체 ${totalKept}`, on: source === "all", data: "rs-all" },
-                  ...REVIEW_SOURCES.filter((x) => d.sourceCounts[x.key] > 0).map((x) => ({
+                  {
+                    href: pageHref(1, "all"),
+                    text: `전체 ${totalKept}`,
+                    on: source === "all",
+                    data: "rs-all",
+                  },
+                  ...REVIEW_SOURCES.filter(
+                    (x) => d.sourceCounts[x.key] > 0,
+                  ).map((x) => ({
                     href: pageHref(1, x.key),
                     text: `${x.label} ${d.sourceCounts[x.key]}`,
                     on: source === x.key,
@@ -854,7 +932,15 @@ async function PlaceDetailRest({ place, page, source, backHref }: DetailProps) {
                 </ul>
               </details>
             )}
-            {d.reviewPages > 1 && <PageLinks page={d.reviewPage} pages={d.reviewPages} href={(n) => pageHref(n)} label="후기 쪽" data="review" />}
+            {d.reviewPages > 1 && (
+              <PageLinks
+                page={d.reviewPage}
+                pages={d.reviewPages}
+                href={(n) => pageHref(n)}
+                label="후기 쪽"
+                data="review"
+              />
+            )}
           </>
         )}
       </section>
