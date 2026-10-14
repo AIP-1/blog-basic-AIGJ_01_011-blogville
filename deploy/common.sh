@@ -49,10 +49,12 @@ ours() {
   case "$("${DOCKER[@]}" inspect -f '{{.Config.Image}}' "$1" 2>/dev/null)" in blogville:*|"$REPO":*) return 0 ;; *) return 1 ;; esac
 }
 
-# 컨테이너 안에서 포트에 요청을 보내 응답(500 미만)을 확인한다. 셋째 값이 있으면 nginx가 그 포트로 보냈는지도 본다
+# 컨테이너 안에서 포트의 /api/health에 요청을 보내 응답(500 미만)을 확인한다. 셋째 값이 있으면 nginx가 그 포트로 보냈는지도 본다.
+# /api/health는 DB까지 확인해서 DB에 못 닿으면 503이라, 그런 새 버전으로는 트래픽을 넘기지 않는다.
+# (v1.7.4 전 이미지에는 이 주소가 없어 404 — 500 미만이라 되돌리기에서도 그대로 통과한다)
 probe() { # 컨테이너 포트 [nginx가 보내야 할 앱 포트]
   "${DOCKER[@]}" exec "$1" node -e "
-fetch('http://127.0.0.1:$2/', { redirect: 'manual' })
+fetch('http://127.0.0.1:$2/api/health', { redirect: 'manual' })
   .then((r) => process.exit(r.status < 500 && (!'${3:-}' || r.headers.get('x-bv8400-upstream') === '127.0.0.1:${3:-}') ? 0 : 1))
   .catch(() => process.exit(1))" 2>/dev/null
 }
