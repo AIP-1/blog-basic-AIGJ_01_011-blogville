@@ -5,7 +5,7 @@ import { useState } from "react";
 import { FOOD_MESSAGES } from "@/lib/food";
 
 /** 📍 내 위치로 찾기: 브라우저에게 위치를 묻고 주소에 붙여 다시 그린다. 서버는 위치를 저장하지 않는다 */
-export function NearbyLocator({ sort, located }: { sort: "distance" | "buzz"; located: boolean }) {
+export function NearbyLocator({ sort, located, radius = 500, kind = "all" }: { sort: "distance" | "buzz"; located: boolean; radius?: number; kind?: string }) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "busy" | "denied" | "unsupported">("idle");
 
@@ -17,7 +17,7 @@ export function NearbyLocator({ sort, located }: { sort: "distance" | "buzz"; lo
         const lat = pos.coords.latitude.toFixed(3);
         const lng = pos.coords.longitude.toFixed(3);
         setState("idle");
-        router.push(`/food?tab=near&lat=${lat}&lng=${lng}${sort === "buzz" ? "&sort=buzz" : ""}`);
+        router.push(`/food?tab=near&lat=${lat}&lng=${lng}${radius !== 500 ? `&r=${radius}` : ""}${kind !== "all" ? `&kind=${kind}` : ""}${sort === "buzz" ? "&sort=buzz" : ""}`);
       },
       (err) => setState(err.code === err.PERMISSION_DENIED ? "denied" : "unsupported"),
       { enableHighAccuracy: false, timeout: 10_000, maximumAge: 300_000 },
