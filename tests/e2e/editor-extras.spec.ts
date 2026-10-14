@@ -11,6 +11,8 @@ test("표를 넣고 줄을 더하고, YouTube 영상과 가운데 정렬 문단�
   await page.keyboard.type("가운데 글");
   await page.getByRole("button", { name: "가운데 정렬" }).click();
   await expect(page.getByRole("button", { name: "가운데 정렬" })).toHaveAttribute("aria-pressed", "true");
+  // 도구를 누르면 에디터가 다음 그리기 때 초점을 되찾는다. 그 전에 친 Enter는 버튼으로 가서 정렬이 풀린다
+  await expect(body).toBeFocused();
   await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "왼쪽 정렬" }).click();
 

@@ -59,6 +59,9 @@ test.describe("POST-01 에디터 도구", () => {
     await page.keyboard.press("Shift+Home");
     await tool(page, "취소선").click();
     await expect(tool(page, "취소선")).toHaveAttribute("aria-pressed", "true");
+    // 에디터 안에 두 꾸밈이 다 들어간 뒤에 발행한다
+    await expect(page.locator(".tiptap u")).toHaveText("밑줄");
+    await expect(page.locator(".tiptap s")).toHaveText("취소");
     await page.getByRole("button", { name: "발행하기" }).click();
     await expect(page).toHaveURL(/\/@[a-z0-9_]+\/\d+$/);
     const article = page.locator(".prose-post");
