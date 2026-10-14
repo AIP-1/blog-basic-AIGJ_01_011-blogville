@@ -25,6 +25,7 @@ import { getWallet } from "@/server/points";
 import { siteUrl } from "@/lib/feed";
 import { noticeDismissKey } from "@/lib/admin-rules";
 import { getActiveNotice } from "@/server/admin-tools";
+import { foodEnabled } from "@/server/food";
 // 한글 글꼴 Pretendard를 이 사이트에서 직접 내려준다. 글자 범위별로 쪼갠 파일이라 화면에 쓰인 글자 몫만 받는다
 import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
@@ -101,7 +102,7 @@ async function Header() {
           Blogville
         </Link>
         <nav className="flex min-w-0 flex-1 items-center" aria-label="메뉴">
-          <MainNav member={!!(member && blog)} />
+          <MainNav member={!!(member && blog)} food={foodEnabled()} />
           <div className="ml-auto flex items-center gap-1 sm:gap-1.5">
             {member && blog && wallet ? (
               <>
