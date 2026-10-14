@@ -14,6 +14,37 @@ export type StockQuote = StockItem & {
   status: string | null;
 };
 
+/** 증시 지수 (코스피·코스닥): 지금 값과 오늘 분 단위 흐름. 받지 못하면 price가 null */
+export type StockIndex = {
+  code: StockIndexCode;
+  name: string;
+  price: number | null;
+  change: number | null;
+  rate: number | null;
+  status: string | null;
+  /** 오늘 장중 값 (오래된 것부터, 많아야 80개). 장 시작 전이면 빈 목록 */
+  chart: number[];
+};
+
+export const STOCK_INDEXES = [
+  { code: "KOSPI", name: "코스피" },
+  { code: "KOSDAQ", name: "코스닥" },
+] as const;
+export type StockIndexCode = (typeof STOCK_INDEXES)[number]["code"];
+
+export function isStockIndex(value: unknown): value is StockIndexCode {
+  return STOCK_INDEXES.some((i) => i.code === value);
+}
+
+/** 분 단위 지수 응답(api.stock.naver.com/chart/…/minute) → 값 목록 (많으면 고르게 솎아 max개) */
+export function parseIndexChart(json: unknown, max = 80): number[] {
+  if (!Array.isArray(json)) return [];
+  const values = json.map((r) => toNumber((r as Record<string, unknown> | null)?.currentPrice)).filter((v): v is number => v !== null);
+  if (values.length <= max) return values;
+  const step = (values.length - 1) / (max - 1);
+  return Array.from({ length: max }, (_, i) => values[Math.round(i * step)]);
+}
+
 export const STOCK_MAX = 10;
 /** 스트림이 끊겼을 때 대신 묻는 간격 */
 export const STOCK_REFRESH_MS = 5_000;

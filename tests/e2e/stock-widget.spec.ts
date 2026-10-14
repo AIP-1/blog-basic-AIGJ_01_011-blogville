@@ -11,13 +11,15 @@ const APPLE = { market: "US", code: "AAPL.O", name: "애플" };
 test("종목을 찾아 넣으면 옆 칸에 보이고 실시간 스트림으로 시세가 바뀌며, 빼면 사라진다", async ({ page, browser }) => {
   const me = await signUpOk(page);
 
-  // 종목이 없으면 주인에게만 안내, 방문자에게는 위젯이 없다
+  // 종목이 없으면 주인에게만 안내, 방문자에게는 지수만
   await page.goto(`/@${me}`);
   await expect(page.locator("[data-stock-widget]")).toContainText("블로그 설정에서 종목을 넣어 보세요");
   const visitor = await browser.newPage();
   await visitor.goto(`/@${me}`);
   await expect(visitor.getByRole("heading", { name: "🔍 블로그 검색" })).toBeVisible();
-  await expect(visitor.locator("[data-stock-widget]")).toHaveCount(0);
+  await expect(visitor.locator("[data-stock-widget]").getByRole("tablist", { name: "지수" })).toBeVisible();
+  await expect(visitor.locator("[data-stock-widget] [data-stock]")).toHaveCount(0);
+  await expect(visitor.locator("[data-stock-widget]")).not.toContainText("블로그 설정에서 종목을 넣어 보세요");
   // 검색은 회원만
   expect((await visitor.request.get("/api/stocks/search?q=삼성")).status()).toBe(401);
 
@@ -36,6 +38,7 @@ test("종목을 찾아 넣으면 옆 칸에 보이고 실시간 스트림으로 
 
   // 옆 칸: 넣은 순서, 스트림으로 새 시세 (오르면 ▲, 내리면 ▼)
   let calls = 0;
+  const index = { code: "KOSPI", name: "코스피", price: 6078.84, change: 43.49, rate: 0.72, status: "OPEN", chart: [6035.35, 6050, 6070, 6060, 6078.84] };
   const quotes = [
     { ...SAMSUNG, price: 71000, change: 500, rate: 0.71, currency: "KRW", status: "OPEN" },
     { ...APPLE, price: 227.5, change: -1.25, rate: -0.55, currency: "USD", status: "OPEN" },
@@ -44,7 +47,7 @@ test("종목을 찾아 넣으면 옆 칸에 보이고 실시간 스트림으로 
     calls++;
     return route.fulfill({
       headers: { "content-type": "text/event-stream" },
-      body: `retry: 60000\n\ndata: ${JSON.stringify({ quotes, at: new Date().toISOString() })}\n\n`,
+      body: `retry: 60000\n\ndata: ${JSON.stringify({ quotes, index, at: new Date().toISOString() })}\n\n`,
     });
   });
   await visitor.goto(`/@${me}`);
@@ -56,8 +59,15 @@ test("종목을 찾아 넣으면 옆 칸에 보이고 실시간 스트림으로 
   await expect(widget.locator('[data-stock="AAPL.O"] [data-stock-price]')).toHaveText("$227.50");
   await expect(widget.locator('[data-stock="AAPL.O"] [data-stock-change]')).toHaveText("▼ 1.25 (-0.55%)");
   expect(calls).toBeGreaterThanOrEqual(1);
+  // 지수: 코스피 큰 숫자와 등락, 오늘 흐름 그래프
+  await expect(widget.locator("[data-stock-index-price]")).toHaveText("6,078.84");
+  await expect(widget.locator("div[data-stock-index]")).toContainText("▲43.49 +0.72%");
+  await expect(widget.locator("[data-stock-index-chart]")).toBeVisible();
+  // 코스닥 탭을 누르면 그 지수로 다시 연결한다
+  await widget.getByRole("tab", { name: "코스닥" }).click();
+  await expect.poll(() => calls).toBeGreaterThanOrEqual(2);
   // 방문자에게는 [종목 바꾸기]가 없다
-  await expect(widget.getByRole("link", { name: "종목 바꾸기" })).toHaveCount(0);
+  await expect(widget.getByRole("link", { name: /관심 종목 바꾸기/ })).toHaveCount(0);
 
   // 빼기
   await page.goto("/settings/blog");

@@ -46,9 +46,9 @@ test("위젯 순서를 ▲▼·끌어 놓기로 바꾸고 숨기고 크기를 �
   await expect(slots(visitor).nth(1)).toHaveAttribute("data-widget-slot", "rss");
   await expect(visitor.locator('[data-widget-slot="search"]')).toHaveCount(0);
   await expect(visitor.locator('[data-widget-slot="recent"]')).toHaveAttribute("data-size", "sm");
-  // 마을 검색은 주인에게만, 종목이 없으면 방문자에게 📈 칸이 보이지 않는다
+  // 마을 검색은 주인에게만, 📈 증시는 종목이 없어도 지수가 보인다
   await expect(visitor.locator('[data-widget-slot="town"]')).toHaveCount(0);
-  await expect(visitor.locator('[data-widget-slot="stocks"]')).toBeHidden();
+  await expect(visitor.locator('[data-widget-slot="stocks"]')).toBeVisible();
   // 👣 크게 = 최근 7일 막대
   await expect(visitor.locator("[data-visit-days] li")).toHaveCount(7);
 
