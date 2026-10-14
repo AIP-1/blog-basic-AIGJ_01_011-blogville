@@ -17,7 +17,7 @@ Blogville 저장소의 **실제 파일**을 예로 들어, 함께 개발하고 �
 
 | 문서 | 내용 |
 |---|---|
-| [05. GitHub Actions CI/CD](05-github-actions.md) | 워크플로 9개, 이미지 자동 배포 흐름 |
+| [05. GitHub Actions CI/CD](05-github-actions.md) | 워크플로 10개, 이미지 자동 배포 흐름 |
 | [06. GitHub Secrets](06-secrets.md) | 시크릿 목록과 다루는 원칙 (값은 적지 않음) |
 | [03. 코드 품질 (품질 게이트 부분)](03-sonar.md#개념) | SonarQube 서버와 품질 게이트 |
 | [07. Jenkins (개념)](07-jenkins.md) | Actions와 비교, 같은 단계의 Jenkinsfile 예시 |

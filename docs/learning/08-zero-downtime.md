@@ -27,8 +27,8 @@ flowchart LR
 
 `run.sh`가 하는 일(순서대로):
 
-1. `state/active`에서 지금 서비스 중인 색을 읽고, 반대 색을 이번 배포 대상으로 정합니다.
-2. DB 접속을 먼저 확인합니다. 안 되면 아무것도 바꾸지 않고 멈춥니다.
+1. DB 접속을 먼저 확인합니다. 안 되면 아무것도 바꾸지 않고 멈춥니다.
+2. `state/active`에서 지금 서비스 중인 색을 읽고, 반대 색을 이번 배포 대상으로 정합니다.
 3. 쉬는 색에 새 이미지를 `docker compose up -d --no-deps --force-recreate <색>`으로 띄웁니다. 컨테이너는 시작하며 마이그레이션을 합니다.
 4. 최대 2분 동안 새 포트의 `/api/health`가 답하는지 확인합니다(DB에 못 닿으면 503이라 통과하지 못함). 안 오면 새 컨테이너를 지우고 끝. **옛 버전은 그대로 서비스 중**입니다.
 5. `switch_traffic`([deploy/common.sh](../../deploy/common.sh)): `nginx/conf.d/upstream.conf`의 포트를 새 색으로 바꾸고 `nginx -t`로 검사한 뒤 `nginx -s reload`. 검사가 실패하면 설정을 되돌립니다. reload는 새 요청만 새 쪽으로 보내고 하던 요청은 옛 쪽에서 마칩니다.

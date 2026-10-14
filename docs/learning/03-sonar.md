@@ -32,7 +32,7 @@
 |---|---|
 | 에디터 안 즉시 검사 | SonarQube for IDE + ESLint |
 | PR마다 자동 검사 | `ci.yml`(lint·typecheck·test·build) + `sonar.yml`(품질 게이트) |
-| merge 막기 | 브랜치 보호 필수 검사 `check` (품질 게이트 `sonar`를 필수로 더할 수 있음, 아래 5단계) |
+| merge 막기 | 브랜치 보호 필수 검사 `check`(`main`은 `e2e`도) (품질 게이트 `sonar`를 필수로 더할 수 있음, 아래 8단계) |
 
 ## SonarCloud 연결하기 (저장소 관리자가 한 번)
 

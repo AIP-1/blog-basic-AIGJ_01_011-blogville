@@ -24,8 +24,10 @@ GitHub 시크릿은 한 번 저장하면 화면에서 다시 볼 수 없고, 로
 | `APP_URL` | 선택 | deploy | 사용자가 여는 주소. 없으면 `http://SSH_ADDRESS:8400` |
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD` | 선택 | deploy, status | 배포 때 관리자 계정·공지 블로그 생성/비밀번호 갱신 (12~64자) |
 | `KAKAO_CLIENT_ID`·`_SECRET`, `NAVER_…`, `GOOGLE_…` | 선택 | deploy | 소셜 로그인. ID와 SECRET이 둘 다 있는 서비스만 켜짐 |
+| `NAVER_SEARCH_CLIENT_ID`, `NAVER_SEARCH_CLIENT_SECRET` | 선택 | deploy | 📰 뉴스 위젯(네이버 검색 API). 있으면 켜짐 |
 | `FEEDBACK_BOT_TOKEN` | 선택 | deploy | 버그·문의 자동 처리 API 열쇠, 32자 이상이면 켜짐 |
 | `MIRROR_TOKEN` | 선택 | mirror | 과제 제출 저장소에 쓰기. 없으면 복사를 건너뜀 |
+| `SONAR_TOKEN` | 선택 | sonar | SonarCloud 분석. 없으면 분석을 건너뜀 ([03-sonar.md](03-sonar.md)) |
 
 로그인 비밀키(`BETTER_AUTH_SECRET`)는 시크릿이 아니라 서버에서 처음 한 번 무작위로 만들어 `~/blogville/auth-secret`에 둡니다([deploy/run.sh](../../deploy/run.sh)). 공개해도 되는 포트 같은 값은 [deploy/deploy.env](../../deploy/deploy.env)에 그대로 커밋합니다.
 
