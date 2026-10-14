@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, eq } from "drizzle-orm";
+import { and, asc, count, eq, max } from "drizzle-orm";
 import { db } from "@/db";
 import { blogs, blogStocks } from "@/db/schema";
 import { isUniqueViolation } from "./names";
@@ -21,13 +21,13 @@ const HEADERS = {
   Accept: "application/json",
 };
 
-/** 블로그의 관심 종목 (넣은 순서) */
+/** 블로그의 관심 종목 (주인이 정한 순서) */
 export async function listBlogStocks(blogId: number) {
   return db
     .select({ id: blogStocks.id, market: blogStocks.market, code: blogStocks.code, name: blogStocks.name })
     .from(blogStocks)
     .where(eq(blogStocks.blogId, blogId))
-    .orderBy(asc(blogStocks.createdAt), asc(blogStocks.id)) as Promise<(StockItem & { id: number })[]>;
+    .orderBy(asc(blogStocks.position), asc(blogStocks.createdAt), asc(blogStocks.id)) as Promise<(StockItem & { id: number })[]>;
 }
 
 /** 관심 종목 넣기: 블로그 행을 잠그고 개수를 세어 10개를 넘지 않게 한다. 실패하면 문구 */
@@ -38,7 +38,9 @@ export async function addBlogStock(ownerId: string, item: StockItem): Promise<st
       if (!blog) return STOCK_ERRORS.invalid;
       const [{ n }] = await tx.select({ n: count() }).from(blogStocks).where(eq(blogStocks.blogId, blog.id));
       if (n >= STOCK_MAX) return STOCK_ERRORS.full;
-      await tx.insert(blogStocks).values({ blogId: blog.id, ...item });
+      // 새 종목은 맨 뒤에
+      const [{ last }] = await tx.select({ last: max(blogStocks.position) }).from(blogStocks).where(eq(blogStocks.blogId, blog.id));
+      await tx.insert(blogStocks).values({ blogId: blog.id, ...item, position: (last ?? -1) + 1 });
       return null;
     });
   } catch (e) {
@@ -52,6 +54,19 @@ export async function removeBlogStock(ownerId: string, id: number): Promise<void
   const [blog] = await db.select({ id: blogs.id }).from(blogs).where(eq(blogs.ownerId, ownerId));
   if (!blog) return;
   await db.delete(blogStocks).where(and(eq(blogStocks.id, id), eq(blogStocks.blogId, blog.id)));
+}
+
+/** 관심 종목 순서 바꾸기: 내 블로그의 종목 ID를 빠짐없이 새 순서로 받는다. 하나라도 다르면(조작·그새 바뀜) false */
+export async function reorderBlogStocks(ownerId: string, ids: number[]): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const [blog] = await tx.select({ id: blogs.id }).from(blogs).where(eq(blogs.ownerId, ownerId)).for("update");
+    if (!blog) return false;
+    const rows = await tx.select({ id: blogStocks.id }).from(blogStocks).where(eq(blogStocks.blogId, blog.id));
+    const mine = new Set(rows.map((r) => r.id));
+    if (ids.length !== mine.size || new Set(ids).size !== ids.length || !ids.every((id) => mine.has(id))) return false;
+    for (const [i, id] of ids.entries()) await tx.update(blogStocks).set({ position: i }).where(and(eq(blogStocks.id, id), eq(blogStocks.blogId, blog.id)));
+    return true;
+  });
 }
 
 type Parsed = NonNullable<ReturnType<typeof parseNaverQuote>>;
@@ -167,5 +182,5 @@ export async function listStocksBySlug(slug: string): Promise<StockItem[]> {
     .from(blogStocks)
     .innerJoin(blogs, eq(blogs.id, blogStocks.blogId))
     .where(eq(blogs.slug, slug))
-    .orderBy(asc(blogStocks.createdAt), asc(blogStocks.id)) as Promise<StockItem[]>;
+    .orderBy(asc(blogStocks.position), asc(blogStocks.createdAt), asc(blogStocks.id)) as Promise<StockItem[]>;
 }

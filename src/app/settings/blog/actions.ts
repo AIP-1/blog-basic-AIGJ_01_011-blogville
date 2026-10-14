@@ -10,7 +10,7 @@ import { layoutOf, WIDGET_MESSAGES } from "@/lib/widgets";
 import { isListStyle, LIST_STYLE_ERROR } from "@/lib/list-style";
 import { ACCENT_ERROR, isBlogAccent } from "@/lib/blog-accent";
 import * as category from "@/server/category";
-import { addBlogStock as saveStock, removeBlogStock as dropStock } from "@/server/stocks";
+import { addBlogStock as saveStock, removeBlogStock as dropStock, reorderBlogStocks } from "@/server/stocks";
 import { checkStock, STOCK_ERRORS } from "@/lib/stocks";
 
 export type SettingsState = { error?: string; message?: string; values?: Record<string, string> } | null;
@@ -125,6 +125,16 @@ export async function removeBlogStock(formData: FormData): Promise<StockState> {
   await dropStock(member.userId, id);
   refresh((await getMyBlog(member.userId)).slug);
   return { message: STOCK_ERRORS.removed };
+}
+
+/** 관심 종목 순서: `ids`에 쉼표로 이은 새 순서 (내 블로그의 종목 전부) */
+export async function reorderBlogStock(formData: FormData): Promise<StockState> {
+  const member = await requireMember();
+  const ids = text(formData, "ids").split(",").map((v) => parseId(v));
+  if (ids.length === 0 || ids.some((id) => id === null)) return { error: STOCK_ERRORS.stale };
+  if (!(await reorderBlogStocks(member.userId, ids as number[]))) return { error: STOCK_ERRORS.stale };
+  refresh((await getMyBlog(member.userId)).slug);
+  return { message: STOCK_ERRORS.reordered };
 }
 
 // ── 카테고리 (BLOG-05) ──

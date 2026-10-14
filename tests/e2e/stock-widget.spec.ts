@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { signUpOk } from "./helpers";
+import { signUpOk, sql } from "./helpers";
 
 // 📈 관심 종목: 블로그 설정에서 찾아 넣고 빼고, 블로그 홈 옆 칸에서 실시간 스트림(SSE)으로 시세가 바뀐다.
 // 네이버 증권은 시험에서 부르지 않는다 — 브라우저가 부르는 검색·시세 주소를 가짜 응답으로 바꾼다.
@@ -19,7 +19,7 @@ test("종목을 찾아 넣으면 옆 칸에 보이고 실시간 스트림으로 
   await expect(visitor.getByRole("heading", { name: "🔍 블로그 검색" })).toBeVisible();
   await expect(visitor.locator("[data-stock-widget]").getByRole("tablist", { name: "지수" })).toBeVisible();
   await expect(visitor.locator("[data-stock-widget] [data-stock]")).toHaveCount(0);
-  await expect(visitor.locator("[data-stock-widget]")).not.toContainText("블로그 설정에서 종목을 넣어 보세요");
+  await expect(visitor.locator("[data-stock-widget]").first()).not.toContainText("블로그 설정에서 종목을 넣어 보세요");
   // 검색은 회원만
   expect((await visitor.request.get("/api/stocks/search?q=삼성")).status()).toBe(401);
 
@@ -102,4 +102,49 @@ test("시세 연결 확인 주소는 입력 없이 정해 둔 종목만 묻는�
   expect([200, 503]).toContain(res.status());
   const json = await res.json();
   expect(json.quotes.map((q: { code: string }) => q.code)).toEqual(["005930", "AAPL.O"]);
+});
+
+test("넣은 종목은 ▲▼·끌어 놓기로 순서를 바꾸면 바로 저장되고 옆 칸도 그 순서, 조작한 순서는 거절", async ({ page, browser }) => {
+  const me = await signUpOk(page);
+  await sql`insert into blog_stocks (blog_id, market, code, name, position)
+    select b.id, v.m, v.c, v.n, v.p from blogs b, (values ('KR','005930','삼성전자',0),('KR','000660','SK하이닉스',1),('US','AAPL.O','애플',2)) v(m,c,n,p) where b.slug = ${me}`;
+  await page.setViewportSize({ width: 1280, height: 1600 });
+  await page.goto("/settings/blog#stocks");
+  const card = page.locator("#stocks");
+  const rows = card.locator("[data-my-stock]");
+  await expect(rows).toHaveCount(3);
+
+  // ▼: 삼성전자를 아래로 → SK하이닉스, 삼성전자, 애플
+  await card.getByRole("button", { name: "삼성전자 아래로" }).click();
+  await expect(card.getByRole("status")).toHaveText("순서를 바꿨어요");
+  await expect(rows.nth(0)).toHaveAttribute("data-my-stock", "000660");
+  // 끌어 놓기: 애플을 맨 위(SK하이닉스 자리)로 → 애플, SK하이닉스, 삼성전자
+  const from = (await card.locator('[data-my-stock="AAPL.O"]').boundingBox())!;
+  const to = (await card.locator('[data-my-stock="000660"]').boundingBox())!;
+  await page.mouse.move(from.x + 12, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + 12, to.y + to.height / 2, { steps: 10 });
+  await page.mouse.up();
+  await expect(rows.nth(0)).toHaveAttribute("data-my-stock", "AAPL.O");
+  await expect.poll(async () => (await sql`select code from blog_stocks s join blogs b on b.id = s.blog_id where b.slug = ${me} order by position`).map((r) => r.code)).toEqual(["AAPL.O", "000660", "005930"]);
+
+  // 새로 고쳐도, 방문자 옆 칸도 같은 순서
+  await page.reload();
+  await expect(rows.nth(0)).toHaveAttribute("data-my-stock", "AAPL.O");
+  await expect(card.getByRole("button", { name: "애플 위로" })).toBeDisabled();
+  const visitor = await browser.newPage();
+  await visitor.route("**/api/stocks/stream?**", (route) => route.abort());
+  await visitor.goto(`/@${me}`);
+  await expect(visitor.locator("[data-stock-widget] [data-stock]")).toHaveCount(3);
+  expect(await visitor.locator("[data-stock-widget] [data-stock]").evaluateAll((els) => els.map((e) => e.getAttribute("data-stock")))).toEqual(["AAPL.O", "000660", "005930"]);
+
+  // 남의 종목 ID를 섞거나 빠뜨린 순서는 거절 (요청을 가로채 바꾼다)
+  await page.route("**/settings/blog**", async (route) => {
+    const req = route.request();
+    if (req.method() !== "POST" || !/name="[^"]*ids"/.test(req.postData() ?? "")) return route.continue();
+    return route.continue({ postData: req.postData()!.replace(/(name="[^"]*ids"\r\n\r\n)[0-9,]+/, "$1999999999") });
+  });
+  await card.getByRole("button", { name: "삼성전자 위로" }).click();
+  await expect(card.getByRole("alert")).toHaveText("종목 목록이 그새 바뀌었어요. 새로 고침한 뒤 다시 해 주세요.");
+  await expect(rows.nth(2)).toHaveAttribute("data-my-stock", "005930");
 });
