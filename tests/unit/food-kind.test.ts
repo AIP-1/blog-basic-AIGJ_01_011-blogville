@@ -62,3 +62,14 @@ describe("넓은 반경 나누기 (gridRects)", () => {
     expect(x2).toBeGreaterThan(126.915);
   });
 });
+
+describe("뺀 까닭 (reviewVerdict)", () => {
+  it("광고·이름 없음·다른 이야기", async () => {
+    const { reviewVerdict } = await import("@/lib/food-relevance");
+    const mafia = { name: "마피아", address: "광주 동구 금남로 18", category: "양식 > 피자" };
+    expect(reviewVerdict({ title: "마피아 근처 분양", summary: "" }, mafia)).toEqual({ keep: false, reason: "spam" });
+    expect(reviewVerdict({ title: "광주 피자 맛집", summary: "" }, mafia)).toEqual({ keep: false, reason: "no-name" });
+    expect(reviewVerdict({ title: "마피아 게임", summary: "보드게임" }, mafia)).toEqual({ keep: false, reason: "off-topic" });
+    expect(reviewVerdict({ title: "동구 마피아 피자 후기", summary: "" }, mafia)).toEqual({ keep: true });
+  });
+});
