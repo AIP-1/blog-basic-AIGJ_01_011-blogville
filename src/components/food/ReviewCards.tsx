@@ -48,6 +48,11 @@ export function ReviewCards({ reviews }: { reviews: FoodReview[] }) {
                 <p className="line-clamp-2 font-semibold group-hover:underline">{r.title}</p>
                 {r.summary && <p className="mt-1 line-clamp-2 text-sm text-ink-soft">{r.summary}</p>}
                 <p className="mt-1.5 text-xs text-ink-soft">
+                  {r.source && r.source !== "naver" && (
+                    <span className="mr-1 rounded border border-line px-1" data-review-source={r.source}>
+                      {r.source === "cafe" ? "다음 카페" : "티스토리·다음"}
+                    </span>
+                  )}
                   {r.blogger}
                   {r.date && ` · ${r.date}`}
                 </p>

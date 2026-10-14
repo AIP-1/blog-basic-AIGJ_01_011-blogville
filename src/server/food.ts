@@ -3,10 +3,10 @@ import { and, desc, eq, ilike, or } from "drizzle-orm";
 import { db } from "@/db";
 import { blogs, posts, profiles } from "@/db/schema";
 import { likePattern } from "@/lib/blog-search";
-import { countBuzz, dongFromRegion, interestGrowth, interestKeywords, isRegionCandidate, isRising, rankRegion, summarizeInterest, type RankedPlace } from "@/lib/food-quality";
+import { countBuzz, dongFromRegion, parseDaumBlogs, interestGrowth, interestKeywords, isRegionCandidate, isRising, rankRegion, summarizeInterest, type RankedPlace } from "@/lib/food-quality";
 import { detectSponsor, pickOgImage, reviewFetchUrl } from "@/lib/food-sponsor";
 import { placeKind, type FoodKind, type FoodKindFilter } from "@/lib/food-kind";
-import { relevantReviews, reviewVerdict, REVIEW_PAGE_MAX, REVIEW_PAGE_SIZE } from "@/lib/food-relevance";
+import { relevantReviews, reviewVerdict, REVIEW_DAYS, REVIEW_PAGE_SIZE } from "@/lib/food-relevance";
 import { todayKST } from "@/lib/kst";
 import {
   FOOD_RADIUS_M,
@@ -16,6 +16,9 @@ import {
   parseKakaoPlaces,
   parseNaverPlaces,
   parseReviews,
+  parseKakaoReviews,
+  reviewKey,
+  type ReviewSource,
   rankByBuzz,
   type BuzzPlace,
   type FoodPlace,
@@ -130,15 +133,27 @@ function reviewQuery(p: Pick<FoodPlace, "name" | "address">): string {
 }
 
 /**
- * 최근 30일 진짜 후기 수 (최신순 100편 중). 그 가게 이야기가 아닌 글, 체험단·협찬 글은 빼고
+ * 최근 30일 진짜 후기 수 (네이버 최신 100편 + 다음·티스토리 최신 50편 중). 그 가게 이야기가 아닌 글, 체험단·협찬 글은 빼고
  * 같은 블로거는 한 번만 센다. 네이버 열쇠가 없거나 못 받으면 0
  */
 function recentCount(p: FoodPlace): Promise<number> {
-  if (!naverFoodEnabled()) return Promise.resolve(0);
+  if (!naverFoodEnabled() && !kakaoEnabled()) return Promise.resolve(0);
   const today = todayKST();
-  return remember(`buzz|${today}|${reviewQuery(p)}`, async () => {
-    const json = await naver("/search/v1/blog", { query: reviewQuery(p), display: FOOD_RECENT_CAP, sort: "date" });
-    return countBuzz(parseReviews(json), p, today);
+  return remember(`buzz2|${today}|${reviewQuery(p)}`, async () => {
+    // 네이버 블로그 + 다음·티스토리·브런치(카카오 블로그 검색). 한쪽이 안 되면 되는 쪽만 센다
+    const [nav, daum] = await Promise.all([
+      naverFoodEnabled()
+        ? naver("/search/v1/blog", { query: reviewQuery(p), display: FOOD_RECENT_CAP, sort: "date" })
+            .then(parseReviews)
+            .catch(() => [])
+        : Promise.resolve([]),
+      kakaoEnabled()
+        ? kakao("/v2/search/blog", { query: reviewQuery(p), sort: "recency", size: 50 })
+            .then(parseDaumBlogs)
+            .catch(() => [])
+        : Promise.resolve([]),
+    ]);
+    return countBuzz([...nav, ...daum], p, today);
   }).catch(() => 0);
 }
 
@@ -415,13 +430,17 @@ function readReviewPage(url: string): Promise<{ image: string | null; sponsor: F
 }
 
 function enrichReviews(list: FoodReview[]): Promise<FoodReview[]> {
-  return mapLimit(list, 4, async (r) => ({ ...r, ...(await readReviewPage(r.url)) }));
+  // 네이버 블로그는 글을 열어 사진·협찬 표시를 읽고, 다른 곳은 받은 썸네일을 두고 요약 글로만 협찬 표시를 본다
+  return mapLimit(list, 4, async (r) => {
+    const page = await readReviewPage(r.url);
+    return { ...r, image: page.image ?? r.image ?? null, sponsor: page.sponsor ?? r.sponsor ?? (r.source && r.source !== "naver" ? detectSponsor(r.summary) : null) };
+  });
 }
 
 export type PlaceDetail = {
   place: FoodPlace;
   reviews: FoodResult<FoodReview[]>;
-  /** 거른 뒤 남은 후기 수와 쪽 (한 쪽 10편, 많아야 10쪽) */
+  /** 거른 뒤 남은 후기 수와 쪽 (한 쪽 10편, 1년 안 글 모두) */
   reviewTotal: number;
   reviewPage: number;
   reviewPages: number;
@@ -429,36 +448,103 @@ export type PlaceDetail = {
   reviewHidden: number;
   /** 뺀 글 몇 편과 그 까닭 (확인용, 많아야 10편) */
   hiddenSample: { title: string; url: string; reason: "spam" | "no-name" | "off-topic" }[];
+  /** 거른 뒤 곳마다 후기 수 */
+  sourceCounts: Record<ReviewSource, number>;
   recent: number;
   local: { id: number; title: string; slug: string; nickname: string; createdAt: Date }[];
 };
 
-/** 식당 하나: 정보 + 네이버 블로그 후기(관련 높은 순 100편에서 그 식당 이야기만 거른 뒤 쪽마다 10편) + Blogville 이웃 글 */
-export async function placeDetail(place: FoodPlace, page = 1): Promise<PlaceDetail> {
+/** 오늘부터 1년 전 (한국 날짜 YYYY-MM-DD) */
+function yearAgo(today: string): string {
+  const d = new Date(`${today}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - REVIEW_DAYS);
+  return d.toISOString().slice(0, 10);
+}
+
+/** 네이버 블로그: 최신순 100편씩, 1년보다 오래된 글이 나오거나 1,000편(네이버 한도)까지 */
+async function naverYear(place: FoodPlace, since: string): Promise<FoodReview[]> {
+  const out: FoodReview[] = [];
+  for (let start = 1; start <= 901; start += 100) {
+    const list = parseReviews(await naver("/search/v1/blog", { query: reviewQuery(place), display: 100, start, sort: "date" })).map((r) => ({ ...r, source: "naver" as const }));
+    out.push(...list);
+    if (list.length < 100 || list.some((r) => r.date && r.date < since)) break;
+  }
+  return out;
+}
+
+/** 카카오(다음) 블로그·카페: 최신순 50편씩, 1년보다 오래된 글이 나오거나 쪽 한도까지 */
+async function kakaoYear(place: FoodPlace, since: string, kind: "blog" | "cafe", pages: number): Promise<FoodReview[]> {
+  const out: FoodReview[] = [];
+  for (let page = 1; page <= pages; page++) {
+    const json = (await kakao(`/v2/search/${kind}`, { query: reviewQuery(place), sort: "recency", size: 50, page })) as { meta?: { is_end?: boolean } };
+    const list = parseKakaoReviews(json, kind === "blog" ? "daum" : "cafe");
+    out.push(...list);
+    if (json?.meta?.is_end !== false || list.some((r) => r.date && r.date < since)) break;
+  }
+  return out;
+}
+
+/** 1년 안 후기를 모든 곳에서 모아 같은 글은 한 번만, 최신순 (6시간 기억). 한 곳이 실패해도 나머지로 */
+function yearReviews(place: FoodPlace): Promise<{ all: FoodReview[]; failed: number; tried: number }> {
+  const today = todayKST();
+  const since = yearAgo(today);
+  return remember(`reviews-1y|${today}|${reviewQuery(place)}`, async () => {
+    const jobs: (() => Promise<FoodReview[]>)[] = [];
+    if (naverFoodEnabled()) jobs.push(() => naverYear(place, since));
+    if (kakaoEnabled()) jobs.push(() => kakaoYear(place, since, "blog", 10), () => kakaoYear(place, since, "cafe", 3));
+    let failed = 0;
+    const lists = await Promise.all(
+      jobs.map((j) =>
+        j().catch((e) => {
+          failed++;
+          console.error("후기 한 곳을 못 받았어요", e instanceof Error ? e.message : e);
+          return [] as FoodReview[];
+        }),
+      ),
+    );
+    if (jobs.length > 0 && failed === jobs.length) throw new Error("모든 후기 검색 실패");
+    const seen = new Set<string>();
+    const all = lists
+      .flat()
+      .filter((r) => !r.date || r.date >= since)
+      .filter((r) => {
+        const k = reviewKey(r.url);
+        return !seen.has(k) && !!seen.add(k);
+      })
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    return { all, failed, tried: jobs.length };
+  });
+}
+
+/** 식당 하나: 정보 + 1년 안 블로그·카페 후기(네이버·티스토리·다음, 그 식당 이야기만, 10편씩 쪽) + Blogville 이웃 글 */
+export async function placeDetail(place: FoodPlace, page = 1, source: ReviewSource | "all" = "all"): Promise<PlaceDetail> {
   let reviewTotal = 0;
   let reviewHidden = 0;
   let hiddenSample: PlaceDetail["hiddenSample"] = [];
   let reviewPage = 1;
   let reviewPages = 1;
-  const reviews: FoodResult<FoodReview[]> = naverFoodEnabled()
-    ? await settle(async () => {
-        const all = await remember(`reviews100|${reviewQuery(place)}`, async () =>
-          parseReviews(await naver("/search/v1/blog", { query: reviewQuery(place), display: REVIEW_PAGE_SIZE * REVIEW_PAGE_MAX, sort: "sim" })),
-        );
-        const kept = relevantReviews(all, place);
-        reviewHidden = all.length - kept.length;
-        hiddenSample = all
-          .map((r) => ({ r, v: reviewVerdict(r, place) }))
-          .flatMap(({ r, v }) => (v.keep ? [] : [{ title: r.title, url: r.url, reason: v.reason }]))
-          .slice(0, 10);
-        reviewTotal = kept.length;
-        reviewPages = Math.max(1, Math.min(REVIEW_PAGE_MAX, Math.ceil(kept.length / REVIEW_PAGE_SIZE)));
-        reviewPage = Math.min(Math.max(1, Math.floor(page) || 1), reviewPages);
-        return enrichReviews(kept.slice((reviewPage - 1) * REVIEW_PAGE_SIZE, reviewPage * REVIEW_PAGE_SIZE));
-      }, "블로그 후기")
-    : { status: "off" };
+  let sourceCounts: PlaceDetail["sourceCounts"] = { naver: 0, daum: 0, cafe: 0 };
+  const reviews: FoodResult<FoodReview[]> =
+    naverFoodEnabled() || kakaoEnabled()
+      ? await settle(async () => {
+          const { all } = await yearReviews(place);
+          const kept = relevantReviews(all, place);
+          reviewHidden = all.length - kept.length;
+          hiddenSample = all
+            .map((r) => ({ r, v: reviewVerdict(r, place) }))
+            .flatMap(({ r, v }) => (v.keep ? [] : [{ title: r.title, url: r.url, reason: v.reason }]))
+            .slice(0, 10);
+          sourceCounts = { naver: 0, daum: 0, cafe: 0 };
+          for (const r of kept) sourceCounts[r.source ?? "naver"]++;
+          const shown = source === "all" ? kept : kept.filter((r) => (r.source ?? "naver") === source);
+          reviewTotal = shown.length;
+          reviewPages = Math.max(1, Math.ceil(shown.length / REVIEW_PAGE_SIZE));
+          reviewPage = Math.min(Math.max(1, Math.floor(page) || 1), reviewPages);
+          return enrichReviews(shown.slice((reviewPage - 1) * REVIEW_PAGE_SIZE, reviewPage * REVIEW_PAGE_SIZE));
+        }, "블로그 후기")
+      : { status: "off" };
   const [recent, local] = await Promise.all([recentCount(place), blogvillePosts(place.name)]);
-  return { place, reviews, reviewTotal, reviewPage, reviewPages, reviewHidden, hiddenSample, recent, local };
+  return { place, reviews, reviewTotal, reviewPage, reviewPages, reviewHidden, hiddenSample, sourceCounts, recent, local };
 }
 
 /** Blogville 공개 글 중 식당 이름이 든 글 (최신 5편) */

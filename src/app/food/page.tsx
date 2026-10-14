@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { NearbyLocator } from "@/components/food/NearbyLocator";
 import { VERDICT_LABELS } from "@/lib/food-relevance";
+import { REVIEW_SOURCES, type ReviewSource } from "@/lib/food";
 import {
   FOOD_KINDS,
   FOOD_RADII,
@@ -99,15 +100,7 @@ async function saveButtons(
 }
 
 /** 쪽 번호: 처음·끝과 지금 쪽 앞뒤 2쪽만, 사이는 … (쪽이 많아도 한 줄) */
-function PageLinks({
-  page,
-  pages,
-  href,
-}: {
-  page: number;
-  pages: number;
-  href: (n: number) => string;
-}) {
+function PageLinks({ page, pages, href, label = "쪽", data = "near" }: { page: number; pages: number; href: (n: number) => string; label?: string; data?: string }) {
   const nums = [
     ...new Set([1, page - 2, page - 1, page, page + 1, page + 2, pages]),
   ]
@@ -117,9 +110,9 @@ function PageLinks({
     "inline-flex size-9 items-center justify-center rounded-lg text-sm";
   return (
     <nav
-      aria-label="쪽"
+      aria-label={label}
       className="flex flex-wrap items-center justify-center gap-1"
-      data-near-pages
+      {...{ [`data-${data}-pages`]: true }}
     >
       {page > 1 && (
         <Link
@@ -302,6 +295,7 @@ export default async function FoodPage({ searchParams }: PageProps<"/food">) {
                 : "all"
             }
             reviewPage={Number(one(sp.rp)) || 1}
+            reviewSource={one(sp.rs) ?? "all"}
           />
         )}
       </Suspense>
@@ -578,7 +572,7 @@ async function RegionTab({
         }))}
       />
       <p className="text-sm text-ink-soft">
-        {place}에서 후기가 많은 식당·카페를 모아{" "}
+        {place}에서 네이버·다음·티스토리 블로그 후기가 많은 식당·카페를 모아{" "}
         <strong className="text-ink">
           {sort === "rising"
             ? "요즘 2주 네이버 검색이 그 전보다 많이 늘어난 순"
@@ -637,11 +631,13 @@ async function SearchTab({
   placeId,
   kind,
   reviewPage,
+  reviewSource,
 }: {
   q: string | null;
   placeId: string | null;
   kind: FoodKindFilter;
   reviewPage: number;
+  reviewSource: string;
 }) {
   const result = q ? await searchPlaces(q, placeId ? "all" : kind) : null;
   const kindHref = (k: string) =>
@@ -675,6 +671,7 @@ async function SearchTab({
           backHref={`/food?tab=search&q=${encodeURIComponent(q!)}`}
           actions={save(picked)}
           page={reviewPage}
+          source={REVIEW_SOURCES.some((x) => x.key === reviewSource) ? (reviewSource as ReviewSource) : "all"}
         />
       ) : (
         result &&
@@ -716,18 +713,21 @@ async function PlaceDetailView({
   backHref,
   actions,
   page,
+  source,
 }: {
   place: FoodPlace;
   backHref: string;
   actions: React.ReactNode;
   page: number;
+  source: ReviewSource | "all";
 }) {
   const [d, interest] = await Promise.all([
-    placeDetail(place, page),
+    placeDetail(place, page, source),
     placeInterest(place),
   ]);
-  const pageHref = (n: number) =>
-    `${backHref}&place=${encodeURIComponent(place.id)}${n > 1 ? `&rp=${n}` : ""}#food-reviews`;
+  const pageHref = (n: number, src: string = source) =>
+    `${backHref}&place=${encodeURIComponent(place.id)}${src !== "all" ? `&rs=${src}` : ""}${n > 1 ? `&rp=${n}` : ""}#food-reviews`;
+  const totalKept = d.sourceCounts.naver + d.sourceCounts.daum + d.sourceCounts.cafe;
   return (
     <div className="space-y-4" data-food-detail={place.id}>
       <Link href={backHref} className="text-sm text-ink-soft hover:underline">
@@ -793,8 +793,22 @@ async function PlaceDetailView({
           </p>
         ) : (
           <>
+            <div className="mt-2">
+              <Chips
+                label="후기 출처"
+                items={[
+                  { href: pageHref(1, "all"), text: `전체 ${totalKept}`, on: source === "all", data: "rs-all" },
+                  ...REVIEW_SOURCES.filter((x) => d.sourceCounts[x.key] > 0).map((x) => ({
+                    href: pageHref(1, x.key),
+                    text: `${x.label} ${d.sourceCounts[x.key]}`,
+                    on: source === x.key,
+                    data: `rs-${x.key}`,
+                  })),
+                ]}
+              />
+            </div>
             <p className="mt-1 text-xs text-ink-soft" data-review-count>
-              그 식당 이야기로 보이는 글 {d.reviewTotal}편
+              최근 1년 · 그 식당 이야기로 보이는 글 {d.reviewTotal}편
               {d.reviewHidden > 0 &&
                 ` · 이름만 같거나 광고로 보이는 글 ${d.reviewHidden}편은 뺐어요`}
             </p>
@@ -827,26 +841,7 @@ async function PlaceDetailView({
                 </ul>
               </details>
             )}
-            {d.reviewPages > 1 && (
-              <nav
-                aria-label="후기 쪽"
-                className="mt-3 flex flex-wrap justify-center gap-1"
-                data-review-pages
-              >
-                {Array.from({ length: d.reviewPages }, (_, i) => i + 1).map(
-                  (n) => (
-                    <Link
-                      key={n}
-                      href={pageHref(n)}
-                      aria-current={n === d.reviewPage ? "page" : undefined}
-                      className={`inline-flex size-9 items-center justify-center rounded-lg text-sm ${n === d.reviewPage ? "bg-ink font-bold text-surface" : "hover:bg-bg"}`}
-                    >
-                      {n}
-                    </Link>
-                  ),
-                )}
-              </nav>
-            )}
+            {d.reviewPages > 1 && <PageLinks page={d.reviewPage} pages={d.reviewPages} href={(n) => pageHref(n)} label="후기 쪽" data="review" />}
           </>
         )}
       </section>
