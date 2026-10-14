@@ -73,3 +73,20 @@ describe("뺀 까닭 (reviewVerdict)", () => {
     expect(reviewVerdict({ title: "동구 마피아 피자 후기", summary: "" }, mafia)).toEqual({ keep: true });
   });
 });
+
+describe("다른 곳 후기 (parseKakaoReviews · reviewKey)", () => {
+  it("카카오(다음) 블로그·카페 → 후기, 한국 날짜, https 썸네일", async () => {
+    const { parseKakaoReviews } = await import("@/lib/food");
+    const [r] = parseKakaoReviews(
+      { documents: [{ title: "<b>마피아</b> 후기", contents: "맛있&amp;좋아", url: "https://a.tistory.com/1", blogname: "에이", thumbnail: "http://t1.daumcdn.net/x.jpg", datetime: "2026-10-13T20:00:00.000+00:00" }] },
+      "daum",
+    );
+    expect(r).toMatchObject({ title: "마피아 후기", summary: "맛있&좋아", blogger: "에이", date: "2026-10-14", image: "https://t1.daumcdn.net/x.jpg", source: "daum" });
+    expect(parseKakaoReviews({ documents: [{ title: "x", url: "javascript:1" }] }, "cafe")).toEqual([]);
+  });
+  it("네이버 블로그 PC·모바일 주소는 같은 글", async () => {
+    const { reviewKey } = await import("@/lib/food");
+    expect(reviewKey("https://blog.naver.com/abc/1234")).toBe(reviewKey("https://m.blog.naver.com/abc/1234?x=1"));
+    expect(reviewKey("https://www.a.tistory.com/1/")).toBe("a.tistory.com/1");
+  });
+});

@@ -39,3 +39,16 @@ test("쪽이 많아도 쪽 번호는 처음·끝·앞뒤만, ‹ ›로 넘긴�
   await expect(pages.locator("a[aria-current=page]")).toHaveText("2");
   await expect(pages.getByRole("link", { name: "이전 쪽" })).toBeVisible();
 });
+
+test("식당 후기는 1년 안 글을 출처별로 골라 볼 수 있다", async ({ page }) => {
+  await page.goto("/food?tab=search&q=%EB%A7%88%ED%94%BC%EC%95%84&place=1000");
+  const all = page.locator('[data-chip="rs-all"]');
+  test.skip((await all.count()) === 0, "열쇠가 없는 시험 서버");
+  await expect(page.locator("[data-review-count]")).toContainText("최근 1년");
+  const daum = page.locator('[data-chip="rs-daum"]');
+  if (await daum.count()) {
+    await daum.click();
+    await expect(page).toHaveURL(/rs=daum/);
+    await expect(page.locator('[data-food-reviews] [data-review-source="daum"]').first()).toBeVisible();
+  }
+});
