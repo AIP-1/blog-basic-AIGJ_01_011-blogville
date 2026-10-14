@@ -666,6 +666,8 @@ export const blogStocks = pgTable(
     market: text("market").notNull(),
     code: text("code").notNull(),
     name: text("name").notNull(),
+    // 옆 칸·설정에 보이는 순서 (작은 것부터, 주인이 ▲▼·끌어 놓기로 바꾼다)
+    position: integer("position").notNull().default(0),
     createdAt: createdAt(),
   },
   (t) => [
