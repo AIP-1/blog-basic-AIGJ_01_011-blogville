@@ -437,7 +437,9 @@ function enrichReviews(list: FoodReview[]): Promise<FoodReview[]> {
   // 네이버 블로그는 글을 열어 사진·협찬 표시를 읽고, 다른 곳은 받은 썸네일을 두고 요약 글로만 협찬 표시를 본다
   return mapLimit(list, 4, async (r) => {
     const page = await readReviewPage(r.url);
-    const sponsor = page.sponsor ?? r.sponsor ?? (r.source && r.source !== "naver" ? detectSponsor(r.summary) : null);
+    // 글 본문·검색 요약 중 한 곳이라도 협찬이면 협찬 (요약에만 "제공받아 작성"이 보이는 글도 있다)
+    const fromSummary = detectSponsor(`${r.title} ${r.summary}`);
+    const sponsor = [page.sponsor, r.sponsor, fromSummary].includes("sponsored") ? "sponsored" : (page.sponsor ?? r.sponsor ?? fromSummary);
     const ocr = sponsor === "sponsored" ? null : sponsorOcrState(r.url);
     return { ...r, image: page.image ?? r.image ?? null, sponsor: ocr === "sponsored" ? "sponsored" : sponsor, sponsorCheck: ocr === "pending" ? ("pending" as const) : undefined };
   });
@@ -469,23 +471,36 @@ function yearAgo(today: string): string {
 
 /** 네이버 블로그: 최신순 100편씩, 1년보다 오래된 글이 나오거나 1,000편(네이버 한도)까지 */
 async function naverYear(place: FoodPlace, since: string): Promise<FoodReview[]> {
-  const out: FoodReview[] = [];
-  for (let start = 1; start <= 901; start += 100) {
-    const list = parseReviews(await naver("/search/v1/blog", { query: reviewQuery(place), display: 100, start, sort: "date" })).map((r) => ({ ...r, source: "naver" as const }));
-    out.push(...list);
-    if (list.length < 100 || list.some((r) => r.date && r.date < since)) break;
-  }
-  return out;
+  return pagesUntil(10, async (i) => {
+    const list = parseReviews(await naver("/search/v1/blog", { query: reviewQuery(place), display: 100, start: i * 100 + 1, sort: "date" })).map((r) => ({ ...r, source: "naver" as const }));
+    return { list, last: list.length < 100 || list.some((r) => r.date && r.date < since) };
+  });
 }
 
 /** 카카오(다음) 블로그·카페: 최신순 50편씩, 1년보다 오래된 글이 나오거나 쪽 한도까지 */
 async function kakaoYear(place: FoodPlace, since: string, kind: "blog" | "cafe", pages: number): Promise<FoodReview[]> {
-  const out: FoodReview[] = [];
-  for (let page = 1; page <= pages; page++) {
-    const json = (await kakao(`/v2/search/${kind}`, { query: reviewQuery(place), sort: "recency", size: 50, page })) as { meta?: { is_end?: boolean } };
+  return pagesUntil(pages, async (i) => {
+    const json = (await kakao(`/v2/search/${kind}`, { query: reviewQuery(place), sort: "recency", size: 50, page: i + 1 })) as { meta?: { is_end?: boolean } };
     const list = parseKakaoReviews(json, kind === "blog" ? "daum" : "cafe");
-    out.push(...list);
-    if (json?.meta?.is_end !== false || list.some((r) => r.date && r.date < since)) break;
+    return { list, last: json?.meta?.is_end !== false || list.some((r) => r.date && r.date < since) };
+  });
+}
+
+/**
+ * 최신순 쪽들을 끝(1년보다 오래된 글·마지막 쪽)이 나올 때까지. 첫 쪽 뒤에는 2쪽·3쪽…씩 한꺼번에 불러
+ * 후기가 많은 식당도 빨리 모은다 (끝 쪽 뒤에 미리 받은 쪽은 버린다)
+ */
+async function pagesUntil<T>(max: number, load: (i: number) => Promise<{ list: T[]; last: boolean }>): Promise<T[]> {
+  const out: T[] = [];
+  let i = 0;
+  for (let batch = 1; i < max; batch = Math.min(batch * 2, 4)) {
+    const idx = Array.from({ length: Math.min(batch, max - i) }, (_, k) => i + k);
+    const pages = await Promise.all(idx.map(load));
+    for (const p of pages) {
+      out.push(...p.list);
+      if (p.last) return out;
+    }
+    i += idx.length;
   }
   return out;
 }
