@@ -117,3 +117,21 @@ describe("후기 거르기 강화 (마피아 실제 사례)", () => {
     ["기어이 기적이 찾아오는 영화처럼", "스플랜더 했는데 제가이겼습니다. 마피아도 하고 언니들 화투치는거 구경도 하고", false],
   ] as const)("%s → %s", async (title, summary, want) => expect(await v(title, summary)).toBe(want));
 });
+
+describe("후기 거르기 v3 (짧은 이름 낱말 경계·다른 업종)", () => {
+  const imp = () => import("@/lib/food-relevance");
+  it("짧은 이름은 더 긴 낱말 속이면 아님", async () => {
+    const { isRelevantReview } = await imp();
+    const garden = { name: "정원", address: "전남 순천시 연향동 1", category: "한식 > 백반" };
+    expect(isRelevantReview({ title: "순천만국가정원맛집 도원경 꼬막정식", summary: "" }, garden)).toBe(false);
+    expect(isRelevantReview({ title: "순천 정원 백반 맛집 다녀왔어요", summary: "" }, garden)).toBe(true);
+    const spring = { name: "봄", address: "광주 서구 상무대로 1", category: "카페" };
+    expect(isRelevantReview({ title: "광천동 점심 맛집 고향에봄", summary: "" }, spring)).toBe(false);
+  });
+  it("제목이 다른 업종이고 이름이 요약에만 있으면 뺀다", async () => {
+    const { isRelevantReview } = await imp();
+    const place = { name: "고향집뚝배기", address: "전남 여수시 학동 1", category: "한식 > 찌개" };
+    expect(isRelevantReview({ title: "여수 원네일 | 영롱함 그 자체! 여수 네일샵", summary: "고향집뚝배기 맛집 옆 건물" }, place)).toBe(false);
+    expect(isRelevantReview({ title: "[여수 맛집] 아이랑 가기 좋은 식당 '고향집뚝배기' 내돈내산 후기", summary: "" }, place)).toBe(true);
+  });
+});
