@@ -90,3 +90,15 @@ describe("다른 곳 후기 (parseKakaoReviews · reviewKey)", () => {
     expect(reviewKey("https://www.a.tistory.com/1/")).toBe("a.tistory.com/1");
   });
 });
+
+describe("통합특별시 주소 (shortCity · areaOf)", () => {
+  it("전남광주통합특별시는 구에 따라 광주/전남, 블로그 검색용 시·구", async () => {
+    const { shortCity, areaOf } = await import("@/lib/food");
+    expect(shortCity("전남광주통합특별시 서구 상무오월로15번길 28-15")).toBe("광주 서구 상무오월로15번길 28-15");
+    expect(shortCity("전남광주통합특별시 광산구 첨단로 1")).toBe("광주 광산구 첨단로 1");
+    expect(shortCity("전남광주통합특별시 순천시 연향동 1")).toBe("전남 순천시 연향동 1");
+    expect(areaOf("전남광주통합특별시 동구 금남로 18")).toBe("광주 동구");
+    expect(shortCity("광주광역시 북구 경양로 126")).toBe("광주 북구 경양로 126");
+    expect(shortCity("강원특별자치도 강릉시 교동 1")).toBe("강원 강릉시 교동 1");
+  });
+});

@@ -180,7 +180,7 @@ export function shortCategory(raw: unknown): string {
 
 /** 주소에서 "광주 서구"처럼 시·구 두 마디 (같은 가게 묶기·지도 검색에 쓴다) */
 export function areaOf(address: string): string {
-  return address.split(" ").slice(0, 2).join(" ");
+  return shortCity(address).split(" ").slice(0, 2).join(" ");
 }
 
 /**
