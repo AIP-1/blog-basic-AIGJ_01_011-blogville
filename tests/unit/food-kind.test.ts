@@ -160,3 +160,18 @@ describe("후기 거르기 v5 (체인 다른 지점·시공 글)", () => {
     expect(isRelevantReview({ title: "광주 상무초밥 상무점 런치 후기", summary: "" }, branch)).toBe(true);
   });
 });
+
+describe("후기 거르기 v6 (일기 글·같은 건물 다른 가게 글)", () => {
+  it("주소가 같아도 일기 글·다른 가게 후기는 빼고, 그 가게 후기는 남긴다", async () => {
+    const { isRelevantReview } = await import("@/lib/food-relevance");
+    const p = { name: "상무초밥 상무점", address: "광주 서구 운천로 253", category: "초밥,롤 > 상무초밥", phone: "062-385-9200" };
+    const embed = "상무초밥 상무본점 전남광주통합특별시 서구 운천로 253";
+    expect(isRelevantReview({ title: "날씨 좋아 행복한 9월의 나=(^.^)=", summary: `간단히 초밥으로 해결! 역시 상무초밥 ${embed} 네일 하러` }, p)).toBe(false);
+    expect(isRelevantReview({ title: "2026년 7-8월 로로네집 일상블로그", summary: `친구와 상무초밥 데이트 ${embed}` }, p)).toBe(false);
+    expect(isRelevantReview({ title: "10월 첫째주 일상", summary: `점심은 ${embed}` }, p)).toBe(false);
+    expect(isRelevantReview({ title: "9월 먹부림~★", summary: `${embed} 초밥 맛있었다` }, p)).toBe(false);
+    expect(isRelevantReview({ title: "광주의 하이디라오 상무지구 헬로훠궈 내돈내산 찐후기", summary: "서구 운천로 253 2층 영업시간 1층에는 상무초밥이랑 라무진이 있네여" }, p)).toBe(false);
+    expect(isRelevantReview({ title: "상무초밥 상무본점 메뉴 구성과 웨이팅 주차 정보 정리", summary: "📍 전남광주 서구 운천로 253" }, p)).toBe(true);
+    expect(isRelevantReview({ title: "광주 초밥 맛집 상무지구 내돈내산 후기", summary: `${embed} 자부심초밥 가츠오우동` }, p)).toBe(true);
+  });
+});

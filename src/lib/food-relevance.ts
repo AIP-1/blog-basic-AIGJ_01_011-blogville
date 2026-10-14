@@ -39,6 +39,11 @@ const NAME_AS_OTHER_BEFORE = "(?:영화|연극|게임|드라마|웹툰|소설|�
 // 식당이 아닌 업종 (제목이 이런 이야기면 식당 후기가 아니다)
 const OTHER_BIZ = /네일|헤어|미용실|미용|피부과|피부관리|병원|의원|치과|한의원|학원|숙소|호텔|펜션|모텔|리조트|부동산|인테리어|웨딩|스튜디오|헬스|필라테스|요가|여행\s*기록|일상|브이로그|vlog|시공|설치|간판|디스플레이|키오스크|POS|창업\s*컨설팅|가맹\s*문의/i;
 
+// 하루·한 달 일기 글 ("10월 첫째주 일상", "9월 먹부림", "7-8월 일상블로그"): 지나가듯 들른 가게는 제목에 없다
+const DIARY = /일상|먹부림|근황|브이로그|vlog|다이어리|\d+\s*월\s*(의|첫|둘|셋|넷|마지막|기록|결산|정리|모음)|\d+\s*주\s*차|주간|하루\s*기록|결산/i;
+// 제목이 어떤 가게 한 곳의 후기인 글 ("상무지구 한식 맛집 송경솥밥", "헬로훠궈 내돈내산 찐후기")
+const REVIEWISH = /맛집|후기|내돈내산|메뉴|리뷰|방문기|솔직/;
+
 export type ReviewVerdict = { keep: true } | { keep: false; reason: "spam" | "no-name" | "off-topic" };
 
 export const VERDICT_LABELS = { spam: "광고·스팸", "no-name": "식당 이름 없음", "off-topic": "다른 이야기" } as const;
@@ -72,8 +77,13 @@ export function reviewVerdict(
   const digits = (place.phone ?? "").replace(/\D/g, "");
   const exact = (roadWord.length >= 3 && flat.includes(squash(roadWord))) || (digits.length >= 8 && text.replace(/\D/g, "").includes(digits));
   if (!exact && (new RegExp(nr + NAME_AS_OTHER_AFTER).test(text) || new RegExp(NAME_AS_OTHER_BEFORE + nr).test(text))) return { keep: false, reason: "off-topic" };
-  // 제목이 다른 업종(네일·미용·숙소·병원·간판 시공…) 이야기면 식당 후기가 아니다 (제목에 이름이 없거나, 이름이 있어도 시공·설치 글)
   const inTitle = squash(r.title).includes(name);
+  // 분류 낱말 ("초밥,롤 > 상무초밥" → 초밥·상무초밥)
+  const catWords = (place.category ?? "").split(/[>,]/).map((w) => w.trim()).filter((w) => w.length >= 2);
+  // 제목에 이름이 없는 일기 글, 또는 제목이 다른 가게 후기인데 이름이 한 번 지나가듯 나온 글 (같은 건물 다른 가게는 주소·전화도 같다)
+  if (!inTitle && DIARY.test(r.title)) return { keep: false, reason: "off-topic" };
+  if (!inTitle && hits.length === 1 && REVIEWISH.test(r.title) && !catWords.some((w) => r.title.includes(w))) return { keep: false, reason: "off-topic" };
+  // 제목이 다른 업종(네일·미용·숙소·병원·간판 시공…) 이야기면 식당 후기가 아니다 (제목에 이름이 없거나, 이름이 있어도 시공·설치 글)
   if (!exact && OTHER_BIZ.test(r.title) && (!inTitle || /시공|설치|간판|디스플레이|키오스크|POS|창업|가맹/i.test(r.title))) return { keep: false, reason: "off-topic" };
   // 체인 다른 지점: "상무초밥 신촌점"처럼 이름 뒤 지점 이름이 이 가게 동네가 아니면 다른 가게
   const branchName = /([가-힣A-Za-z]{1,8})점$/.exec(place.name.trim())?.[1] ?? null;
