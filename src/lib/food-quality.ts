@@ -273,3 +273,39 @@ export function dongFromRegion(
     ),
   };
 }
+
+/**
+ * 카카오(다음) 블로그 검색 결과 → 후기. 티스토리·다음·브런치 같은 네이버 밖 블로그.
+ * 같은 이름의 네이버 블로거와 섞이지 않게 글쓴이 앞에 "d:"를 붙인다.
+ */
+export function parseDaumBlogs(json: unknown): FoodReview[] {
+  const docs = (json as { documents?: unknown })?.documents;
+  if (!Array.isArray(docs)) return [];
+  const clean = (v: unknown) =>
+    typeof v === "string"
+      ? v
+          .replace(/<[^>]*>/g, "")
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;|&apos;/g, "'")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/&amp;/g, "&")
+          .trim()
+      : "";
+  return docs.flatMap((d: Record<string, unknown>) => {
+    const url =
+      typeof d?.url === "string" && /^https?:\/\//.test(d.url) ? d.url : null;
+    const title = clean(d?.title);
+    if (!url || !title) return [];
+    const dt = typeof d.datetime === "string" ? d.datetime.slice(0, 10) : "";
+    return [
+      {
+        title,
+        summary: clean(d.contents),
+        url,
+        blogger: `d:${clean(d.blogname) || new URL(url).host}`,
+        date: /^\d{4}-\d{2}-\d{2}$/.test(dt) ? dt : "",
+      },
+    ];
+  });
+}
