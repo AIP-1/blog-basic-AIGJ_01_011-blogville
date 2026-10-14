@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { BlogCoverForm } from "@/components/settings/BlogCoverForm";
 import { StockManager } from "@/components/settings/StockManager";
+import { WidgetManager } from "@/components/settings/WidgetManager";
+import { layoutOf } from "@/lib/widgets";
 import { listBlogStocks } from "@/server/stocks";
 import { CategoryManager } from "@/components/settings/CategoryManager";
 import { VisitChart } from "@/components/settings/VisitChart";
@@ -69,6 +71,9 @@ export default async function BlogSettingsPage({ searchParams }: PageProps<"/set
       </Card>
       <Card id="cover" title="🖼️ 커버 사진">
         <BlogCoverForm coverKey={blog.coverKey} />
+      </Card>
+      <Card id="widgets" title="🧩 위젯 관리">
+        <WidgetManager layout={layoutOf(blog.widgetLayout)} />
       </Card>
       <Card id="stocks" title="📈 관심 종목">
         <StockManager stocks={stocks} />

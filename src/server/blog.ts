@@ -7,6 +7,7 @@ import { attachments, blogs, items, posts, profiles } from "@/db/schema";
 import { likePattern } from "@/lib/blog-search";
 import { DEFAULT_ACCENT, type BlogAccent } from "@/lib/blog-accent";
 import { DEFAULT_LIST_STYLE, type ListStyle } from "@/lib/list-style";
+import type { WidgetLayout } from "@/lib/widgets";
 import { BLOG_ERRORS } from "@/lib/blog-rules";
 import { mayUseSlug, normalizeName, SLUG_RE } from "@/lib/names";
 import { findNameConflict, isUniqueViolation, lockName } from "./names";
@@ -100,6 +101,11 @@ export async function updateBlogListStyle(ownerId: string, style: ListStyle) {
     .update(blogs)
     .set({ listStyle: style === DEFAULT_LIST_STYLE ? null : style })
     .where(eq(blogs.ownerId, ownerId));
+}
+
+/** 옆 칸 위젯 배치 (layoutOf로 고른 값). null이면 기본 배치로 */
+export async function updateBlogWidgets(ownerId: string, layout: WidgetLayout | null) {
+  await db.update(blogs).set({ widgetLayout: layout }).where(eq(blogs.ownerId, ownerId));
 }
 
 export const COVER_ERRORS = {

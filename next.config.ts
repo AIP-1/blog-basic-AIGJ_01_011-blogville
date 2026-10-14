@@ -9,7 +9,7 @@ const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   // 다른 사이트로 나갈 때는 주소 전체 대신 사이트 주소만 알린다 (비공개 글 주소가 새지 않게)
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), browsing-topics=()" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self), browsing-topics=()" },
 ];
 // 스크립트는 Next가 화면에 바로 넣는 것이 있어 막지 않고, 틀 넣기·플러그인·base 바꾸기만 막는다
 const pageCsp = "frame-ancestors 'self'; object-src 'none'; base-uri 'self'";

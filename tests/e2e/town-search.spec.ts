@@ -94,7 +94,7 @@ test.describe("BLOG-07 마을 검색", () => {
     await expect(page).toHaveURL(/page=2/);
     await expect(page).toHaveURL(/q=/);
     await expect(listTitle(page)).toHaveText(`🔍 '${key} 쪽' 검색 결과`);
-    await expect(page.getByRole("link", { name: `${key} 쪽 9` })).toBeVisible();
+    await expect(page.locator("section[aria-labelledby=list-title]").getByRole("link", { name: `${key} 쪽 9` })).toBeVisible();
     await expect(blogRows(page)).toHaveCount(0); // 블로그 묶음은 1페이지에만
 
     await page.getByRole("link", { name: "← 전체 글 보기" }).click();

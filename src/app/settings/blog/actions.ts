@@ -5,7 +5,8 @@ import { BLOG_ERRORS, checkBlogIntro, checkBlogTitle } from "@/lib/blog-rules";
 import { parseId } from "@/lib/ids";
 import { KEY_PATTERN } from "@/lib/attachments";
 import { getMyBlog, requireMember } from "@/server/dal";
-import { COVER_ERRORS, removeBlogCover, setBlogCover, updateBlogAccent as saveAccent, updateBlogInfo as saveInfo, updateBlogListStyle as saveListStyle, updateBlogSlug as saveSlug } from "@/server/blog";
+import { COVER_ERRORS, removeBlogCover, setBlogCover, updateBlogAccent as saveAccent, updateBlogInfo as saveInfo, updateBlogListStyle as saveListStyle, updateBlogSlug as saveSlug, updateBlogWidgets } from "@/server/blog";
+import { layoutOf, WIDGET_MESSAGES } from "@/lib/widgets";
 import { isListStyle, LIST_STYLE_ERROR } from "@/lib/list-style";
 import { ACCENT_ERROR, isBlogAccent } from "@/lib/blog-accent";
 import * as category from "@/server/category";
@@ -60,6 +61,26 @@ export async function updateBlogListStyle(_prev: SettingsState, formData: FormDa
   await saveListStyle(member.userId, style);
   refresh((await getMyBlog(member.userId)).slug);
   return { message: BLOG_ERRORS.saved, values: { listStyle: style } };
+}
+
+/** 옆 칸 위젯 배치 저장: 화면이 보낸 JSON을 layoutOf로 고쳐 저장한다. reset이면 기본 배치(NULL) */
+export async function saveWidgetLayout(_prev: SettingsState, formData: FormData): Promise<SettingsState> {
+  const member = await requireMember();
+  if (formData.get("reset") === "1") {
+    await updateBlogWidgets(member.userId, null);
+    refresh((await getMyBlog(member.userId)).slug);
+    return { message: WIDGET_MESSAGES.reset };
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text(formData, "layout"));
+  } catch {
+    return { error: WIDGET_MESSAGES.invalid };
+  }
+  if (!raw || typeof raw !== "object" || !Array.isArray((raw as { items?: unknown }).items)) return { error: WIDGET_MESSAGES.invalid };
+  await updateBlogWidgets(member.userId, layoutOf(raw));
+  refresh((await getMyBlog(member.userId)).slug);
+  return { message: WIDGET_MESSAGES.saved };
 }
 
 export type CoverState = { error: string } | { message: string } | null;
