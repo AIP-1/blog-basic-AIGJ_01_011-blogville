@@ -35,6 +35,8 @@ jobs:
             echo "== 8400 포트"; (ss -ltnp 2>/dev/null || netstat -ltn 2>/dev/null) | grep -E ':8400\b' || echo "8400을 듣는 곳이 없어요"
             echo "== 서버 안에서 열기"; for u in http://127.0.0.1:8400/ http://$(hostname -I | awk '{print $1}'):8400/; do echo "$u -> $(curl -s -o /dev/null -m 10 -w '%{http_code}' $u || echo 실패)"; done
             echo "== 서버 IP"; hostname -I
+            echo "== nginx가 보내는 앱 (upstream.conf)"; grep -E '^\s*server ' ~/blogville/nginx/conf.d/upstream.conf 2>/dev/null || echo "아직 nginx 전 구성이에요"
+            echo "== 답한 앱"; curl -sI -m 10 http://127.0.0.1:8400/ | grep -i '^x-bv8400-upstream' || echo "머리에 없음"
             ACTIVE=$(cat ~/blogville/state/active 2>/dev/null || echo blue); APP="bv8400-$ACTIVE"; echo "== 서비스 중: $APP"
             echo "== 관리자 계정 점검 (값은 찍지 않음)"; $D exec -e ADMIN_USERNAME="$ADMIN_USERNAME" -e ADMIN_PASSWORD="$ADMIN_PASSWORD" "$APP" node scripts/check-admin.mjs || echo "점검 스크립트가 없는 버전이에요 (다음 배포 뒤 다시)"
             echo "== 최근 로그"; $D logs --tail 30 "$APP" 2>&1 | grep -vE "collation|severity|01000|detail:|hint:|file:|line:|routine:|^\{|^\}" | tail -30
