@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { NearbyLocator } from "@/components/food/NearbyLocator";
+import { FocusOnMapButton, FoodMap } from "@/components/food/FoodMap";
 import { PlaceCard } from "@/components/food/PlaceCard";
 import {
   buzzLabel,
@@ -25,6 +26,11 @@ export const metadata: Metadata = {
 };
 
 const DEFAULT_REGION = "서울";
+
+/** 🗺 지도용 카카오 JavaScript 키 (없으면 지도 없이 목록만) */
+function mapKey(): string | null {
+  return process.env.KAKAO_JS_KEY || null;
+}
 
 function detailHref(q: string, p: FoodPlace) {
   return `/food?tab=search&q=${encodeURIComponent(q)}&place=${encodeURIComponent(p.id)}`;
@@ -96,13 +102,17 @@ async function NearTab({ lat, lng, sort }: { lat?: string; lng?: string; sort: "
         ) : result.value.length === 0 ? (
           <Notice>{FOOD_MESSAGES.nearEmpty}</Notice>
         ) : (
-          <ol className="space-y-3" data-food-list="near">
-            {result.value.map((p) => (
-              <li key={p.id}>
-                <PlaceCard place={p} recent={naverFoodEnabled() ? p.recent : undefined} detailHref={detailHref(p.name, p)} />
-              </li>
-            ))}
-          </ol>
+          <>
+            {mapKey() && <FoodMap jsKey={mapKey()!} places={result.value} me={at} researchSort={sort} />}
+            <ol className="space-y-3" data-food-list="near">
+              {result.value.map((p, i) => (
+                <li key={p.id}>
+                  <PlaceCard place={p} rank={mapKey() ? i + 1 : undefined} recent={naverFoodEnabled() ? p.recent : undefined} detailHref={detailHref(p.name, p)} />
+                  {mapKey() && p.lat !== null && <FocusOnMapButton id={p.id} />}
+                </li>
+              ))}
+            </ol>
+          </>
         ))}
     </div>
   );
@@ -133,13 +143,17 @@ async function RegionTab({ region }: { region: string }) {
       ) : result.value.length === 0 ? (
         <Notice>{FOOD_MESSAGES.empty}</Notice>
       ) : (
-        <ol className="space-y-3" data-food-list="region">
-          {result.value.map((p, i) => (
-            <li key={p.id}>
-              <PlaceCard place={p} recent={p.recent} rank={i + 1} detailHref={detailHref(p.name, p)} />
-            </li>
-          ))}
-        </ol>
+        <>
+          {mapKey() && result.value.some((p) => p.lat !== null) && <FoodMap jsKey={mapKey()!} places={result.value} />}
+          <ol className="space-y-3" data-food-list="region">
+            {result.value.map((p, i) => (
+              <li key={p.id}>
+                <PlaceCard place={p} recent={p.recent} rank={i + 1} detailHref={detailHref(p.name, p)} />
+                {mapKey() && p.lat !== null && <FocusOnMapButton id={p.id} />}
+              </li>
+            ))}
+          </ol>
+        </>
       )}
     </div>
   );
@@ -196,6 +210,7 @@ async function PlaceDetailView({ place, backHref }: { place: FoodPlace; backHref
         ← 검색 결과로
       </Link>
       <PlaceCard place={place} recent={d.reviews.status === "ok" ? d.recent : undefined} />
+      {mapKey() && place.lat !== null && <FoodMap jsKey={mapKey()!} places={[place]} />}
 
       {d.local.length > 0 && (
         <section aria-labelledby="food-local" className="rounded-xl border border-line bg-surface p-4">
