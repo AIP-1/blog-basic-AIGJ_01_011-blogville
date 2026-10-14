@@ -1,7 +1,7 @@
 // 🍽 블로그 글 본문이 정말 그 식당 이야기인지: 제목·요약만으로는 "마피아 게임"·"서구사회" 같은 글이 섞이므로,
 // 글을 열었을 때 본문에 그 식당의 전화번호·도로명·지도 링크가 있는지 본다.
 // 하나라도 있으면 확실한 후기, 없으면 이름과 먹은 이야기가 여러 번 나와야 남기고, 그것도 아니면 뺀다.
-import type { FoodPlace } from "./food";
+import { shortCity, type FoodPlace } from "./food";
 
 export type BodyMatch = "match" | "weak" | "mismatch" | "unknown";
 
@@ -69,19 +69,28 @@ export function bodyMatch(html: string, place: Pick<FoodPlace, "id" | "name" | "
   return named >= 2 && dining >= 3 ? "weak" : "mismatch";
 }
 
-// 블로그 제목에 자주 나오는 다른 지역 이름 (여행 일기에 그 식당 이름이 지나가는 글을 가려낸다).
-// 흔한 낱말과 겹치는 이름(공주·부여·진주·세종·동해·남해)은 넣지 않는다
+// 블로그 제목에 자주 나오는 다른 지역 이름 (여행 일기·다른 지점 글에 그 식당 이름이 지나가는 글을 가려낸다).
+// 흔한 낱말과 겹치는 이름(공주·부여·진주·동해·남해)은 넣지 않는다
 const REGIONS = [
-  "서울", "부산", "대구", "인천", "광주", "대전", "울산", "제주", "서귀포", "강릉", "속초", "양양", "춘천", "원주", "평창", "여수", "순천", "목포", "전주",
-  "군산", "경주", "포항", "안동", "통영", "거제", "창원", "김해", "청주", "천안", "태안", "보령", "가평", "수원", "담양", "보성",
-  "해남", "완도", "고흥", "울릉", "단양", "제천", "충주", "삼척", "정선", "영월", "오사카", "도쿄", "후쿠오카", "교토", "삿포로", "다낭", "방콕", "대만", "타이베이", "홍콩",
+  "서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종", "제주", "서귀포", "강릉", "속초", "양양", "춘천", "원주", "평창", "여수", "순천", "목포", "전주",
+  "군산", "경주", "포항", "안동", "통영", "거제", "창원", "김해", "청주", "천안", "태안", "보령", "가평", "수원", "담양", "보성", "나주", "광양", "익산", "구미",
+  "해남", "완도", "고흥", "울릉", "단양", "제천", "충주", "삼척", "정선", "영월", "의정부", "고양", "용인", "성남", "부천", "안산", "안양", "평택", "김포", "파주",
+  "오사카", "도쿄", "후쿠오카", "교토", "삿포로", "다낭", "방콕", "대만", "타이베이", "홍콩",
 ];
+// 블로그에 도시 이름 대신 자주 쓰는 동네 → 속한 시·도 (같은 도시 안의 동네 글은 빼지 않으려고)
+const HOODS: Record<string, string> = {
+  신촌: "서울", 홍대: "서울", 강남역: "서울", 잠실: "서울", 성수동: "서울", 이태원: "서울", 을지로: "서울", 여의도: "서울", 압구정: "서울", 연남동: "서울",
+  판교: "경기", 분당: "경기", 일산: "경기", 동탄: "경기", 송도: "인천", 해운대: "부산", 서면: "부산", 광안리: "부산", 동성로: "대구", 나성동: "세종",
+};
 
-/** 제목이 다른 지역 이야기인지 (예: 광주 식당인데 "7/29-31 강릉야호~"). 그 식당 동네 말이 같이 있으면 아니다 */
-export function otherRegionTitle(title: string, place: Pick<FoodPlace, "address">, localWords: string[]): boolean {
-  const flat = squash(title);
-  const own = squash(place.address);
-  const other = REGIONS.find((r) => flat.includes(r) && !own.includes(r));
+/** 제목이 다른 지역 이야기인지 (예: 광주 식당인데 "7/29-31 강릉야호~", "신촌 … 상무초밥 신촌점"). 그 식당 동네 말이 같이 있으면 아니다 */
+export function otherRegionTitle(title: string, place: Pick<FoodPlace, "address"> & { name?: string }, localWords: string[]): boolean {
+  // 식당 이름 속 지역 낱말("세종한정식", "부산갈매기")은 지역으로 보지 않는다
+  const flat = place.name ? squash(title).split(squash(place.name)).join(" ") : squash(title);
+  const own = squash(`${place.address} ${shortCity(place.address)}`);
+  const other =
+    REGIONS.some((r) => flat.includes(r) && !own.includes(r)) ||
+    Object.entries(HOODS).some(([hood, city]) => flat.includes(hood) && !own.includes(hood) && !own.includes(city));
   if (!other) return false;
   return !localWords.some((w) => w.length >= 2 && flat.includes(squash(w)));
 }
