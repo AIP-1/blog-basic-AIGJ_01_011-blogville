@@ -304,3 +304,10 @@ body {
   body:has([data-phone-tabs]) .to-top { bottom: calc(4.5rem + env(safe-area-inset-bottom)); }
   body:has([data-phone-tabs]) .toast { bottom: calc(5rem + env(safe-area-inset-bottom)); }
 }
+
+/* 🗺 맛집 지도 (카카오맵 CustomOverlay) */
+.food-map-me { width: 18px; height: 18px; border-radius: 9999px; background: #2a78d6; border: 3px solid #fff; box-shadow: 0 0 0 6px rgb(42 120 214 / 0.25); }
+.food-map-pin { display: flex; align-items: center; justify-content: center; min-width: 30px; height: 30px; padding: 0 6px; border-radius: 9999px; background: var(--accent); color: #fff; font-weight: 800; font-size: 13px; border: 2px solid #fff; box-shadow: 0 2px 6px rgb(0 0 0 / 0.3); cursor: pointer; }
+.food-map-info { display: grid; gap: 2px; min-width: 180px; max-width: 240px; padding: 10px 12px; border-radius: 12px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 6px 18px rgb(0 0 0 / 0.18); font-size: 13px; white-space: normal; }
+.food-map-info span { color: var(--ink-soft); font-size: 12px; }
+.food-map-info a { color: var(--accent); font-weight: 700; font-size: 12px; }

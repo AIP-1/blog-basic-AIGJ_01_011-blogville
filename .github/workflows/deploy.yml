@@ -8,7 +8,12 @@
 #             FEEDBACK_BOT_TOKEN (선택, 32자 이상이면 버그·문의 자동 처리 API /api/feedback가 켜짐)
 #             NAVER_SEARCH_CLIENT_ID·_SECRET (선택, 있으면 📰 뉴스 위젯이 켜짐 — NAVER API HUB 뉴스 검색 앱의 인증 정보)
 #             NAVER_TREND_CLIENT_ID·_SECRET (선택, 검색어 트렌드를 다른 API HUB 앱으로 받았을 때만. 없으면 위 NAVER_SEARCH_* 앱으로 🔎 키워드 도우미)
-#             KAKAO_REST_API_KEY (선택, 있으면 🍽 맛집 내 주변·식당 찾기 — 카카오맵 사용 설정을 켠 앱의 REST API 키), KAKAO_JS_KEY (선택, 🗺 지도 — 같은 앱 JavaScript 키)
+<<<<<<< HEAD
+#             KAKAO_REST_API_KEY (선택, 있으면 🍽 맛집 내 주변·식당 찾기 — 카카오맵 사용 설정을 켠 앱의 REST API 키)
+=======
+#             KAKAO_REST_API_KEY (선택, 있으면 🍽 맛집 내 주변·식당 찾기 — 카카오맵 사용 설정을 켠 앱의 REST API 키)
+#             KAKAO_JS_KEY (선택, 있으면 🗺 맛집 지도 — 같은 앱의 JavaScript 키, Web 사이트 도메인 등록 필요)
+>>>>>>> origin/develop
 name: deploy
 
 on:
