@@ -8,7 +8,7 @@
 |---|---|---|
 | `build.gradle`의 `dependencies { }` | `package.json`의 `dependencies`·`devDependencies` | 쓰는 라이브러리 목록. `devDependencies`는 개발·시험에만 필요 |
 | `gradle build` (컴파일+검사+테스트+jar) | `npm run verify` | 한 번에 전부 확인. lint → typecheck → 커버리지를 재는 단위 테스트(`test:coverage`) → build를 차례로 돌립니다 |
-| `gradle compileJava` | `npm run typecheck` | 타입 오류 확인 (`tsc --noEmit`) |
+| `gradle compileJava` | `npm run typecheck` | 타입 오류 확인 (`next typegen`으로 라우트 타입을 만든 뒤 `tsc --noEmit`) |
 | `gradle check` / Checkstyle | `npm run lint` | 코드 규칙 검사 (ESLint, `eslint.config.mjs`) |
 | `gradle test` (JUnit) | `npm test` | 단위 테스트 (Vitest, `vitest.config.mts`) |
 | `gradle bootJar` | `npm run build` | 운영용 결과물 만들기 (`next build` → `.next/`) |
