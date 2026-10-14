@@ -708,19 +708,39 @@ async function SearchTab({
   );
 }
 
-async function PlaceDetailView({
-  place,
-  backHref,
-  actions,
-  page,
-  source,
-}: {
+type DetailProps = {
   place: FoodPlace;
   backHref: string;
   actions: React.ReactNode;
   page: number;
   source: ReviewSource | "all";
-}) {
+};
+
+/** 식당 상세: 가게 정보·지도는 바로 그리고, 1년 치 후기(여러 곳을 부르느라 몇 초 걸린다)는 받는 대로 이어서 그린다 */
+function PlaceDetailView(props: DetailProps) {
+  const { place, backHref, actions } = props;
+  return (
+    <div className="space-y-4" data-food-detail={place.id}>
+      <Link href={backHref} className="text-sm text-ink-soft hover:underline">
+        ← 검색 결과로
+      </Link>
+      <PlaceCard place={place} actions={actions} />
+      {mapProviders() && place.lat !== null && <FoodMap providers={mapProviders()!} places={[place]} />}
+      <Suspense
+        fallback={
+          <section className="rounded-xl border border-line bg-surface p-4" aria-busy="true" data-reviews-loading>
+            <h2 className="font-bold">📝 블로그·카페 후기</h2>
+            <p className="mt-2 animate-pulse text-sm text-ink-soft">최근 1년 후기를 네이버·티스토리·다음에서 모으는 중이에요…</p>
+          </section>
+        }
+      >
+        <PlaceDetailRest {...props} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function PlaceDetailRest({ place, page, source, backHref }: DetailProps) {
   const [d, interest] = await Promise.all([
     placeDetail(place, page, source),
     placeInterest(place),
@@ -729,18 +749,7 @@ async function PlaceDetailView({
     `${backHref}&place=${encodeURIComponent(place.id)}${src !== "all" ? `&rs=${src}` : ""}${n > 1 ? `&rp=${n}` : ""}#food-reviews`;
   const totalKept = d.sourceCounts.naver + d.sourceCounts.daum + d.sourceCounts.cafe;
   return (
-    <div className="space-y-4" data-food-detail={place.id}>
-      <Link href={backHref} className="text-sm text-ink-soft hover:underline">
-        ← 검색 결과로
-      </Link>
-      <PlaceCard
-        place={place}
-        recent={d.reviews.status === "ok" ? d.recent : undefined}
-        actions={actions}
-      />
-      {mapProviders() && place.lat !== null && (
-        <FoodMap providers={mapProviders()!} places={[place]} />
-      )}
+    <>
       {interest && <InterestSpark interest={interest} />}
 
       {d.local.length > 0 && (
@@ -775,7 +784,7 @@ async function PlaceDetailView({
       >
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 id="food-reviews" className="font-bold">
-            📝 네이버 블로그 후기
+            📝 블로그·카페 후기
           </h2>
           {d.reviews.status === "ok" && (
             <span className="text-xs text-ink-soft">{buzzLabel(d.recent)}</span>
@@ -852,7 +861,7 @@ async function PlaceDetailView({
       >
         ✏ 이 식당 후기 쓰기
       </Link>
-    </div>
+    </>
   );
 }
 
