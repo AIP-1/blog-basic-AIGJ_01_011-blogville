@@ -240,11 +240,30 @@ export function nearbyPlaces(
  * 한 번에 다섯 묶음까지라 묶음마다 "<지역> 맛집"을 기준으로 넣고, 기준 대비 비율로 바꿔 서로 비교한다.
  * 못 받으면 null (순위는 후기 수만 쓴다)
  */
+/** 데이터랩 검색어 트렌드: 묶음 이름 → 주간 검색 비율(같은 요청 안에서 가장 큰 값이 100) */
+async function trendSeries(groups: { groupName: string; keywords: string[] }[], weeks: number, today: string): Promise<Map<string, number[]>> {
+  const start = new Date(`${today}T00:00:00Z`);
+  start.setUTCDate(start.getUTCDate() - weeks * 7);
+  const res = await fetch(`${TREND()}/search-trend/v1/search`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "X-NCP-APIGW-API-KEY-ID": (process.env.NAVER_TREND_CLIENT_ID || process.env.NAVER_SEARCH_CLIENT_ID)!,
+      "X-NCP-APIGW-API-KEY": (process.env.NAVER_TREND_CLIENT_SECRET || process.env.NAVER_SEARCH_CLIENT_SECRET)!,
+    },
+    body: JSON.stringify({ startDate: start.toISOString().slice(0, 10), endDate: today, timeUnit: "week", keywordGroups: groups }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`search-trend ${res.status}`);
+  const json = (await res.json()) as { results?: { title?: string; data?: { ratio?: number }[] }[] };
+  return new Map((json.results ?? []).map((r) => [r.title ?? "", (r.data ?? []).map((d) => Number(d.ratio) || 0)]));
+}
+
 async function searchInterest(region: string, places: FoodPlace[]): Promise<Map<string, { value: number; rising: boolean }> | null> {
   if (!naverFoodEnabled() || places.length === 0) return null;
   const today = todayKST();
-  const start = new Date(`${today}T00:00:00Z`);
-  start.setUTCDate(start.getUTCDate() - TREND_WEEKS * 7);
   const anchor = { groupName: "__anchor", keywords: [`${region} 맛집`] };
   const batches: FoodPlace[][] = [];
   for (let i = 0; i < places.length; i += 4) batches.push(places.slice(i, i + 4));
@@ -253,26 +272,7 @@ async function searchInterest(region: string, places: FoodPlace[]): Promise<Map<
       remember(
         `interest|${today}|${region}|${batch.map((p) => p.id).join(",")}`,
         async () => {
-          const res = await fetch(`${TREND()}/search-trend/v1/search`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-              "X-NCP-APIGW-API-KEY-ID": (process.env.NAVER_TREND_CLIENT_ID || process.env.NAVER_SEARCH_CLIENT_ID)!,
-              "X-NCP-APIGW-API-KEY": (process.env.NAVER_TREND_CLIENT_SECRET || process.env.NAVER_SEARCH_CLIENT_SECRET)!,
-            },
-            body: JSON.stringify({
-              startDate: start.toISOString().slice(0, 10),
-              endDate: today,
-              timeUnit: "week",
-              keywordGroups: [anchor, ...batch.map((p) => ({ groupName: p.id, keywords: interestKeywords(p) }))],
-            }),
-            signal: AbortSignal.timeout(TIMEOUT_MS),
-            cache: "no-store",
-          });
-          if (!res.ok) throw new Error(`search-trend ${res.status}`);
-          const json = (await res.json()) as { results?: { title?: string; data?: { ratio?: number }[] }[] };
-          const series = new Map((json.results ?? []).map((r) => [r.title ?? "", (r.data ?? []).map((d) => Number(d.ratio) || 0)]));
+          const series = await trendSeries([anchor, ...batch.map((p) => ({ groupName: p.id, keywords: interestKeywords(p) }))], TREND_WEEKS, today);
           const base = summarizeInterest(series.get("__anchor") ?? []).average || 1;
           return batch.map((p) => {
             const s = summarizeInterest(series.get(p.id) ?? []);
@@ -287,6 +287,24 @@ async function searchInterest(region: string, places: FoodPlace[]): Promise<Map<
     console.error("맛집 검색 관심도를 못 받았어요", e instanceof Error ? e.message : e);
     return null;
   }
+}
+
+export type PlaceInterest = { weeks: number[]; rising: boolean; falling: boolean };
+
+/** 식당 한 곳의 최근 12주 네이버 검색 관심 (가장 많던 주가 100). 검색이 거의 없거나 못 받으면 null */
+export function placeInterest(place: FoodPlace): Promise<PlaceInterest | null> {
+  if (!naverFoodEnabled()) return Promise.resolve(null);
+  const today = todayKST();
+  return remember(
+    `pinterest|${today}|${place.id}`,
+    async () => {
+      const weeks = (await trendSeries([{ groupName: "p", keywords: interestKeywords(place) }], 12, today)).get("p") ?? [];
+      if (weeks.filter((w) => w > 0).length < 3) return null;
+      const s = summarizeInterest(weeks);
+      return { weeks, rising: isRising(s), falling: s.before >= 1 && s.recent < s.before * 0.7 };
+    },
+    TREND_TTL_MS,
+  ).catch(() => null);
 }
 
 /**

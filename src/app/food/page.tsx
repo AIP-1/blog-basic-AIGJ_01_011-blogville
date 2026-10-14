@@ -14,6 +14,7 @@ import {
   FoodMap,
   type MapProvider,
 } from "@/components/food/FoodMap";
+import { InterestSpark } from "@/components/food/InterestSpark";
 import { PlaceCard } from "@/components/food/PlaceCard";
 import { ReviewCards } from "@/components/food/ReviewCards";
 import { SaveButton } from "@/components/food/SaveButton";
@@ -45,6 +46,7 @@ import {
   naverFoodEnabled,
   nearbyPlaces,
   placeDetail,
+  placeInterest,
   regionHot,
   searchPlaces,
   type FoodResult,
@@ -560,7 +562,10 @@ async function PlaceDetailView({
   actions: React.ReactNode;
   page: number;
 }) {
-  const d = await placeDetail(place, page);
+  const [d, interest] = await Promise.all([
+    placeDetail(place, page),
+    placeInterest(place),
+  ]);
   const pageHref = (n: number) =>
     `${backHref}&place=${encodeURIComponent(place.id)}${n > 1 ? `&rp=${n}` : ""}#food-reviews`;
   return (
@@ -576,6 +581,7 @@ async function PlaceDetailView({
       {mapProviders() && place.lat !== null && (
         <FoodMap providers={mapProviders()!} places={[place]} />
       )}
+      {interest && <InterestSpark interest={interest} />}
 
       {d.local.length > 0 && (
         <section
