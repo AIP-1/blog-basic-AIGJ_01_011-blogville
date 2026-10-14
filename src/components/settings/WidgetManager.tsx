@@ -2,7 +2,7 @@
 
 import { useActionState, useRef, useState } from "react";
 import { saveWidgetLayout, type SettingsState } from "@/app/settings/blog/actions";
-import { defaultLayout, dropWidget, moveWidget, WEATHER_CITIES, widgetInfo, type WeatherCityKey, type WidgetItem, type WidgetKey, type WidgetLayout } from "@/lib/widgets";
+import { defaultLayout, dropWidget, moveWidget, widgetInfo, type WidgetItem, type WidgetKey, type WidgetLayout } from "@/lib/widgets";
 
 /**
  * 블로그 관리 → 🧩 위젯 관리: 끌어서(또는 ▲▼로) 순서를 바꾸고, 보이기·크기를 고른 뒤 [저장].
@@ -10,7 +10,6 @@ import { defaultLayout, dropWidget, moveWidget, WEATHER_CITIES, widgetInfo, type
  */
 export function WidgetManager({ layout }: { layout: WidgetLayout }) {
   const [items, setItems] = useState<WidgetItem[]>(layout.items);
-  const [city, setCity] = useState<WeatherCityKey>(layout.weather.city);
   const [dragging, setDragging] = useState<WidgetKey | null>(null);
   // 끌기 시작한 위젯 (렌더를 기다리지 않고 dragover·drop에서 바로 읽는다)
   const dragKey = useRef<WidgetKey | null>(null);
@@ -28,7 +27,7 @@ export function WidgetManager({ layout }: { layout: WidgetLayout }) {
   return (
     <form action={action} className="space-y-3">
       <p className="text-sm text-ink-soft">블로그 홈 옆 칸에 보일 위젯의 순서와 크기를 골라요. 끌어서 옮기거나 ▲▼를 누르세요.</p>
-      <input type="hidden" name="layout" value={JSON.stringify({ items, weather: { city } })} />
+      <input type="hidden" name="layout" value={JSON.stringify({ items })} />
       <ol className="space-y-2" data-widget-manager>
         {items.map((it, i) => {
           const info = widgetInfo(it.key);
@@ -109,17 +108,6 @@ export function WidgetManager({ layout }: { layout: WidgetLayout }) {
       <p className="sr-only" aria-live="polite">
         {announce}
       </p>
-      <label className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="font-semibold">🌤️ 날씨 기본 도시</span>
-        <select value={city} onChange={(e) => setCity(e.target.value as WeatherCityKey)} className="field w-auto" name="weatherCity">
-          {WEATHER_CITIES.map((c) => (
-            <option key={c.key} value={c.key}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-        <span className="text-ink-soft">방문자가 📍 내 위치를 누르면 그 위치 날씨로 바뀌어요</span>
-      </label>
       <div className="flex flex-wrap items-center justify-end gap-3">
         {state?.error ? (
           <p role="alert" className="form-error">
@@ -137,9 +125,7 @@ export function WidgetManager({ layout }: { layout: WidgetLayout }) {
           className="btn btn-ghost"
           disabled={pending}
           onClick={() => {
-            const base = defaultLayout();
-            setItems(base.items);
-            setCity(base.weather.city);
+            setItems(defaultLayout().items);
           }}
         >
           기본 배치로

@@ -7,7 +7,8 @@ import { guestbookPath } from "@/lib/guestbook-rules";
 import type { getBlogSidebar } from "@/server/sidebar";
 import type { VisitStats } from "@/server/stats";
 import { BlogStocks } from "./BlogStocks";
-import { BlogCalendar, BlogWeather } from "./BlogWidgets";
+import { CalendarWidget } from "./widgets/CalendarWidget";
+import { WeatherWidget } from "./widgets/WeatherWidget";
 import { WIDGET_LIMITS, type WidgetKey, type WidgetLayout, type WidgetSize } from "@/lib/widgets";
 import { thumbUrl } from "@/lib/attachments";
 import { VisitSparkline } from "./VisitSparkline";
@@ -26,12 +27,14 @@ type Props = {
   categoryNav: React.ReactNode;
   isOwner?: boolean;
   layout: WidgetLayout;
+  /** ☀️ 날씨 위젯의 블로그 도시 (blogs.weather_city) */
+  weatherCity: string | null;
   /** 👣 방문자를 크게 보일 때 최근 7일 (작게면 null) */
   visitDays: { date: string; count: number }[] | null;
 };
 
 /** 블로그 홈 오른쪽 옆 칸 (BLOG-09). 휴대폰에서는 글 목록 아래. */
-export function BlogSidebar({ blogId, slug, sidebar, visits, recordVisit, search, townSearch, activeTag, categoryNav, isOwner = false, layout, visitDays }: Props) {
+export function BlogSidebar({ blogId, slug, sidebar, visits, recordVisit, search, townSearch, activeTag, categoryNav, isOwner = false, layout, weatherCity, visitDays }: Props) {
   const empty = <p className="px-1 text-sm text-ink-soft">아직 없어요</p>;
   const linkClass = "flex min-h-11 items-center gap-2 rounded-lg px-2 hover:bg-bg";
   const sizeOf = (key: WidgetKey): WidgetSize => layout.items.find((it) => it.key === key)?.size ?? "lg";
@@ -54,16 +57,12 @@ export function BlogSidebar({ blogId, slug, sidebar, visits, recordVisit, search
         );
       case "calendar":
         return (
-          <Suspense fallback={<section className="widget min-h-40" aria-hidden />}>
-            <BlogCalendar blogId={blogId} slug={slug} size={sizeOf("calendar")} />
+          <Suspense fallback={<section className="widget min-h-72" aria-hidden />}>
+            <CalendarWidget blog={{ id: blogId, slug }} isOwner={isOwner} />
           </Suspense>
         );
       case "weather":
-        return (
-          <Suspense fallback={<section className="widget min-h-24" aria-hidden />}>
-            <BlogWeather city={layout.weather.city} size={sizeOf("weather")} />
-          </Suspense>
-        );
+        return <WeatherWidget blog={{ weatherCity }} isOwner={isOwner} />;
       case "search":
         return (
           <section className="widget" aria-labelledby="w-search">

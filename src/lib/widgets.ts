@@ -1,11 +1,12 @@
 // 블로그 옆 칸 위젯보드 (블로그 꾸미기): 주인이 순서·보이기·크기를 고른다. 브라우저와 서버가 같이 쓴다.
-// DB에는 blogs.widget_layout(jsonb)에 { items: [{ key, visible, size }], weather?: { city } } 로 둔다. NULL이면 기본 배치.
+// DB에는 blogs.widget_layout(jsonb)에 { items: [{ key, visible, size }] } 로 둔다. NULL이면 기본 배치.
+// (날씨 위젯의 도시는 위젯 안에서 주인이 바로 바꾼다: blogs.weather_city)
 // 모르는 키·겹친 키는 버리고, 새로 생긴 위젯은 기본값으로 맨 뒤에 붙인다 (옛 배치를 저장한 블로그도 새 위젯이 보이게).
 
 export const WIDGETS = [
   { key: "guestbook", icon: "📖", label: "방명록", sizable: false, hint: "방명록 바로 가기와 글 수" },
-  { key: "calendar", icon: "📅", label: "캘린더", sizable: true, hint: "글 쓴 날 표시 · 작게: 이번 주 / 크게: 한 달" },
-  { key: "weather", icon: "🌤️", label: "이번 주 날씨", sizable: true, hint: "작게: 오늘 / 크게: 7일" },
+  { key: "calendar", icon: "📅", label: "캘린더", sizable: false, hint: "글 쓴 날 표시, 누르면 그날 글" },
+  { key: "weather", icon: "☀️", label: "이번 주 날씨", sizable: false, hint: "지금·시간대별·7일 예보, 미세먼지 (도시는 위젯에서 바꿔요)" },
   { key: "stocks", icon: "📈", label: "관심 종목", sizable: true, hint: "실시간 시세 · 작게: 이름과 등락률만" },
   { key: "search", icon: "🔍", label: "블로그 검색", sizable: false, hint: "이 블로그에서 글 찾기" },
   { key: "town", icon: "🏘", label: "마을 검색", sizable: false, hint: "주인에게만 보여요" },
@@ -21,54 +22,19 @@ export const WIDGETS = [
 export type WidgetKey = (typeof WIDGETS)[number]["key"];
 export type WidgetSize = "sm" | "lg";
 export type WidgetItem = { key: WidgetKey; visible: boolean; size: WidgetSize };
-export type WidgetLayout = { items: WidgetItem[]; weather: { city: WeatherCityKey } };
-
-/** 날씨 위젯의 기본 도시 (보는 사람이 📍 내 위치를 누르기 전) */
-export const WEATHER_CITIES = [
-  { key: "seoul", label: "서울", lat: 37.5665, lon: 126.978 },
-  { key: "incheon", label: "인천", lat: 37.4563, lon: 126.7052 },
-  { key: "suwon", label: "수원", lat: 37.2636, lon: 127.0286 },
-  { key: "chuncheon", label: "춘천", lat: 37.8813, lon: 127.7298 },
-  { key: "gangneung", label: "강릉", lat: 37.7519, lon: 128.8761 },
-  { key: "cheongju", label: "청주", lat: 36.6424, lon: 127.489 },
-  { key: "sejong", label: "세종", lat: 36.48, lon: 127.289 },
-  { key: "daejeon", label: "대전", lat: 36.3504, lon: 127.3845 },
-  { key: "jeonju", label: "전주", lat: 35.8242, lon: 127.148 },
-  { key: "gwangju", label: "광주", lat: 35.1595, lon: 126.8526 },
-  { key: "daegu", label: "대구", lat: 35.8714, lon: 128.6014 },
-  { key: "pohang", label: "포항", lat: 36.019, lon: 129.3435 },
-  { key: "ulsan", label: "울산", lat: 35.5384, lon: 129.3114 },
-  { key: "changwon", label: "창원", lat: 35.2281, lon: 128.6811 },
-  { key: "busan", label: "부산", lat: 35.1796, lon: 129.0756 },
-  { key: "jeju", label: "제주", lat: 33.4996, lon: 126.5312 },
-] as const;
-
-export type WeatherCityKey = (typeof WEATHER_CITIES)[number]["key"];
-
-export const DEFAULT_WEATHER_CITY: WeatherCityKey = "seoul";
+export type WidgetLayout = { items: WidgetItem[] };
 
 export function isWidgetKey(value: unknown): value is WidgetKey {
   return WIDGETS.some((w) => w.key === value);
-}
-
-export function isWeatherCity(value: unknown): value is WeatherCityKey {
-  return WEATHER_CITIES.some((c) => c.key === value);
 }
 
 export function widgetInfo(key: WidgetKey) {
   return WIDGETS.find((w) => w.key === key)!;
 }
 
-export function weatherCity(key: WeatherCityKey) {
-  return WEATHER_CITIES.find((c) => c.key === key)!;
-}
-
-/** 처음 배치: 모두 보이고 크게. 날씨는 처음엔 작게 */
+/** 처음 배치: 모두 보이고 크게 */
 export function defaultLayout(): WidgetLayout {
-  return {
-    items: WIDGETS.map((w) => ({ key: w.key, visible: true, size: w.key === "weather" ? "sm" : "lg" })),
-    weather: { city: DEFAULT_WEATHER_CITY },
-  };
+  return { items: WIDGETS.map((w) => ({ key: w.key, visible: true, size: "lg" })) };
 }
 
 type Rec = Record<string, unknown>;
@@ -91,8 +57,7 @@ export function layoutOf(value: unknown): WidgetLayout {
     }
   }
   for (const it of base.items) if (!seen.has(it.key)) items.push(it);
-  const city = rec(r.weather)?.city;
-  return { items, weather: { city: isWeatherCity(city) ? city : DEFAULT_WEATHER_CITY } };
+  return { items };
 }
 
 /** 배치를 한 칸 위(-1)·아래(+1)로. 끝이면 그대로 */

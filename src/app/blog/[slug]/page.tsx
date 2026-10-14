@@ -322,6 +322,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
           recordVisit={!isOwner}
           isOwner={isOwner}
           layout={layout}
+          weatherCity={blog.weatherCity}
           visitDays={visitDays}
           search={search ?? ""}
           townSearch={isOwner ? (town ?? "") : undefined}

@@ -1,33 +1,42 @@
 import "server-only";
-import { and, asc, eq, gte, lt } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { blogs, posts } from "@/db/schema";
-import { monthKey, shiftMonth, type CalendarMonth } from "@/lib/calendar";
+import type { CalendarMonth, CalendarPost } from "@/lib/calendar";
 
-/** 한 달에 많이 써도 위젯이 무겁지 않게 */
-const MONTH_LIMIT = 300;
+// 📅 캘린더 위젯: 한 달 동안 그 블로그에 쓴 글을 한국 날짜별로. 주인이 아니면 공개 글만.
+// 하루에 많이 써도 앞의 몇 개만 (위젯 안 목록)
+const PER_DAY = 5;
 
-/** 📅 캘린더 위젯: 그 달(한국 날짜)에 쓴 공개 글을 날마다. 비공개·예약 글은 주인이 봐도 넣지 않는다 (같은 화면을 누가 보든 같게) */
-export async function getPostCalendar(blogId: number, year: number, month: number): Promise<CalendarMonth> {
-  const next = shiftMonth(year, month, 1);
-  // 한국 자정 = UTC 전날 15시
-  const from = new Date(Date.UTC(year, month - 1, 1) - 9 * 3_600_000);
-  const to = new Date(Date.UTC(next.year, next.month - 1, 1) - 9 * 3_600_000);
+/** 그 달(`2026-10`)에 쓴 글 (날짜별, 쓴 순서) */
+export async function getCalendarMonth(blogId: number, month: string, viewerIsOwner: boolean): Promise<CalendarMonth> {
+  const day = sql<string>`to_char(${posts.createdAt} at time zone 'Asia/Seoul', 'YYYY-MM-DD')`;
+  // 한국 시간 그 달 1일 0시 ~ 다음 달 1일 0시 (posts_blog_list_idx를 쓴다)
+  const from = sql`(${`${month}-01`}::date::timestamp at time zone 'Asia/Seoul')`;
+  const to = sql`((${`${month}-01`}::date + interval '1 month')::timestamp at time zone 'Asia/Seoul')`;
   const rows = await db
-    .select({ id: posts.id, title: posts.title, createdAt: posts.createdAt })
+    .select({ id: posts.id, title: posts.title, day })
     .from(posts)
-    .where(and(eq(posts.blogId, blogId), eq(posts.isPublic, true), gte(posts.createdAt, from), lt(posts.createdAt, to)))
+    .where(
+      and(
+        eq(posts.blogId, blogId),
+        viewerIsOwner ? undefined : eq(posts.isPublic, true),
+        sql`${posts.createdAt} >= ${from}`,
+        sql`${posts.createdAt} < ${to}`,
+      ),
+    )
     .orderBy(asc(posts.createdAt), asc(posts.id))
-    .limit(MONTH_LIMIT);
-  const days: CalendarMonth["days"] = {};
+    .limit(500);
+  const days: Record<string, CalendarPost[]> = {};
   for (const r of rows) {
-    const day = new Date(r.createdAt.getTime() + 9 * 3_600_000).getUTCDate();
-    (days[day] ??= []).push({ id: r.id, title: r.title });
+    const list = (days[r.day] ??= []);
+    if (list.length < PER_DAY) list.push({ id: r.id, title: r.title });
   }
-  return { month: monthKey(year, month), days };
+  return { month, days };
 }
 
-export async function getPostCalendarBySlug(slug: string, year: number, month: number): Promise<CalendarMonth | null> {
-  const [blog] = await db.select({ id: blogs.id }).from(blogs).where(eq(blogs.slug, slug)).limit(1);
-  return blog ? getPostCalendar(blog.id, year, month) : null;
+/** 주소로 블로그 id·주인 */
+export async function findBlogForCalendar(slug: string) {
+  const [row] = await db.select({ id: blogs.id, ownerId: blogs.ownerId }).from(blogs).where(eq(blogs.slug, slug)).limit(1);
+  return row ?? null;
 }

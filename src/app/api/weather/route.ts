@@ -1,22 +1,22 @@
-import { checkCoords } from "@/lib/weather";
-import { isWeatherCity, weatherCity } from "@/lib/widgets";
-import { getWeather, placeName } from "@/server/weather";
+import { cityOf, isCityKey, roundCoord } from "@/lib/weather";
+import { getWeather } from "@/server/weather";
 
-// 🌤️ 날씨 위젯: ?city=seoul (블로그 기본 도시) 또는 ?lat=..&lon=.. (방문자가 📍 내 위치를 눌렀을 때). 누구나.
+// ☀️ 날씨 위젯이 부른다. 누구나 (방문자도 본다).
+//   ?lat=&lon=  보는 사람이 위치를 허락했을 때 (0.1도로 줄여 쓴다)
+//   ?city=busan 고를 수 있는 도시 (위젯이 블로그 주인이 고른 도시로 부른다)
+// 자료는 서버가 30분 기억하니 브라우저도 5분은 다시 묻지 않는다.
 export async function GET(req: Request) {
-  const q = new URL(req.url).searchParams;
-  const city = q.get("city");
-  let weather;
-  if (city !== null) {
-    if (!isWeatherCity(city)) return Response.json({ error: "bad request" }, { status: 400 });
-    const c = weatherCity(city);
-    weather = await getWeather(c.lat, c.lon, c.label);
-  } else {
-    const at = checkCoords(q.get("lat"), q.get("lon"));
-    if (!at) return Response.json({ error: "bad request" }, { status: 400 });
-    const [place] = await Promise.all([placeName(at.lat, at.lon)]);
-    weather = await getWeather(at.lat, at.lon, place ?? "내 위치");
+  const params = new URL(req.url).searchParams;
+  let place: { lat: number; lon: number; name: string | null; city: string | null } | null = null;
+  if (params.has("lat") && params.has("lon")) {
+    const at = roundCoord(Number(params.get("lat")), Number(params.get("lon")));
+    if (at) place = { ...at, name: null, city: null };
+  } else if (isCityKey(params.get("city"))) {
+    const city = cityOf(params.get("city"));
+    place = { lat: city.lat, lon: city.lon, name: city.name, city: city.key };
   }
-  if (!weather) return Response.json({ error: "unavailable" }, { status: 502, headers: { "Cache-Control": "no-store" } });
-  return Response.json(weather, { headers: { "Cache-Control": "private, max-age=600" } });
+  if (!place) return Response.json({ error: "어느 곳의 날씨인지 몰라요" }, { status: 400 });
+  const weather = await getWeather(place.lat, place.lon);
+  if (!weather) return Response.json({ error: "날씨를 받지 못했어요" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+  return Response.json({ place: { name: place.name, city: place.city }, weather }, { headers: { "Cache-Control": "public, max-age=300" } });
 }

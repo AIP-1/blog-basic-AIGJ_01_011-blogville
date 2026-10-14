@@ -1,124 +1,95 @@
-// 📅 캘린더 위젯: 달력 칸 계산과 우리나라 공휴일. 브라우저와 서버가 같이 쓴다. 날짜는 모두 한국 날짜.
+// 📅 캘린더 위젯 (v1.7.0 위젯 보드): 이번 달 달력, 글 쓴 날 점, 공휴일 빨강, 날짜를 누르면 그날 글.
 
-/** 한 날짜에 쓴 글 (위젯은 제목만) */
+/**
+ * 한국 공휴일 (대체공휴일 포함). 해가 바뀌면 다음 해를 더한다.
+ * 2026년부터 노동절(5/1)·제헌절(7/17)이 공휴일이 됐다. 임시공휴일은 정해지면 더한다.
+ */
+export const HOLIDAYS: Readonly<Record<string, string>> = {
+  "2026-01-01": "신정",
+  "2026-02-16": "설날 연휴",
+  "2026-02-17": "설날",
+  "2026-02-18": "설날 연휴",
+  "2026-03-01": "삼일절",
+  "2026-03-02": "대체공휴일",
+  "2026-05-01": "노동절",
+  "2026-05-05": "어린이날",
+  "2026-05-24": "부처님오신날",
+  "2026-05-25": "대체공휴일",
+  "2026-06-03": "지방선거",
+  "2026-06-06": "현충일",
+  "2026-07-17": "제헌절",
+  "2026-08-15": "광복절",
+  "2026-08-17": "대체공휴일",
+  "2026-09-24": "추석 연휴",
+  "2026-09-25": "추석",
+  "2026-09-26": "추석 연휴",
+  "2026-09-28": "대체공휴일",
+  "2026-10-03": "개천절",
+  "2026-10-05": "대체공휴일",
+  "2026-10-09": "한글날",
+  "2026-12-25": "성탄절",
+  "2027-01-01": "신정",
+  "2027-02-06": "설날 연휴",
+  "2027-02-07": "설날",
+  "2027-02-08": "설날 연휴",
+  "2027-02-09": "대체공휴일",
+  "2027-03-01": "삼일절",
+  "2027-05-01": "노동절",
+  "2027-05-05": "어린이날",
+  "2027-05-13": "부처님오신날",
+  "2027-06-06": "현충일",
+  "2027-07-17": "제헌절",
+  "2027-08-15": "광복절",
+  "2027-08-16": "대체공휴일",
+  "2027-09-14": "추석 연휴",
+  "2027-09-15": "추석",
+  "2027-09-16": "추석 연휴",
+  "2027-10-03": "개천절",
+  "2027-10-04": "대체공휴일",
+  "2027-10-09": "한글날",
+  "2027-10-11": "대체공휴일",
+  "2027-12-25": "성탄절",
+  "2027-12-27": "대체공휴일",
+};
+
 export type CalendarPost = { id: number; title: string };
-/** `YYYY-MM` 한 달: 날(1~31) → 그날 쓴 공개 글 */
-export type CalendarMonth = { month: string; days: Record<number, CalendarPost[]> };
+/** 날짜(`YYYY-MM-DD`, 한국 시간)별 그날 쓴 글 */
+export type CalendarMonth = { month: string; days: Record<string, CalendarPost[]> };
 
-export const MONTH_RE = /^(\d{4})-(0[1-9]|1[0-2])$/;
-
-/** `2026-10` → { year: 2026, month: 10 }. 이상하면 null. 2000~2100년만 */
-export function parseMonth(value: string | null | undefined): { year: number; month: number } | null {
-  const m = MONTH_RE.exec(value ?? "");
-  if (!m) return null;
-  const year = Number(m[1]);
-  if (year < 2000 || year > 2100) return null;
-  return { year, month: Number(m[2]) };
+/** `2026-10` 모양만. 2000~2099년 */
+export function parseMonth(value: unknown): string | null {
+  return typeof value === "string" && /^20\d\d-(0[1-9]|1[0-2])$/.test(value) ? value : null;
 }
 
-export function monthKey(year: number, month: number): string {
-  return `${year}-${String(month).padStart(2, "0")}`;
+/** 한 달 앞뒤 (`2026-10` → `2026-09` / `2026-11`) */
+export function shiftMonth(month: string, by: number): string {
+  const [y, m] = month.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + by, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-/** 이전·다음 달 */
-export function shiftMonth(year: number, month: number, delta: number): { year: number; month: number } {
-  const i = year * 12 + (month - 1) + delta;
-  return { year: Math.floor(i / 12), month: (i % 12) + 1 };
+/**
+ * 달력 칸: 일요일 시작 6줄(42칸)이 아니라 필요한 줄만. 앞뒤는 이웃 달 날짜로 채운다 (그림처럼 흐리게).
+ * 각 칸은 날짜와 이 달인지.
+ */
+export function monthGrid(month: string): { date: string; inMonth: boolean }[] {
+  const [y, m] = month.split("-").map(Number);
+  const first = new Date(Date.UTC(y, m - 1, 1));
+  const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const lead = first.getUTCDay();
+  const total = Math.ceil((lead + days) / 7) * 7;
+  const cells: { date: string; inMonth: boolean }[] = [];
+  for (let i = 0; i < total; i++) {
+    const d = new Date(Date.UTC(y, m - 1, 1 - lead + i));
+    cells.push({ date: d.toISOString().slice(0, 10), inMonth: i >= lead && i < lead + days });
+  }
+  return cells;
 }
 
-export function daysInMonth(year: number, month: number): number {
-  return new Date(Date.UTC(year, month, 0)).getUTCDate();
-}
-
-/** 그 날의 요일 (0 = 일요일) */
-export function weekday(year: number, month: number, day: number): number {
-  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-}
-
-/** 달력 칸: 일요일부터 한 주씩, 앞뒤 빈칸은 null */
-export function monthGrid(year: number, month: number): (number | null)[][] {
-  const first = weekday(year, month, 1);
-  const total = daysInMonth(year, month);
-  const cells: (number | null)[] = [...Array(first).fill(null), ...Array.from({ length: total }, (_, i) => i + 1)];
-  while (cells.length % 7) cells.push(null);
-  const weeks: (number | null)[][] = [];
-  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
-  return weeks;
-}
-
-/** 오늘(한국 날짜)이 든 주: 일요일부터 7일, 날마다 { year, month, day } (달이 바뀌어도 이어서) */
-export function weekOf(year: number, month: number, day: number): { year: number; month: number; day: number }[] {
-  const start = Date.UTC(year, month - 1, day) - weekday(year, month, day) * 86_400_000;
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(start + i * 86_400_000);
-    return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() };
-  });
-}
-
-/** 한국 시간의 오늘 */
-export function todayParts(now: Date = new Date()): { year: number; month: number; day: number } {
-  const d = new Date(now.getTime() + 9 * 3_600_000);
-  return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() };
-}
-
-// 관공서 공휴일 (대체 공휴일 포함). 음력 명절은 해마다 달라서 표로 둔다. 표에 없는 해는 양력 공휴일만.
-const FIXED: Record<string, string> = {
-  "01-01": "새해",
-  "03-01": "삼일절",
-  "05-05": "어린이날",
-  "06-06": "현충일",
-  "08-15": "광복절",
-  "10-03": "개천절",
-  "10-09": "한글날",
-  "12-25": "성탄절",
-};
-const BY_YEAR: Record<number, Record<string, string>> = {
-  2025: {
-    "01-27": "임시 공휴일",
-    "01-28": "설날 연휴",
-    "01-29": "설날",
-    "01-30": "설날 연휴",
-    "03-03": "대체 공휴일",
-    "05-05": "어린이날·부처님오신날",
-    "05-06": "대체 공휴일",
-    "06-03": "대통령 선거",
-    "10-05": "추석 연휴",
-    "10-06": "추석",
-    "10-07": "추석 연휴",
-    "10-08": "대체 공휴일",
-  },
-  2026: {
-    "02-16": "설날 연휴",
-    "02-17": "설날",
-    "02-18": "설날 연휴",
-    "03-02": "대체 공휴일",
-    "05-24": "부처님오신날",
-    "05-25": "대체 공휴일",
-    "06-03": "지방 선거",
-    "08-17": "대체 공휴일",
-    "09-24": "추석 연휴",
-    "09-25": "추석",
-    "09-26": "추석 연휴",
-    "10-05": "대체 공휴일",
-  },
-  2027: {
-    "02-06": "설날 연휴",
-    "02-07": "설날",
-    "02-08": "설날 연휴",
-    "02-09": "대체 공휴일",
-    "05-13": "부처님오신날",
-    "08-16": "대체 공휴일",
-    "09-14": "추석 연휴",
-    "09-15": "추석",
-    "09-16": "추석 연휴",
-    "10-04": "대체 공휴일",
-    "10-11": "대체 공휴일",
-    "12-27": "대체 공휴일",
-  },
-};
-
-/** 그 날이 공휴일이면 이름, 아니면 null */
-export function holidayName(year: number, month: number, day: number): string | null {
-  const key = `${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-  return BY_YEAR[year]?.[key] ?? FIXED[key] ?? null;
+/** 일요일·공휴일은 빨강, 토요일은 파랑 */
+export function dayTone(date: string): "holiday" | "saturday" | null {
+  const [y, m, d] = date.split("-").map(Number);
+  const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  if (wd === 0 || HOLIDAYS[date]) return "holiday";
+  return wd === 6 ? "saturday" : null;
 }

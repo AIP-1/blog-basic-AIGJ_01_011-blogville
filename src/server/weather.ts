@@ -1,66 +1,59 @@
 import "server-only";
-import { parseOpenMeteo, parsePlaceName, type Weather } from "@/lib/weather";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { blogs } from "@/db/schema";
+import { isCityKey, parseForecast, type Weather } from "@/lib/weather";
 
-// 🌤️ 날씨 위젯: 서버가 Open-Meteo에서 받아 30분 동안 기억한다 (좌표는 소수 둘째 자리 ≈ 1km로 묶는다).
-// 동네 이름은 OpenStreetMap Nominatim에서 하루 동안 기억한다 (사용 정책: 초당 1번 이하, 앱 이름을 밝힌다).
-// 시험은 WEATHER_BASE·GEOCODE_BASE로 가짜 서버를 가리킨다.
+// ☀️ 날씨 위젯 자료: Open-Meteo(열쇠 없음)를 서버가 받아 자리마다 30분 기억한다.
+// 브라우저는 Open-Meteo를 직접 부르지 않는다 (사이트 CSP는 그대로). 시험은 WEATHER_BASE·AIR_BASE로 가짜 서버를 가리킨다.
 const WEATHER_BASE = () => process.env.WEATHER_BASE ?? "https://api.open-meteo.com";
-const GEOCODE_BASE = () => process.env.GEOCODE_BASE ?? "https://nominatim.openstreetmap.org";
-const WEATHER_TTL_MS = 30 * 60_000;
-const PLACE_TTL_MS = 24 * 60 * 60_000;
+const AIR_BASE = () => process.env.AIR_BASE ?? "https://air-quality-api.open-meteo.com";
+const TTL_MS = 30 * 60_000;
+// 못 받았을 때는 잠깐만 기억해 1분 뒤 다시 묻는다
+const FAIL_TTL_MS = 60_000;
 const TIMEOUT_MS = 4_000;
-const UA = "Blogville weather widget (https://unqiuepcg.java21.net)";
 
-const weatherCache = new Map<string, { at: number; value: Promise<Weather | null> }>();
-const placeCache = new Map<string, { at: number; value: Promise<string | null> }>();
-let lastGeocode = 0;
+const cache = new Map<string, { at: number; ok: boolean; value: Promise<Weather | null> }>();
 
 async function getJson(url: string): Promise<unknown> {
-  const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" }, signal: AbortSignal.timeout(TIMEOUT_MS), cache: "no-store" });
-  if (!res.ok) throw new Error(`weather ${res.status}`);
+  const res = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(TIMEOUT_MS), cache: "no-store" });
+  if (!res.ok) throw new Error(`open-meteo ${res.status}`);
   return res.json();
 }
 
-function trim<T>(cache: Map<string, { at: number; value: T }>, ttl: number, max: number) {
-  if (cache.size > max) for (const [k, v] of cache) if (Date.now() - v.at >= ttl) cache.delete(k);
+async function load(lat: number, lon: number): Promise<Weather | null> {
+  const at = `latitude=${lat}&longitude=${lon}&timezone=auto`;
+  const forecast = getJson(
+    `${WEATHER_BASE()}/v1/forecast?${at}&forecast_days=7` +
+      "&current=temperature_2m,weather_code,is_day" +
+      "&hourly=temperature_2m,weather_code,is_day" +
+      "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+  );
+  // 미세먼지는 없어도 날씨는 보여 준다
+  const air = getJson(`${AIR_BASE()}/v1/air-quality?${at}&current=pm10,pm2_5`).catch(() => null);
+  return parseForecast(await forecast, await air);
 }
 
-/** 좌표의 동네 이름 (못 받으면 null). Nominatim은 초당 1번까지라 너무 잦으면 묻지 않는다 */
-export function placeName(lat: number, lon: number): Promise<string | null> {
-  const key = `${lat.toFixed(2)},${lon.toFixed(2)}`;
-  const hit = placeCache.get(key);
-  if (hit && Date.now() - hit.at < PLACE_TTL_MS) return hit.value;
-  if (Date.now() - lastGeocode < 1_100) return Promise.resolve(null);
-  lastGeocode = Date.now();
-  const value = getJson(`${GEOCODE_BASE()}/reverse?format=jsonv2&zoom=12&accept-language=ko&lat=${lat}&lon=${lon}`)
-    .then(parsePlaceName)
-    .catch(() => null);
-  placeCache.set(key, { at: Date.now(), value });
-  trim(placeCache, PLACE_TTL_MS, 5_000);
-  return value;
+/** 그 자리의 날씨 (30분 기억). 못 받으면 null */
+export function getWeather(lat: number, lon: number): Promise<Weather | null> {
+  const key = `${lat},${lon}`;
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < (hit.ok ? TTL_MS : FAIL_TTL_MS)) return hit.value;
+  const entry = { at: Date.now(), ok: true, value: Promise.resolve<Weather | null>(null) };
+  entry.value = load(lat, lon)
+    .catch(() => null)
+    .then((w) => {
+      entry.ok = w !== null;
+      return w;
+    });
+  cache.set(key, entry);
+  if (cache.size > 2_000) for (const [k, v] of cache) if (Date.now() - v.at >= TTL_MS) cache.delete(k);
+  return entry.value;
 }
 
-/** 오늘부터 7일 날씨. place는 화면에 보일 이름. 못 받으면 null */
-export function getWeather(lat: number, lon: number, place: string): Promise<Weather | null> {
-  const key = `${lat.toFixed(2)},${lon.toFixed(2)}`;
-  const hit = weatherCache.get(key);
-  if (hit && Date.now() - hit.at < WEATHER_TTL_MS) return hit.value.then((w) => (w ? { ...w, place } : null));
-  const params = new URLSearchParams({
-    latitude: String(lat),
-    longitude: String(lon),
-    current: "temperature_2m,weather_code",
-    daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
-    timezone: "Asia/Seoul",
-    forecast_days: "7",
-  });
-  const value = getJson(`${WEATHER_BASE()}/v1/forecast?${params}`)
-    .then((json) => parseOpenMeteo(json, place))
-    .catch(() => null);
-  weatherCache.set(key, { at: Date.now(), value });
-  // 실패는 1분만 기억한다
-  value.then((w) => {
-    if (!w) setTimeout(() => weatherCache.get(key)?.value === value && weatherCache.delete(key), 60_000);
-  });
-  trim(weatherCache, WEATHER_TTL_MS, 2_000);
-  return value;
+/** 내 블로그의 날씨 도시 바꾸기. 모르는 도시면 false */
+export async function setBlogWeatherCity(ownerId: string, key: string): Promise<boolean> {
+  if (!isCityKey(key)) return false;
+  await db.update(blogs).set({ weatherCity: key }).where(eq(blogs.ownerId, ownerId));
+  return true;
 }
