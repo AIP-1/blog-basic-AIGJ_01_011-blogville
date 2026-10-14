@@ -265,7 +265,13 @@ export function FoodMap({ providers, places, me = null, researchSort, className 
   function researchHere() {
     const c = api.current?.map.center();
     if (!c) return;
-    router.push(`/food?tab=near&lat=${c.lat.toFixed(3)}&lng=${c.lng.toFixed(3)}${researchSort === "buzz" ? "&sort=buzz" : ""}`);
+    // 거리·분류·정렬은 지금 주소 그대로, 위치만 지도 가운데로
+    const q = new URLSearchParams(window.location.search);
+    q.set("tab", "near");
+    q.set("lat", c.lat.toFixed(3));
+    q.set("lng", c.lng.toFixed(3));
+    if (researchSort === "buzz") q.set("sort", "buzz");
+    router.push(`/food?${q}`);
     setMoved(false);
   }
 

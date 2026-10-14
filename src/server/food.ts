@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { blogs, posts, profiles } from "@/db/schema";
 import { likePattern } from "@/lib/blog-search";
 import { detectSponsor, pickOgImage, reviewFetchUrl } from "@/lib/food-sponsor";
+import { placeKind, type FoodKind, type FoodKindFilter } from "@/lib/food-kind";
+import { relevantReviews, REVIEW_PAGE_MAX, REVIEW_PAGE_SIZE } from "@/lib/food-relevance";
 import { todayKST } from "@/lib/kst";
 import {
   FOOD_RADIUS_M,
@@ -33,6 +35,7 @@ const TIMEOUT_MS = 5_000;
 const PAGE_TTL_MS = 24 * 3_600_000;
 const PAGE_MAX_BYTES = 1_500_000;
 // 지역 인기 후보를 모으는 검색어 (네이버 지역 검색은 한 번에 5곳까지라 여러 번 묻는다)
+const NEAR_MAX = 30;
 const REGION_QUERIES = ["맛집", "한식 맛집", "고기 맛집", "일식 맛집", "중식 맛집", "양식 맛집"];
 
 export type FoodResult<T> = { status: "ok"; value: T } | { status: "off" | "forbidden" | "error" };
@@ -130,17 +133,54 @@ function withBuzz(list: FoodPlace[]): Promise<BuzzPlace[]> {
   return mapLimit(list, 5, async (p) => ({ ...p, recent: await recentCount(p) }));
 }
 
-/** 📍 내 주변 1km 식당 (가까운 순, 또는 최근 블로그 글 많은 순) */
-export function nearbyPlaces(at: { lat: number; lng: number }, sort: "distance" | "buzz"): Promise<FoodResult<BuzzPlace[]>> {
+type NearSort = "distance" | "buzz";
+
+/** 카카오 로컬 여러 쪽 (한 쪽 15곳, 많아야 3쪽 = 45곳). 끝 쪽이면 멈춘다 */
+async function kakaoPages(path: string, params: Record<string, string | number>, pages: number): Promise<FoodPlace[]> {
+  const out: FoodPlace[] = [];
+  for (let page = 1; page <= pages; page++) {
+    const json = (await kakao(path, { ...params, size: 15, page })) as { meta?: { is_end?: boolean } };
+    out.push(...parseKakaoPlaces(json));
+    if (json?.meta?.is_end !== false) break;
+  }
+  return out;
+}
+
+/** 분류마다 카카오에 묻는 방법: 식당은 음식점(FD6), 카페·디저트는 카페(CE7)+베이커리, 술집은 "술집" 키워드 */
+function nearSources(kind: FoodKindFilter, at: { lat: number; lng: number }, radius: number, sort: NearSort) {
+  // 가까운 순은 가까운 곳부터, 인기 순은 반경 안에서 고르게 (카카오 정확도 순) 받아 블로그 글 수로 다시 줄 세운다
+  const base = { x: at.lng, y: at.lat, radius, sort: sort === "distance" ? "distance" : "accuracy" };
+  const cat = (code: string, pages: number) => () => kakaoPages("/v2/local/search/category.json", { ...base, category_group_code: code }, pages);
+  const kw = (query: string, pages: number) => () => kakaoPages("/v2/local/search/keyword.json", { ...base, query, category_group_code: "FD6" }, pages);
+  if (kind === "meal") return [cat("FD6", 3)];
+  if (kind === "cafe") return [cat("CE7", 3), kw("베이커리", 1), kw("디저트", 1)];
+  if (kind === "bar") return [kw("술집", 3), kw("포차", 1)];
+  return [cat("FD6", 3), cat("CE7", 2)];
+}
+
+/** 📍 내 주변: 고른 거리(300m~2km)·분류(식당·카페/디저트·술집) 안의 가게 (가까운 순, 또는 최근 블로그 글 많은 순). 많아야 30곳 */
+export function nearbyPlaces(
+  at: { lat: number; lng: number },
+  sort: NearSort,
+  radius: number = FOOD_RADIUS_M,
+  kind: FoodKindFilter = "all",
+): Promise<FoodResult<(BuzzPlace & { kind: FoodKind })[]>> {
   if (!kakaoEnabled()) return Promise.resolve({ status: "off" });
   return settle(async () => {
-    const list = await remember(`near|${at.lat},${at.lng}`, async () =>
-      parseKakaoPlaces(
-        await kakao("/v2/local/search/category.json", { category_group_code: "FD6", x: at.lng, y: at.lat, radius: FOOD_RADIUS_M, sort: "distance", size: 15 }),
-      ),
-    );
-    const buzz = await withBuzz(list);
-    return sort === "buzz" ? rankByBuzz(buzz) : buzz;
+    const found = await remember(`near2|${at.lat},${at.lng}|${radius}|${kind}|${sort}`, async () => {
+      const lists = await Promise.all(nearSources(kind, at, radius, sort).map((load) => load()));
+      const seen = new Set<string>();
+      return lists
+        .flat()
+        .filter((p) => !seen.has(p.id) && !!seen.add(p.id))
+        .filter((p) => p.distance === null || p.distance <= radius)
+        .map((p) => ({ ...p, kind: placeKind(p.category, p.name) }))
+        .filter((p) => kind === "all" || p.kind === kind)
+        .sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0))
+        .slice(0, NEAR_MAX);
+    });
+    const buzz = (await withBuzz(found)) as (BuzzPlace & { kind: FoodKind })[];
+    return (sort === "buzz" ? rankByBuzz(buzz) : buzz) as (BuzzPlace & { kind: FoodKind })[];
   }, "주변 식당");
 }
 
@@ -156,17 +196,22 @@ export function regionHot(region: string): Promise<FoodResult<BuzzPlace[]>> {
   }, "지역 인기 식당");
 }
 
-/** 🔎 식당 찾기: 카카오(음식점만 15곳), 카카오 열쇠가 없으면 네이버 지역 검색 5곳 */
-export function searchPlaces(q: string): Promise<FoodResult<FoodPlace[]>> {
+/** 🔎 식당 찾기: 카카오(음식점+카페 각 15곳, 분류로 거름), 카카오 열쇠가 없으면 네이버 지역 검색 5곳 */
+export function searchPlaces(q: string, kind: FoodKindFilter = "all"): Promise<FoodResult<(FoodPlace & { kind: FoodKind })[]>> {
+  const tag = (list: FoodPlace[]) =>
+    list.map((p) => ({ ...p, kind: placeKind(p.category, p.name) })).filter((p) => kind === "all" || p.kind === kind);
   if (kakaoEnabled()) {
-    return settle(
-      () =>
+    return settle(async () => {
+      const [meal, cafe] = await Promise.all([
         remember(`search|k|${q}`, async () => parseKakaoPlaces(await kakao("/v2/local/search/keyword.json", { query: q, category_group_code: "FD6", size: 15 }))),
-      "식당 검색",
-    );
+        remember(`search|k|ce7|${q}`, async () => parseKakaoPlaces(await kakao("/v2/local/search/keyword.json", { query: q, category_group_code: "CE7", size: 15 }))),
+      ]);
+      const seen = new Set<string>();
+      return tag([...meal, ...cafe].filter((p) => !seen.has(p.id) && !!seen.add(p.id)));
+    }, "식당 검색");
   }
   if (naverFoodEnabled()) {
-    return settle(() => remember(`search|n|${q}`, async () => parseNaverPlaces(await naver("/search/v1/local", { query: q, display: 5 }))), "식당 검색");
+    return settle(async () => tag(await remember(`search|n|${q}`, async () => parseNaverPlaces(await naver("/search/v1/local", { query: q, display: 5 })))), "식당 검색");
   }
   return Promise.resolve({ status: "off" });
 }
@@ -205,25 +250,37 @@ function enrichReviews(list: FoodReview[]): Promise<FoodReview[]> {
 export type PlaceDetail = {
   place: FoodPlace;
   reviews: FoodResult<FoodReview[]>;
+  /** 거른 뒤 남은 후기 수와 쪽 (한 쪽 10편, 많아야 10쪽) */
+  reviewTotal: number;
+  reviewPage: number;
+  reviewPages: number;
+  /** 이름만 같고 다른 이야기라 뺀 글 수 */
+  reviewHidden: number;
   recent: number;
   local: { id: number; title: string; slug: string; nickname: string; createdAt: Date }[];
 };
 
-/** 식당 하나: 정보 + 네이버 블로그 후기 10편 + Blogville 이웃 글 */
-export async function placeDetail(place: FoodPlace): Promise<PlaceDetail> {
+/** 식당 하나: 정보 + 네이버 블로그 후기(관련 높은 순 100편에서 그 식당 이야기만 거른 뒤 쪽마다 10편) + Blogville 이웃 글 */
+export async function placeDetail(place: FoodPlace, page = 1): Promise<PlaceDetail> {
+  let reviewTotal = 0;
+  let reviewHidden = 0;
+  let reviewPage = 1;
+  let reviewPages = 1;
   const reviews: FoodResult<FoodReview[]> = naverFoodEnabled()
-    ? await settle(
-        async () =>
-          enrichReviews(
-            await remember(`reviews|${reviewQuery(place)}`, async () =>
-              parseReviews(await naver("/search/v1/blog", { query: reviewQuery(place), display: 10, sort: "sim" })),
-            ),
-          ),
-        "블로그 후기",
-      )
+    ? await settle(async () => {
+        const all = await remember(`reviews100|${reviewQuery(place)}`, async () =>
+          parseReviews(await naver("/search/v1/blog", { query: reviewQuery(place), display: REVIEW_PAGE_SIZE * REVIEW_PAGE_MAX, sort: "sim" })),
+        );
+        const kept = relevantReviews(all, place);
+        reviewHidden = all.length - kept.length;
+        reviewTotal = kept.length;
+        reviewPages = Math.max(1, Math.min(REVIEW_PAGE_MAX, Math.ceil(kept.length / REVIEW_PAGE_SIZE)));
+        reviewPage = Math.min(Math.max(1, Math.floor(page) || 1), reviewPages);
+        return enrichReviews(kept.slice((reviewPage - 1) * REVIEW_PAGE_SIZE, reviewPage * REVIEW_PAGE_SIZE));
+      }, "블로그 후기")
     : { status: "off" };
   const [recent, local] = await Promise.all([recentCount(place), blogvillePosts(place.name)]);
-  return { place, reviews, recent, local };
+  return { place, reviews, reviewTotal, reviewPage, reviewPages, reviewHidden, recent, local };
 }
 
 /** Blogville 공개 글 중 식당 이름이 든 글 (최신 5편) */
