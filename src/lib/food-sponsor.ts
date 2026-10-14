@@ -94,3 +94,41 @@ export function reviewFetchUrl(url: string): string | null {
   if (/(^|\.)tistory\.com$/.test(host) || host === "brunch.co.kr") return `https://${host}${u.pathname}`;
   return null;
 }
+
+// 그림 속 글자 읽기(OCR)에 쓸 그림: 블로그가 올린 그림 주소만 (아무 주소나 서버가 받지 않게)
+const IMAGE_HOSTS = /^(postfiles|blogfiles|mblogthumb-phinf)\.pstatic\.net$|^blog\.kakaocdn\.net$|^(t1|img1)\.daumcdn\.net$/;
+
+/**
+ * 협찬 배너가 있을 법한 그림 주소: 글의 맨 앞 2장과 맨 끝 4장 (배너는 보통 글 처음이나 끝에 붙는다).
+ * 네이버 그림은 가로 400px로 작게 받아 빨리 읽는다
+ */
+export function sponsorImageUrls(html: string): string[] {
+  const urls: string[] = [];
+  for (const m of html.matchAll(/<img\b[^>]*>/gi)) {
+    const tag = m[0];
+    const raw = tag.match(/\bdata-lazy-src\s*=\s*["']([^"']+)["']/i)?.[1] ?? tag.match(/\bdata-src\s*=\s*["']([^"']+)["']/i)?.[1] ?? tag.match(/\bsrc\s*=\s*["']([^"']+)["']/i)?.[1];
+    if (!raw) continue;
+    let u: URL;
+    try {
+      u = new URL(raw.replace(/&amp;/g, "&"));
+    } catch {
+      continue;
+    }
+    if (u.protocol !== "https:" || !IMAGE_HOSTS.test(u.hostname)) continue;
+    if (/\.gif$/i.test(u.pathname)) continue; // 움짤·스티커는 건너뛴다
+    if (u.hostname.endsWith("pstatic.net")) {
+      u.search = "";
+      u.searchParams.set("type", "w400");
+    }
+    const s = u.toString();
+    if (!urls.includes(s)) urls.push(s);
+  }
+  return urls.length <= 6 ? urls : [...urls.slice(0, 2), ...urls.slice(-4)];
+}
+
+/** 그림에서 읽은 글자가 협찬 표시인가 (띄어쓰기를 잘못 읽어도 되게 빈칸을 지우고 본다) */
+export function ocrSaysSponsored(text: string): boolean {
+  const flat = text.replace(/\s+/g, "");
+  if (/협찬(아님|아닙니다|없)|광고아님|내돈내산/.test(flat)) return false;
+  return /협찬|원고료|체험단|제공받|지원받|유료광고|광고를?포함|소정의|파트너스활동/.test(flat);
+}

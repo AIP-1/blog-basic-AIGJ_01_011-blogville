@@ -4,7 +4,8 @@ import { db } from "@/db";
 import { blogs, posts, profiles } from "@/db/schema";
 import { likePattern } from "@/lib/blog-search";
 import { countBuzz, dongFromRegion, parseDaumBlogs, interestGrowth, interestKeywords, isRegionCandidate, isRising, rankRegion, summarizeInterest, type RankedPlace } from "@/lib/food-quality";
-import { detectSponsor, pickOgImage, reviewFetchUrl } from "@/lib/food-sponsor";
+import { detectSponsor, pickOgImage, reviewFetchUrl, sponsorImageUrls } from "@/lib/food-sponsor";
+import { queueSponsorOcr, sponsorOcrState } from "@/server/food-ocr";
 import { placeKind, type FoodKind, type FoodKindFilter } from "@/lib/food-kind";
 import { relevantReviews, reviewVerdict, REVIEW_DAYS, REVIEW_PAGE_SIZE } from "@/lib/food-relevance";
 import { todayKST } from "@/lib/kst";
@@ -422,7 +423,10 @@ function readReviewPage(url: string): Promise<{ image: string | null; sponsor: F
     if (!res.ok || (!process.env.FOOD_PAGE_BASE && !reviewFetchUrl(res.url || target))) return { image: null, sponsor: null };
     const buf = await res.arrayBuffer();
     const html = new TextDecoder().decode(buf.byteLength > PAGE_MAX_BYTES ? buf.slice(0, PAGE_MAX_BYTES) : buf);
-    return { image: pickOgImage(html), sponsor: detectSponsor(html) };
+    const sponsor = detectSponsor(html);
+    // 문구로 협찬을 못 찾았으면 글 앞뒤 그림의 글자를 뒤에서 읽어 본다 (화면은 기다리지 않는다)
+    if (sponsor !== "sponsored") queueSponsorOcr(url, sponsorImageUrls(html));
+    return { image: pickOgImage(html), sponsor };
   })().catch(() => ({ image: null, sponsor: null }) as const);
   pageCache.set(target, { at: Date.now(), value });
   if (pageCache.size > 3_000) for (const [k, v] of pageCache) if (Date.now() - v.at >= PAGE_TTL_MS) pageCache.delete(k);
@@ -433,7 +437,9 @@ function enrichReviews(list: FoodReview[]): Promise<FoodReview[]> {
   // 네이버 블로그는 글을 열어 사진·협찬 표시를 읽고, 다른 곳은 받은 썸네일을 두고 요약 글로만 협찬 표시를 본다
   return mapLimit(list, 4, async (r) => {
     const page = await readReviewPage(r.url);
-    return { ...r, image: page.image ?? r.image ?? null, sponsor: page.sponsor ?? r.sponsor ?? (r.source && r.source !== "naver" ? detectSponsor(r.summary) : null) };
+    const sponsor = page.sponsor ?? r.sponsor ?? (r.source && r.source !== "naver" ? detectSponsor(r.summary) : null);
+    const ocr = sponsor === "sponsored" ? null : sponsorOcrState(r.url);
+    return { ...r, image: page.image ?? r.image ?? null, sponsor: ocr === "sponsored" ? "sponsored" : sponsor, sponsorCheck: ocr === "pending" ? ("pending" as const) : undefined };
   });
 }
 
