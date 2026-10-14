@@ -23,6 +23,7 @@ export type FoodReview = {
   date: string; // YYYY-MM-DD
   image?: string | null; // 글 대표 사진 (og:image)
   sponsor?: "sponsored" | "self" | null; // 협찬 표시 / 내돈내산 / 모름
+  sponsorCheck?: "pending"; // 그림 속 협찬 표시를 아직 읽는 중
   /** 어디서 찾은 글: 네이버 블로그 / 다음 블로그(티스토리·브런치 등) / 다음 카페 */
   source?: ReviewSource;
 };

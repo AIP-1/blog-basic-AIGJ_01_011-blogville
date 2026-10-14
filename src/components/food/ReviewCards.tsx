@@ -1,11 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FoodReview } from "@/lib/food";
 
 /** 📝 블로그 후기 카드: 대표 사진 배너 + 협찬/내돈내산 표시. [협찬 글 숨기기]로 걸러 본다 */
-export function ReviewCards({ reviews }: { reviews: FoodReview[] }) {
+export function ReviewCards({ reviews: initial }: { reviews: FoodReview[] }) {
   const [hideSponsored, setHide] = useState(false);
+  // 그림 속 협찬 표시를 다 읽은 글: 주소 → 협찬인지
+  const [read, setRead] = useState<Record<string, boolean>>({});
+  const [gaveUp, setGaveUp] = useState(false);
+  const pending = initial.filter((r) => r.sponsorCheck === "pending").map((r) => r.url);
+  const pendingKey = pending.join("\n");
+  const reviews = initial.map((r) => (read[r.url] ? { ...r, sponsor: "sponsored" as const } : r));
+  const checking = !gaveUp && pending.some((u) => !(u in read));
+
+  // 서버가 뒤에서 그림 글자를 읽는 동안 몇 번 물어 보고, 다 읽은 카드에 💰 협찬을 붙인다
+  useEffect(() => {
+    const urls = pendingKey ? pendingKey.split("\n") : [];
+    if (urls.length === 0) return;
+    let left = urls;
+    let stop = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const delays = [2_000, 4_000, 6_000, 10_000, 15_000];
+    const ask = async (i: number) => {
+      const q = left.map((u) => `u=${encodeURIComponent(u)}`).join("&");
+      const res = await fetch(`/api/food/sponsor?${q}`).catch(() => null);
+      const body = res?.ok ? ((await res.json().catch(() => ({}))) as { states?: Record<string, string> }) : {};
+      if (stop) return;
+      const done = Object.entries(body.states ?? {}).filter(([, s]) => s !== "pending");
+      if (done.length) {
+        setRead((prev) => ({ ...prev, ...Object.fromEntries(done.map(([u, s]) => [u, s === "sponsored"])) }));
+        left = left.filter((u) => !done.some(([d]) => d === u));
+      }
+      if (left.length === 0) return;
+      if (i + 1 >= delays.length) return setGaveUp(true);
+      timer = setTimeout(() => void ask(i + 1), delays[i + 1]);
+    };
+    timer = setTimeout(() => void ask(0), delays[0]);
+    return () => {
+      stop = true;
+      clearTimeout(timer);
+    };
+  }, [pendingKey]);
   const sponsored = reviews.filter((r) => r.sponsor === "sponsored").length;
   const self = reviews.filter((r) => r.sponsor === "self").length;
   const shown = hideSponsored ? reviews.filter((r) => r.sponsor !== "sponsored") : reviews;
@@ -14,6 +50,11 @@ export function ReviewCards({ reviews }: { reviews: FoodReview[] }) {
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className="rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">💰 협찬 표시 {sponsored}편</span>
         <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-200">🧾 내돈내산 {self}편</span>
+        {checking && (
+          <span className="animate-pulse text-ink-soft" data-food-sponsor-checking>
+            🔎 그림 속 협찬 표시 확인 중…
+          </span>
+        )}
         {sponsored > 0 && (
           <label className="ml-auto inline-flex min-h-11 cursor-pointer items-center gap-1.5 text-sm text-ink-soft">
             <input type="checkbox" checked={hideSponsored} onChange={(e) => setHide(e.target.checked)} data-food-hide-sponsored />
@@ -63,7 +104,7 @@ export function ReviewCards({ reviews }: { reviews: FoodReview[] }) {
       </ol>
       {hideSponsored && shown.length === 0 && <p className="mt-3 text-center text-sm text-ink-soft">협찬 표시가 없는 후기가 없어요.</p>}
       <p className="mt-3 text-xs text-ink-soft">
-        💰 협찬은 글에 &ldquo;협찬·원고료·제공받아·체험단&rdquo; 같은 문구나 체험단 배너가 있는 글이에요. 표시 없이 쓴 협찬 글은 못 찾을 수 있어요.
+        💰 협찬은 글에 &ldquo;협찬·원고료·제공받아·체험단&rdquo; 같은 문구, #협찬 태그, 체험단 배너나 &ldquo;협찬을 포함합니다&rdquo; 그림이 있는 글이에요. 표시 없이 쓴 협찬 글은 못 찾을 수 있어요.
       </p>
     </div>
   );
