@@ -1,6 +1,7 @@
 # 화면 시험(Playwright E2E)을 실제 PostgreSQL과 운영 빌드(next start)로 돌린다.
 # 운영으로 가는 PR(release·hotfix → main)마다, 그리고 `e2e` 꼬리표를 단 develop PR에서 돈다. 손으로는 Actions → e2e → Run workflow.
-# 약 15~25분. 실패하면 화면 기록(Playwright 보고서)을 내려받을 수 있다.
+# 시험을 4개 job(e2e-shard 1~4)에 나눠 동시에 돌리고, 이름이 정확히 `e2e`인 job이 결과를 모은다
+# (main 규칙이 요구하는 검사 이름. 샤드가 하나라도 실패·취소·건너뜀이면 실패). 보고서는 샤드별 blob을 합쳐 html 하나로 올린다.
 name: e2e
 
 on:
@@ -14,10 +15,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  e2e:
+  e2e-shard:
+    name: e2e-shard ${{ matrix.shard }}
     if: github.event_name == 'workflow_dispatch' || github.base_ref == 'main' || contains(github.event.pull_request.labels.*.name, 'e2e')
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     services:
       db:
         image: postgres:16
@@ -67,15 +73,63 @@ jobs:
           for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:3000/ && exit 0; sleep 2; done
           cat next.log; exit 1
 
-      - name: 화면 시험
-        run: npx playwright test --workers=3 --retries=1 --reporter=list,html
+      - name: 화면 시험 (${{ matrix.shard }}/4)
+        run: npx playwright test --shard=${{ matrix.shard }}/4 --workers=3 --retries=1 --reporter=list,blob
 
-      - name: 보고서 올리기
+      - name: 보고서 조각 올리기
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: blob-report-${{ matrix.shard }}
+          path: blob-report
+          retention-days: 7
+
+      - name: 서버 기록 올리기
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
-          path: |
-            playwright-report
-            next.log
+          name: next-log-${{ matrix.shard }}
+          path: next.log
           retention-days: 7
+
+  # main 규칙이 요구하는 검사 `e2e`: 샤드가 모두 성공해야 성공 (건너뜀·취소도 실패). 샤드와 같은 조건일 때만 돈다
+  e2e:
+    if: always() && (github.event_name == 'workflow_dispatch' || github.base_ref == 'main' || contains(github.event.pull_request.labels.*.name, 'e2e'))
+    needs: e2e-shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 패키지 설치
+        run: npm ci
+
+      - name: 보고서 조각 받기
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          path: all-blob-reports
+          pattern: blob-report-*
+          merge-multiple: true
+
+      - name: 보고서 합치기
+        run: |
+          if ls all-blob-reports/*.zip >/dev/null 2>&1; then npx playwright merge-reports --reporter html ./all-blob-reports; else echo "보고서 조각 없음"; fi
+
+      - name: 보고서 올리기
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: 샤드 결과 확인
+        run: |
+          echo "샤드 결과: ${{ needs.e2e-shard.result }}"
+          test "${{ needs.e2e-shard.result }}" = "success"
