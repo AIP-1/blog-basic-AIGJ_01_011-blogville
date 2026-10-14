@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Pagination } from "@/components/blog/Pagination";
 import { parsePage } from "@/lib/ids";
 import { feedbackNotificationText, guestbookNotificationText, levelUpText, NOTIFICATION_EMPTY, NOTIFICATIONS_PAGE_SIZE, notificationText, notificationTime } from "@/lib/notifications";
+import { fullDateTime } from "@/lib/time";
 import { requireMember } from "@/server/dal";
 import { countUnreadNotifications, listNotifications } from "@/server/notifications";
 import { markAllNotificationsRead, openNotification } from "./actions";
@@ -53,7 +54,7 @@ export default async function NotificationsPage({ searchParams }: PageProps<"/no
                         ? guestbookNotificationText(n.kind, n.nickname)
                         : notificationText(n.kind, n.nickname, n.postTitle)}
                   </span>
-                  <time className="shrink-0 text-sm font-normal text-ink-soft" dateTime={n.createdAt.toISOString()}>
+                  <time className="shrink-0 text-sm font-normal text-ink-soft" dateTime={n.createdAt.toISOString()} title={fullDateTime(n.createdAt)}>
                     {notificationTime(n.createdAt, now)}
                   </time>
                 </button>

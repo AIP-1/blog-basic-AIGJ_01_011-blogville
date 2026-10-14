@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Pagination } from "@/components/blog/Pagination";
 import { FeedbackStatusBadge } from "@/components/support/FeedbackStatusBadge";
 import { SupportForm } from "@/components/support/SupportForm";
-import { formatDateTime } from "@/lib/comment-rules";
+import { formatDateTime } from "@/lib/time";
 import { parsePage } from "@/lib/ids";
 import { loginHref } from "@/lib/safe-next";
 import { FEEDBACK_KIND_LABELS, FEEDBACK_PAGE_SIZE, feedbackPagePath } from "@/lib/support-rules";

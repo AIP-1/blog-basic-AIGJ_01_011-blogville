@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Pagination } from "@/components/blog/Pagination";
 import { ADMIN_PAGE_SIZE, AUDIT_ACTIONS, parseAuditAction, type AuditAction } from "@/lib/admin-rules";
-import { formatDateTime } from "@/lib/comment-rules";
+import { formatDateTime } from "@/lib/time";
 import { parsePage } from "@/lib/ids";
 import { listAudit } from "@/server/admin-tools";
 import { requireAdmin } from "@/server/dal";

@@ -117,7 +117,7 @@ test.describe("ADM-01 회원 관리", () => {
     await target.page.goto("/write");
     await expect(target.page).toHaveURL("/");
     await signIn(target.page, target.username, PASSWORD);
-    await expect(target.page.locator("p[role=alert]")).toHaveText(/^이용이 정지된 계정이에요 \(\d{4}\. \d{2}\. \d{2}\. \d{2}:\d{2}까지, 사유: 도배 글\)$/);
+    await expect(target.page.locator("p[role=alert]")).toHaveText(/^이용이 정지된 계정이에요 \(\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}까지, 사유: 도배 글\)$/);
     expect(await sql`select 1 from sessions where user_id = ${target.userId}`).toHaveLength(0);
 
     // 정지 중에 어떻게든 세션이 생겨도 로그인한 것으로 보지 않는다
