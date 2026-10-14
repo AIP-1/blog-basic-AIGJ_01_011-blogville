@@ -36,6 +36,9 @@ const nameRegex = (name: string) => [...name].map(escapeRe).join("\\s*");
 const NAME_AS_OTHER_AFTER = "\\s*(?:게임|겜|연극|영화|드라마|웹툰|소설|공연|뮤지컬|노래|앨범|보드게임|조직|두목|보스|파티|놀이)";
 const NAME_AS_OTHER_BEFORE = "(?:영화|연극|게임|드라마|웹툰|소설|뮤지컬|노래)\\s*[<《「『\"'“]?\\s*";
 
+// 식당이 아닌 업종 (제목이 이런 이야기면 식당 후기가 아니다)
+const OTHER_BIZ = /네일|헤어|미용실|미용|피부과|피부관리|병원|의원|치과|한의원|학원|숙소|호텔|펜션|모텔|리조트|부동산|인테리어|웨딩|스튜디오|헬스|필라테스|요가|여행\s*기록|일상|브이로그|vlog/i;
+
 export type ReviewVerdict = { keep: true } | { keep: false; reason: "spam" | "no-name" | "off-topic" };
 
 export const VERDICT_LABELS = { spam: "광고·스팸", "no-name": "식당 이름 없음", "off-topic": "다른 이야기" } as const;
@@ -58,23 +61,31 @@ export function reviewVerdict(
   const name = squash(bare);
   const flat = squash(text);
   if (!name || !flat.includes(name)) return { keep: false, reason: "no-name" };
+  const short = [...name].length <= 3;
   const nr = nameRegex(name);
+  // 짧은 이름은 더 긴 낱말 속 글자("국가정원"의 정원, "고향에봄"의 봄)를 이름으로 치지 않는다: 바로 앞이 한글이면 아님
+  const hits = [...text.matchAll(new RegExp(nr, "g"))].filter((m) => !short || m.index === 0 || !/[가-힣]/.test(text[m.index! - 1]));
+  if (hits.length === 0) return { keep: false, reason: "no-name" };
   // 주소의 도로명(○○로·○○길)이나 전화번호가 글에 그대로 있으면 그 가게
   const road = place.address.split(/\s+/).find((w) => /[가-힣]+(로|길)(\d+번?길)?$/.test(w.replace(/\s*\d+(-\d+)?$/, "")));
   const roadWord = road ? road.replace(/\d+번?길$/, "").replace(/\d.*$/, "") : "";
   const digits = (place.phone ?? "").replace(/\D/g, "");
   const exact = (roadWord.length >= 3 && flat.includes(squash(roadWord))) || (digits.length >= 8 && text.replace(/\D/g, "").includes(digits));
   if (!exact && (new RegExp(nr + NAME_AS_OTHER_AFTER).test(text) || new RegExp(NAME_AS_OTHER_BEFORE + nr).test(text))) return { keep: false, reason: "off-topic" };
+  // 제목이 다른 업종(네일·미용·숙소·병원…) 이야기이고 제목에 식당 이름이 없으면, 본문에 지나가듯 나온 것
+  const inTitle = squash(r.title).includes(name);
+  if (!exact && !inTitle && OTHER_BIZ.test(r.title)) return { keep: false, reason: "off-topic" };
   const catWord = place.category ? place.category.split(">").pop()!.trim().split(",")[0] : "";
-  const near = [...text.matchAll(new RegExp(nr, "g"))].some((m) => {
-    const win = text.slice(Math.max(0, m.index! - 20), m.index! + m[0].length + 20);
+  const near = hits.some((m) => {
+    const win = text.slice(Math.max(0, m.index! - 15), m.index! + m[0].length + 15);
     return NEAR_FOOD.test(win) || (catWord.length >= 2 && win.includes(catWord));
   });
   const area = areaWords(place.address).some((w) => flat.includes(squash(w)));
   const food = FOOD_WORDS.test(text) || (catWord.length >= 2 && text.includes(catWord));
-  const strict = [...name].length <= 3 || OFF_TOPIC.test(text);
-  // 짧은 이름은 다른 동네 같은 이름 가게 글도 많아, 이름 곁 먹은 이야기 + 동네(또는 도로명·전화)가 둘 다 있어야
-  const ok = strict ? exact || (near && area) : near || exact || (area && food);
+  const strict = short || OFF_TOPIC.test(text);
+  // 짧은 이름은 다른 동네 같은 이름 가게 글도 많아, 이름 곁 먹은 이야기 + 동네(또는 도로명·전화)가 둘 다 있어야.
+  // 긴 이름도 제목에 이름이 없으면 곁 먹은 이야기 + 동네가 있어야 (요약 끝에 지나가듯 나온 이름)
+  const ok = strict ? exact || (near && area) : exact || (inTitle ? near || (area && food) : near && area);
   return ok ? { keep: true } : { keep: false, reason: "off-topic" };
 }
 
