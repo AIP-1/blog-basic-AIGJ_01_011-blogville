@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { NearbyLocator } from "@/components/food/NearbyLocator";
@@ -98,26 +99,57 @@ async function saveButtons(
 }
 
 /** 쪽 번호: 처음·끝과 지금 쪽 앞뒤 2쪽만, 사이는 … (쪽이 많아도 한 줄) */
-function PageLinks({ page, pages, href }: { page: number; pages: number; href: (n: number) => string }) {
-  const nums = [...new Set([1, page - 2, page - 1, page, page + 1, page + 2, pages])].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
-  const cell = "inline-flex size-9 items-center justify-center rounded-lg text-sm";
+function PageLinks({
+  page,
+  pages,
+  href,
+}: {
+  page: number;
+  pages: number;
+  href: (n: number) => string;
+}) {
+  const nums = [
+    ...new Set([1, page - 2, page - 1, page, page + 1, page + 2, pages]),
+  ]
+    .filter((n) => n >= 1 && n <= pages)
+    .sort((a, b) => a - b);
+  const cell =
+    "inline-flex size-9 items-center justify-center rounded-lg text-sm";
   return (
-    <nav aria-label="쪽" className="flex flex-wrap items-center justify-center gap-1" data-near-pages>
+    <nav
+      aria-label="쪽"
+      className="flex flex-wrap items-center justify-center gap-1"
+      data-near-pages
+    >
       {page > 1 && (
-        <Link href={href(page - 1)} className={`${cell} hover:bg-bg`} aria-label="이전 쪽">
+        <Link
+          href={href(page - 1)}
+          className={`${cell} hover:bg-bg`}
+          aria-label="이전 쪽"
+        >
           ‹
         </Link>
       )}
       {nums.map((n, i) => (
         <span key={n} className="contents">
-          {i > 0 && n - nums[i - 1] > 1 && <span className="px-1 text-ink-soft">…</span>}
-          <Link href={href(n)} aria-current={n === page ? "page" : undefined} className={`${cell} ${n === page ? "bg-ink font-bold text-surface" : "hover:bg-bg"}`}>
+          {i > 0 && n - nums[i - 1] > 1 && (
+            <span className="px-1 text-ink-soft">…</span>
+          )}
+          <Link
+            href={href(n)}
+            aria-current={n === page ? "page" : undefined}
+            className={`${cell} ${n === page ? "bg-ink font-bold text-surface" : "hover:bg-bg"}`}
+          >
             {n}
           </Link>
         </span>
       ))}
       {page < pages && (
-        <Link href={href(page + 1)} className={`${cell} hover:bg-bg`} aria-label="다음 쪽">
+        <Link
+          href={href(page + 1)}
+          className={`${cell} hover:bg-bg`}
+          aria-label="다음 쪽"
+        >
           ›
         </Link>
       )}
@@ -147,6 +179,24 @@ function Chips({
         </Link>
       ))}
     </nav>
+  );
+}
+
+function FoodLoading({ tab }: { tab: FoodTab }) {
+  return (
+    <div className="mt-4 space-y-3" aria-busy="true" data-food-loading>
+      <p className="text-sm text-ink-soft">
+        {tab === "region"
+          ? "🔥 후기와 검색 관심도를 모아 순위를 매기는 중이에요… 처음 보는 동네는 몇 초 걸려요."
+          : "🍽 식당을 모으는 중이에요…"}
+      </p>
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          className="h-28 animate-pulse rounded-xl border border-line bg-surface"
+        />
+      ))}
+    </div>
   );
 }
 
@@ -200,45 +250,61 @@ export default async function FoodPage({ searchParams }: PageProps<"/food">) {
           </Link>
         ))}
       </nav>
-      {tab === "saved" ? (
-        <SavedTab />
-      ) : !foodEnabled() ? (
-        <Notice>{FOOD_MESSAGES.off}</Notice>
-      ) : tab === "near" ? (
-        <NearTab
-          lat={one(sp.lat)}
-          lng={one(sp.lng)}
-          sort={one(sp.sort) === "buzz" ? "buzz" : "distance"}
-          radius={parseRadius(one(sp.r))}
-          kind={
-            isFoodKind(one(sp.kind)) ? (one(sp.kind) as FoodKindFilter) : "all"
-          }
-          page={Number(one(sp.p)) || 1}
-        />
-      ) : tab === "region" ? (
-        <RegionTab
-          region={
-            isFoodRegion(one(sp.region)) ? one(sp.region)! : DEFAULT_REGION
-          }
-          area={one(sp.area)}
-          at={parseCoords(one(sp.lat), one(sp.lng))}
-          sort={
-            isRegionSort(one(sp.sort)) ? (one(sp.sort) as RegionSort) : "best"
-          }
-          kind={
-            isFoodKind(one(sp.kind)) ? (one(sp.kind) as FoodKindFilter) : "all"
-          }
-        />
-      ) : (
-        <SearchTab
-          q={parseFoodQuery(one(sp.q))}
-          placeId={one(sp.place) ?? null}
-          kind={
-            isFoodKind(one(sp.kind)) ? (one(sp.kind) as FoodKindFilter) : "all"
-          }
-          reviewPage={Number(one(sp.rp)) || 1}
-        />
-      )}
+      {/* 탭·조건이 바뀔 때마다 위 탭 줄은 바로 보이고, 목록 자리에는 모으는 중 안내가 뜬다 (첫 조회는 네이버·카카오를 여러 번 불러 몇 초 걸린다) */}
+      <Suspense
+        key={new URLSearchParams(
+          Object.entries(sp).flatMap(([k, v]) =>
+            v === undefined ? [] : [[k, String(one(v))]],
+          ),
+        ).toString()}
+        fallback={<FoodLoading tab={tab} />}
+      >
+        {tab === "saved" ? (
+          <SavedTab />
+        ) : !foodEnabled() ? (
+          <Notice>{FOOD_MESSAGES.off}</Notice>
+        ) : tab === "near" ? (
+          <NearTab
+            lat={one(sp.lat)}
+            lng={one(sp.lng)}
+            sort={one(sp.sort) === "buzz" ? "buzz" : "distance"}
+            radius={parseRadius(one(sp.r))}
+            kind={
+              isFoodKind(one(sp.kind))
+                ? (one(sp.kind) as FoodKindFilter)
+                : "all"
+            }
+            page={Number(one(sp.p)) || 1}
+          />
+        ) : tab === "region" ? (
+          <RegionTab
+            region={
+              isFoodRegion(one(sp.region)) ? one(sp.region)! : DEFAULT_REGION
+            }
+            area={one(sp.area)}
+            at={parseCoords(one(sp.lat), one(sp.lng))}
+            sort={
+              isRegionSort(one(sp.sort)) ? (one(sp.sort) as RegionSort) : "best"
+            }
+            kind={
+              isFoodKind(one(sp.kind))
+                ? (one(sp.kind) as FoodKindFilter)
+                : "all"
+            }
+          />
+        ) : (
+          <SearchTab
+            q={parseFoodQuery(one(sp.q))}
+            placeId={one(sp.place) ?? null}
+            kind={
+              isFoodKind(one(sp.kind))
+                ? (one(sp.kind) as FoodKindFilter)
+                : "all"
+            }
+            reviewPage={Number(one(sp.rp)) || 1}
+          />
+        )}
+      </Suspense>
     </section>
   );
 }
@@ -363,7 +429,16 @@ async function NearTab({
               {kind === "all"
                 ? "가게"
                 : FOOD_KINDS.find((k) => k.key === kind)!.label}{" "}
-              {list!.total}곳{list!.total >= ({ 300: 120, 500: 200, 1000: 300, 2000: 500 } as Record<number, number>)[radius] ? ` (가까운 ${list!.total}곳까지)` : ""}
+              {list!.total}곳
+              {list!.total >=
+              (
+                { 300: 120, 500: 200, 1000: 300, 2000: 500 } as Record<
+                  number,
+                  number
+                >
+              )[radius]
+                ? ` (가까운 ${list!.total}곳까지)`
+                : ""}
               {list!.pages > 1 &&
                 ` · ${(list!.page - 1) * 20 + 1}~${(list!.page - 1) * 20 + list!.items.length}번째`}
             </p>
@@ -394,7 +469,13 @@ async function NearTab({
                 </li>
               ))}
             </ol>
-            {list!.pages > 1 && <PageLinks page={list!.page} pages={list!.pages} href={(n) => href({ p: n })} />}
+            {list!.pages > 1 && (
+              <PageLinks
+                page={list!.page}
+                pages={list!.pages}
+                href={(n) => href({ p: n })}
+              />
+            )}
           </>
         ))}
     </div>
@@ -511,7 +592,7 @@ async function RegionTab({
       {result.status !== "ok" ? (
         <Notice>{failText(result)}</Notice>
       ) : list.length === 0 ? (
-        <Notice>{FOOD_MESSAGES.empty}</Notice>
+        <Notice>{FOOD_MESSAGES.regionEmpty}</Notice>
       ) : (
         <>
           {mapProviders() && list.some((p) => p.lat !== null) && (
