@@ -1,0 +1,51 @@
+# 운영 서버의 무중단(블루·그린) 배포 구성. deploy/run.sh가 서버의 ~/blogville/에 놓고 docker compose로 띄운다.
+# (저장소 맨 위 docker-compose.yml은 개발용 PostgreSQL이고, 이 파일과 상관없다)
+#
+#   사용자 ─▶ nginx (bv8400-nginx, PROXY_PORT=8400)
+#                 ├─▶ blue  (bv8400-blue,  BLUE_PORT=8401)   ← nginx/conf.d/upstream.conf에 적힌 한쪽만
+#                 └─▶ green (bv8400-green, GREEN_PORT=8402)
+#
+# 포트는 .env(deploy/deploy.env), 비밀 값은 app.env(배포 때 GitHub 시크릿으로 만듦)에서 읽는다.
+# 이 서버의 도커는 다른 사람도 같이 쓰므로 프로젝트·컨테이너 이름은 모두 bv8400으로 시작한다.
+# 서버 네트워크(host)를 그대로 쓴다: 도커 기본 네트워크에서는 이 서버의 공인 IP(DB)로 가는 길이 막혀 있다.
+name: bv8400
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-app: &app
+  env_file: ./app.env
+  network_mode: host
+  restart: unless-stopped
+  volumes:
+    - ./uploads:/app/storage/uploads
+  logging: *logging
+
+services:
+  nginx:
+    image: ${NGINX_IMAGE:-nginx:1.27-alpine}
+    container_name: bv8400-nginx
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      # 폴더째 연결해야 run.sh가 upstream.conf를 바꿨을 때 컨테이너 안에서도 바로 보인다
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/html:/usr/share/nginx/bv8400:ro
+    logging: *logging
+
+  blue:
+    <<: *app
+    image: ${BLUE_IMAGE:-bv8400-blogville:none}
+    container_name: bv8400-blue
+    environment:
+      PORT: ${BLUE_PORT:-8401}
+
+  green:
+    <<: *app
+    image: ${GREEN_IMAGE:-bv8400-blogville:none}
+    container_name: bv8400-green
+    environment:
+      PORT: ${GREEN_PORT:-8402}

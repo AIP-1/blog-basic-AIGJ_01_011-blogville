@@ -1,0 +1,39 @@
+# Blogville 앞단 nginx (deploy/run.sh가 ${PROXY_PORT}를 deploy.env 값으로 바꿔 서버의 nginx/conf.d/blogville.conf로 놓는다)
+# 요청을 보낼 앱(blue/green)은 같은 폴더의 upstream.conf가 정한다. run.sh·rollback.sh가 그 파일을 바꾸고
+# `nginx -s reload`를 하면 새 요청부터 새 쪽으로 가고, 이미 들어온 요청은 원래 쪽에서 끝까지 처리된다.
+
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ""      "";
+}
+
+server {
+    listen ${PROXY_PORT};
+    server_name _;
+
+    # 첨부 파일 한 번에 31MB까지 (src/lib/attachments.ts REQUEST_MAX_BYTES) + 여유
+    client_max_body_size 40m;
+
+    location / {
+        proxy_pass http://bv8400_app;
+        proxy_http_version 1.1;
+        # 앞단(도메인 쪽)이 넘겨준 Host·X-Forwarded-Host·X-Forwarded-Proto는 그대로 둔다 (앱이 올린 곳 확인에 씀)
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # 웹소켓은 이어 주고, 보통 요청은 앱과의 연결을 다시 쓴다(keepalive)
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        # 화면을 나눠 보내는(스트리밍) 응답을 바로바로 넘긴다
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        # 어느 앱(blue 8401 / green 8402)이 답했는지 응답 머리에 적는다. run.sh가 전환을 확인할 때 쓰고, curl -I로도 볼 수 있다
+        add_header X-Bv8400-Upstream $upstream_addr always;
+    }
+
+    error_page 502 503 504 /__bv8400_down.html;
+    location = /__bv8400_down.html {
+        root /usr/share/nginx/bv8400;
+        internal;
+    }
+}
