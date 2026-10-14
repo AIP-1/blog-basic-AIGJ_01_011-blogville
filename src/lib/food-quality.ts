@@ -1,9 +1,10 @@
 // 🍽 맛집 품질 규칙: 지역 인기에서 식당·디저트가 아닌 곳(백화점·쇼핑몰·큰 체인)을 거르고,
 // "요즘 블로그에 많이 올라온 순"을 셀 때 광고·체험단 글과 그 가게와 상관없는 글을 뺀다.
 // 순수 함수만 둔다 (서버·시험이 같이 쓴다).
-import { FOOD_RECENT_DAYS, type FoodPlace, type FoodReview } from "@/lib/food";
+import { FOOD_RECENT_DAYS, shortCity, type FoodPlace, type FoodReview } from "@/lib/food";
 import type { FoodKind } from "@/lib/food-kind";
-import { isRelevantReview } from "@/lib/food-relevance";
+import { areaWords, isRelevantReview } from "@/lib/food-relevance";
+import { otherRegionTitle } from "@/lib/food-place-match";
 
 /** 식당·디저트로 보는 업종 말 (네이버 지역 검색·카카오 분류 둘 다) */
 const FOOD_CATEGORY =
@@ -115,12 +116,12 @@ export function isAdLike(r: Pick<FoodReview, "title" | "summary">): boolean {
   return AD_WORDS.test(`${r.title} ${r.summary}`);
 }
 
-/** 요즘 많이 올라온 순에 셀 글인가: 그 가게 이야기이고 광고·체험단이 아닌 글 */
+/** 요즘 많이 올라온 순에 셀 글인가: 그 가게 이야기이고 광고·체험단·다른 지역 여행 글이 아닌 글 */
 export function countsAsBuzz(
   r: Pick<FoodReview, "title" | "summary">,
   p: Pick<FoodPlace, "name" | "address" | "category">,
 ): boolean {
-  return !isAdLike(r) && isRelevantReview(r, p);
+  return !isAdLike(r) && isRelevantReview(r, p) && !otherRegionTitle(r.title, p, areaWords(shortCity(p.address)));
 }
 
 /** 최근 days일 안의 진짜 후기 수. 같은 블로거가 여러 번 쓴 글은 한 편으로 센다 */
