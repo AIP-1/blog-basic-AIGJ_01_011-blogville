@@ -97,6 +97,34 @@ async function saveButtons(
   };
 }
 
+/** 쪽 번호: 처음·끝과 지금 쪽 앞뒤 2쪽만, 사이는 … (쪽이 많아도 한 줄) */
+function PageLinks({ page, pages, href }: { page: number; pages: number; href: (n: number) => string }) {
+  const nums = [...new Set([1, page - 2, page - 1, page, page + 1, page + 2, pages])].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
+  const cell = "inline-flex size-9 items-center justify-center rounded-lg text-sm";
+  return (
+    <nav aria-label="쪽" className="flex flex-wrap items-center justify-center gap-1" data-near-pages>
+      {page > 1 && (
+        <Link href={href(page - 1)} className={`${cell} hover:bg-bg`} aria-label="이전 쪽">
+          ‹
+        </Link>
+      )}
+      {nums.map((n, i) => (
+        <span key={n} className="contents">
+          {i > 0 && n - nums[i - 1] > 1 && <span className="px-1 text-ink-soft">…</span>}
+          <Link href={href(n)} aria-current={n === page ? "page" : undefined} className={`${cell} ${n === page ? "bg-ink font-bold text-surface" : "hover:bg-bg"}`}>
+            {n}
+          </Link>
+        </span>
+      ))}
+      {page < pages && (
+        <Link href={href(page + 1)} className={`${cell} hover:bg-bg`} aria-label="다음 쪽">
+          ›
+        </Link>
+      )}
+    </nav>
+  );
+}
+
 /** 동그란 고르기 단추 줄 (거리·분류) */
 function Chips({
   label,
@@ -335,7 +363,7 @@ async function NearTab({
               {kind === "all"
                 ? "가게"
                 : FOOD_KINDS.find((k) => k.key === kind)!.label}{" "}
-              {list!.total}곳{list!.total >= 200 ? " (가까운 200곳까지)" : ""}
+              {list!.total}곳{list!.total >= ({ 300: 120, 500: 200, 1000: 300, 2000: 500 } as Record<number, number>)[radius] ? ` (가까운 ${list!.total}곳까지)` : ""}
               {list!.pages > 1 &&
                 ` · ${(list!.page - 1) * 20 + 1}~${(list!.page - 1) * 20 + list!.items.length}번째`}
             </p>
@@ -366,26 +394,7 @@ async function NearTab({
                 </li>
               ))}
             </ol>
-            {list!.pages > 1 && (
-              <nav
-                aria-label="쪽"
-                className="flex flex-wrap justify-center gap-1"
-                data-near-pages
-              >
-                {Array.from({ length: list!.pages }, (_, i) => i + 1).map(
-                  (n) => (
-                    <Link
-                      key={n}
-                      href={href({ p: n })}
-                      aria-current={n === list!.page ? "page" : undefined}
-                      className={`inline-flex size-9 items-center justify-center rounded-lg text-sm ${n === list!.page ? "bg-ink font-bold text-surface" : "hover:bg-bg"}`}
-                    >
-                      {n}
-                    </Link>
-                  ),
-                )}
-              </nav>
-            )}
+            {list!.pages > 1 && <PageLinks page={list!.page} pages={list!.pages} href={(n) => href({ p: n })} />}
           </>
         ))}
     </div>
@@ -411,7 +420,7 @@ async function RegionTab({
   const region = mine && isFoodRegion(mine.city) ? mine.city : pickedRegion;
   const area = mine ? null : isFoodArea(region, rawArea) ? rawArea : null;
   const place = mine?.dong ?? area ?? region;
-  const result = await regionHot(place);
+  const result = await regionHot(place, kind);
   const list =
     result.status === "ok"
       ? sortRegion(
