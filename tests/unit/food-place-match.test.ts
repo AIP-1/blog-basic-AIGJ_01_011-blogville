@@ -39,3 +39,11 @@ describe("다른 지역 여행 글 (otherRegionTitle)", () => {
     expect(otherRegionTitle("공주님 생일 파티 마피아 피자", mafia, local)).toBe(false);
   });
 });
+
+describe("많이 올라온 순 세기 (countsAsBuzz)", () => {
+  it("다른 지역 여행 글은 세지 않는다", async () => {
+    const { countsAsBuzz } = await import("@/lib/food-quality");
+    expect(countsAsBuzz({ title: "강릉 여행 마피아 피자 맛집", summary: "먹었어요" }, mafia)).toBe(false);
+    expect(countsAsBuzz({ title: "광주 쌍촌동 마피아 피자 맛집", summary: "먹었어요" }, mafia)).toBe(true);
+  });
+});
