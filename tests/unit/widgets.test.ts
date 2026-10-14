@@ -34,12 +34,12 @@ describe("moveWidget · dropWidget", () => {
   const items = defaultLayout().items.slice(0, 4);
   const keys = (list: typeof items) => list.map((it) => it.key);
   it("한 칸 위·아래, 끝이면 그대로", () => {
-    expect(keys(moveWidget(items, "calendar", -1))).toEqual(["calendar", "guestbook", "weather", "stocks"]);
+    expect(keys(moveWidget(items, "calendar", -1))).toEqual(["calendar", "guestbook", "weather", "news"]);
     expect(keys(moveWidget(items, "guestbook", -1))).toEqual(keys(items));
     expect(keys(moveWidget(items, "stocks", 1))).toEqual(keys(items));
   });
   it("끌어 놓으면 놓은 자리로", () => {
-    expect(keys(dropWidget(items, "stocks", "guestbook"))).toEqual(["stocks", "guestbook", "calendar", "weather"]);
-    expect(keys(dropWidget(items, "guestbook", "weather"))).toEqual(["calendar", "weather", "guestbook", "stocks"]);
+    expect(keys(dropWidget(items, "news", "guestbook"))).toEqual(["news", "guestbook", "calendar", "weather"]);
+    expect(keys(dropWidget(items, "guestbook", "weather"))).toEqual(["calendar", "weather", "guestbook", "news"]);
   });
 });

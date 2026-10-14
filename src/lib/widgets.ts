@@ -7,6 +7,7 @@ export const WIDGETS = [
   { key: "guestbook", icon: "📖", label: "방명록", sizable: false, hint: "방명록 바로 가기와 글 수" },
   { key: "calendar", icon: "📅", label: "캘린더", sizable: false, hint: "글 쓴 날 표시, 누르면 그날 글" },
   { key: "weather", icon: "☀️", label: "이번 주 날씨", sizable: false, hint: "지금·시간대별·7일 예보, 미세먼지 (도시는 위젯에서 바꿔요)" },
+  { key: "news", icon: "📰", label: "오늘의 뉴스", sizable: true, hint: "여러 언론이 많이 다룬 이슈 · 작게: 3개 / 크게: 5개" },
   { key: "stocks", icon: "📈", label: "증시", sizable: true, hint: "코스피·코스닥과 관심 종목 실시간 · 작게: 그래프 없이 등락률만" },
   { key: "search", icon: "🔍", label: "블로그 검색", sizable: false, hint: "이 블로그에서 글 찾기" },
   { key: "town", icon: "🏘", label: "마을 검색", sizable: false, hint: "주인에게만 보여요" },

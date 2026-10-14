@@ -6,6 +6,7 @@ import { SEARCH_MAX } from "@/lib/blog-search";
 import { guestbookPath } from "@/lib/guestbook-rules";
 import type { getBlogSidebar } from "@/server/sidebar";
 import type { VisitStats } from "@/server/stats";
+import { BlogNews } from "./BlogNews";
 import { BlogStocks } from "./BlogStocks";
 import { CalendarWidget } from "./widgets/CalendarWidget";
 import { WeatherWidget } from "./widgets/WeatherWidget";
@@ -47,6 +48,12 @@ export function BlogSidebar({ blogId, slug, sidebar, visits, recordVisit, search
           <Link href={guestbookPath(slug)} className="widget flex min-h-11 items-center gap-2 font-semibold hover:bg-bg" data-guestbook-link>
             <span aria-hidden>📖</span> 방명록 <span className="ml-auto text-sm font-normal text-ink-soft">{sidebar.guestbookCount}</span>
           </Link>
+        );
+      case "news":
+        return (
+          <Suspense fallback={null}>
+            <BlogNews size={sizeOf("news")} />
+          </Suspense>
         );
       case "stocks":
         // 📈 관심 종목: 시세를 받는 동안 나머지 옆 칸을 막지 않는다

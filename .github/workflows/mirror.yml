@@ -1,0 +1,47 @@
+# 과제 제출 저장소(AIP-1/blog-basic-AIGJ_01_011-blogville)로 main·develop·태그를 그대로 복사.
+# 시크릿 MIRROR_TOKEN(제출 저장소 Contents 쓰기 토큰)이 없으면 건너뜀. Actions → mirror → Run workflow로 바로도 가능.
+name: mirror
+
+on:
+  push:
+    branches: [main, develop]
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: mirror
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    if: github.repository == 'handsomeguen/blogville'
+    runs-on: ubuntu-latest
+    env:
+      MIRROR_TOKEN: ${{ secrets.MIRROR_TOKEN }}
+      MIRROR_REPO: AIP-1/blog-basic-AIGJ_01_011-blogville
+    steps:
+      - name: 토큰 확인
+        id: token
+        run: |
+          if [ -z "$MIRROR_TOKEN" ]; then
+            echo "::notice::MIRROR_TOKEN 시크릿이 없어 제출 저장소 복사를 건너뜀"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.ok == 'true'
+        with:
+          fetch-depth: 0
+          # 기본 GITHUB_TOKEN 인증 헤더가 남으면 제출 저장소 push에 그 토큰이 쓰여 거절됨
+          persist-credentials: false
+
+      - name: 제출 저장소로 복사
+        if: steps.token.outputs.ok == 'true'
+        run: |
+          url="https://x-access-token:${MIRROR_TOKEN}@github.com/${MIRROR_REPO}.git"
+          git push --force "$url" \
+            refs/remotes/origin/main:refs/heads/main \
+            refs/remotes/origin/develop:refs/heads/develop
+          git push "$url" --tags

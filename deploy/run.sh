@@ -63,6 +63,11 @@ for k in KAKAO_CLIENT_ID KAKAO_CLIENT_SECRET NAVER_CLIENT_ID NAVER_CLIENT_SECRET
   v="${!k:-}"
   if [ -n "$v" ]; then printf '%s=%s\n' "$k" "$v" >> "$DEPLOY_DIR/app.env"; fi
 done
+# 📰 뉴스 위젯 (네이버 검색 API): 값이 있는 것만
+for k in NAVER_SEARCH_CLIENT_ID NAVER_SEARCH_CLIENT_SECRET; do
+  v="${!k:-}"
+  if [ -n "$v" ]; then printf '%s=%s\n' "$k" "$v" >> "$DEPLOY_DIR/app.env"; fi
+done
 # 버그·문의 자동 처리 API 열쇠 (SUP-04): 있을 때만 넣는다
 if [ -n "${FEEDBACK_BOT_TOKEN:-}" ]; then printf 'FEEDBACK_BOT_TOKEN=%s\n' "$FEEDBACK_BOT_TOKEN" >> "$DEPLOY_DIR/app.env"; fi
 
