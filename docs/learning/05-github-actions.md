@@ -57,3 +57,14 @@ gh pr checks <PR 번호> --watch          # PR 검사 기다리기
 1. `ci.yml`을 열어 step 이름(`패키지 설치`, `lint`, …)과 Actions 화면의 단계 이름이 같은지 봅니다.
 2. 연습 브랜치에서 일부러 lint 오류를 넣은 PR을 열고 `check`가 빨갛게 되어 merge 버튼이 막히는지 봅니다.
 3. `deploy.yml`에서 이미지 태그가 어떻게 정해지는지(커밋 해시) 찾아봅니다.
+
+
+## 이미지 저장소(GHCR)
+
+`deploy.yml`은 서버 배포가 끝나면 같은 이미지를 `ghcr.io/handsomeguen/blogville`에 `커밋 7자리`·`버전`·`latest` 꼬리표로 올립니다(올리기에 실패해도 배포는 그대로). 운영과 같은 버전을 내 컴퓨터에서 띄워 보려면:
+
+```bash
+docker pull ghcr.io/handsomeguen/blogville:latest
+```
+
+받은 이미지는 [04-docker.md](04-docker.md)의 `docker run` 예시에서 `blogville:local` 대신 쓰면 됩니다.
