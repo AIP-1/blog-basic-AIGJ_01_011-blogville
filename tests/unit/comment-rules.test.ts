@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canSeeSecret, checkComment, COMMENT_ERRORS, formatDateTime, isCommentHidden, isReplyHidden } from "@/lib/comment-rules";
+import { canSeeSecret, checkComment, COMMENT_ERRORS, isCommentHidden, isReplyHidden } from "@/lib/comment-rules";
 
 describe("checkComment (SOC-01)", () => {
   it("앞뒤 공백을 지우고 줄바꿈을 맞춘다", () => {
@@ -13,13 +13,6 @@ describe("checkComment (SOC-01)", () => {
   it("1000자, 이모지는 1자", () => {
     expect(checkComment("가".repeat(1000)).ok).toBe(true);
     expect(checkComment("😀".repeat(1000)).ok).toBe(true);
-  });
-});
-
-describe("formatDateTime", () => {
-  it("한국 시간 24시간", () => {
-    expect(formatDateTime(new Date("2026-10-02T05:07:00Z"))).toBe("2026. 10. 02. 14:07");
-    expect(formatDateTime(new Date("2026-10-02T15:00:00Z"))).toBe("2026. 10. 03. 00:00");
   });
 });
 

@@ -11,7 +11,8 @@ import {
 } from "@/app/blog/guestbook-actions";
 import { CommentForm } from "@/components/post/CommentSection";
 import { ReportButton } from "@/components/post/ReportButton";
-import { formatDateTime } from "@/lib/comment-rules";
+import { formatDateTime } from "@/lib/time";
+import { Time } from "@/components/common/Time";
 import { confirmFirst } from "@/lib/confirm-action";
 import { GUESTBOOK_SECRET_PLACEHOLDER } from "@/lib/guestbook-rules";
 import type { GuestbookEntry } from "@/server/guestbook";
@@ -100,9 +101,7 @@ function Entry({ entry, ownerNickname }: { entry: GuestbookEntry; ownerNickname:
         ) : (
           <span className="font-bold text-ink-soft">{entry.nickname ?? "알 수 없음"}</span>
         )}
-        <time dateTime={entry.createdAt.toISOString()} className="text-ink-soft">
-          {formatDateTime(entry.createdAt)}
-        </time>
+        <Time date={entry.createdAt} className="text-ink-soft" />
         {entry.editedAt && (
           <span className="text-ink-soft" title={`${formatDateTime(entry.editedAt)}에 수정`}>
             (수정됨)
@@ -163,9 +162,7 @@ function Entry({ entry, ownerNickname }: { entry: GuestbookEntry; ownerNickname:
             <>
               <p className="flex flex-wrap items-center gap-x-2 text-sm">
                 <span className="font-bold">↳ {ownerNickname}</span>
-                <time dateTime={entry.reply.repliedAt.toISOString()} className="text-ink-soft">
-                  {formatDateTime(entry.reply.repliedAt)}
-                </time>
+                <Time date={entry.reply.repliedAt} className="text-ink-soft" />
                 {entry.reply.editedAt && (
                   <span className="text-ink-soft" title={`${formatDateTime(entry.reply.editedAt)}에 수정`}>
                     (수정됨)

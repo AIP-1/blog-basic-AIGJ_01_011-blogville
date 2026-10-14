@@ -183,11 +183,11 @@ test.describe("GAME-08 알림", () => {
     await expect(badge(owner.page)).toHaveText("1");
     await bell(owner.page).click();
     await expect(rows(owner.page)).toHaveCount(1);
-    await expect(rows(owner.page).getByRole("button")).toHaveAccessibleName(`안 읽음, 💬 ${actor.username}님이 「늦게 온 알림 글」에 댓글을 달았어요 방금`);
+    await expect(rows(owner.page).getByRole("button")).toHaveAccessibleName(`안 읽음, 💬 ${actor.username}님이 「늦게 온 알림 글」에 댓글을 달았어요 방금 전`);
     await owner.page.getByRole("button", { name: "모두 읽음" }).click();
     await expect(owner.page.getByRole("button", { name: "모두 읽음" })).toHaveCount(0);
     await expect(badge(owner.page)).toHaveCount(0);
-    await expect(rows(owner.page).getByRole("button")).toHaveAccessibleName(`💬 ${actor.username}님이 「늦게 온 알림 글」에 댓글을 달았어요 방금`);
+    await expect(rows(owner.page).getByRole("button")).toHaveAccessibleName(`💬 ${actor.username}님이 「늦게 온 알림 글」에 댓글을 달았어요 방금 전`);
 
     await owner.page.goto("/notifications?page=2");
     await expect(owner.page.getByText("아직 알림이 없어요")).toBeVisible();

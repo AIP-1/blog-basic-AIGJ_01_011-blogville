@@ -2,7 +2,8 @@ import Link from "next/link";
 import type { Post } from "@/db/schema";
 import { firstImageUrl, thumbUrl } from "@/lib/attachments";
 import { scheduleLabel } from "@/lib/schedule";
-import { excerpt, formatDate } from "@/lib/text";
+import { excerpt } from "@/lib/text";
+import { Time } from "@/components/common/Time";
 import { CategoryBadge } from "../post/CategoryBadge";
 
 type Props = {
@@ -55,7 +56,7 @@ export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle,
           <p className="mt-1 line-clamp-2 text-ink-soft">{excerpt(post.contentText)}</p>
           <p className="mt-2 text-sm text-ink-soft">
             {blogTitle && `${blogTitle} · `}
-            {formatDate(post.createdAt)}
+            <Time date={post.createdAt} />
             <span aria-label={`공감 ${likeCount}`}> · ♥ {likeCount}</span>
             {commentCount > 0 && <span aria-label={`댓글 ${commentCount}개`}> · 💬 {commentCount}</span>}
             <span aria-label={`조회 ${post.viewCount}`}> · 👀 {post.viewCount}</span>

@@ -143,7 +143,7 @@ test.describe("GAME-07 경험치·코인 내역", () => {
     await expect(row).toContainText("🎉 가입 축하");
     await expect(row).toContainText("🪙 +100");
     await expect(row).not.toContainText("✨");
-    await expect(row.locator("time")).toHaveText(/^\d{4}\. \d{2}\. \d{2}\. \d{2}:\d{2}$/);
+    await expect(row.locator("time")).toHaveText(/^\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}$/);
 
     // 경험치 250 → Lv.5, 50 / 100 (출석 10 + 댓글 100 + 글 140)
     await sql`insert into point_ledger (user_id, reason, exp_delta, coin_delta, ref_id, created_at)

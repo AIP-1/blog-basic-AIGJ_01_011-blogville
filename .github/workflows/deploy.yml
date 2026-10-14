@@ -1,4 +1,5 @@
 # main에 올라오면 도커 이미지를 만들어 서버에 올리고 deploy/run.sh로 실행한다 (포트 8400).
+# 서버에서는 docker compose(deploy/compose.yml)로 nginx(8400) + 앱 두 벌(blue 8401 / green 8402)을 띄워 무중단으로 바꾼다.
 # 쓰는 시크릿: SSH_ADDRESS, SSH_PORT, SSH_ID, SSH_PASSWORD,
 #             DB_ADDRESS, DB_PORT, DB_NAME, DB_SCHEMA, DB_USERNAME, DB_PASSWORD
 #             APP_URL (선택, 없으면 http://SSH_ADDRESS:8400)
@@ -27,10 +28,15 @@ jobs:
           IMAGE="bv8400-blogville:${GITHUB_SHA::7}"  # 서버 도커를 같이 쓰므로 이름이 겹치지 않게
           echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
           docker build -t "$IMAGE" .
-          mkdir -p out
-          docker save "$IMAGE" | gzip > out/blogville-image.tar.gz
-          cp deploy/run.sh deploy/rollback.sh deploy/backup.sh out/
-          ls -lh out
+          # 앞단 nginx 이미지도 함께 보낸다 (서버가 Docker Hub에서 받지 못해도 뜨게)
+          NGINX_IMAGE=$(sed -n 's/^NGINX_IMAGE=//p' deploy/deploy.env)
+          docker pull -q "$NGINX_IMAGE"
+          mkdir -p out/bin
+          docker save "$IMAGE" "$NGINX_IMAGE" | gzip > out/blogville-image.tar.gz
+          cp -r deploy/run.sh deploy/rollback.sh deploy/backup.sh deploy/common.sh deploy/compose.yml deploy/deploy.env deploy/nginx out/
+          # 서버에 docker compose가 없을 때 쓸 compose (러너와 서버 모두 x86_64)
+          gzip -c "$(docker info --format '{{range .ClientInfo.Plugins}}{{if eq .Name "compose"}}{{.Path}}{{end}}{{end}}')" > out/bin/docker-compose.gz
+          ls -lhR out
 
       - name: DB 접속 주소 만들기
         env:
@@ -99,7 +105,7 @@ jobs:
           port: ${{ env.SSH_PORT }}
           username: ${{ secrets.SSH_ID }}
           password: ${{ secrets.SSH_PASSWORD }}
-          source: out/blogville-image.tar.gz,out/run.sh,out/rollback.sh,out/backup.sh
+          source: out/blogville-image.tar.gz,out/run.sh,out/rollback.sh,out/backup.sh,out/common.sh,out/compose.yml,out/deploy.env,out/nginx,out/bin
           target: blogville
           strip_components: 1
 

@@ -60,7 +60,7 @@ describe("ADM-01 정지 기간·사유·문구", () => {
   });
 
   it("로그인 화면 문구: 한국 시간 날짜와 사유, 영구 정지", () => {
-    expect(suspendedMessage(new Date("2026-10-20T06:00:00Z"), "도배")).toBe("이용이 정지된 계정이에요 (2026. 10. 20. 15:00까지, 사유: 도배)");
+    expect(suspendedMessage(new Date("2026-10-20T06:00:00Z"), "도배")).toBe("이용이 정지된 계정이에요 (2026.10.20 15:00까지, 사유: 도배)");
     expect(suspendedMessage(PERMANENT_UNTIL, "광고")).toBe("이용이 정지된 계정이에요 (영구 정지, 사유: 광고)");
     expect(suspendedMessage(PERMANENT_UNTIL, null)).toBe("이용이 정지된 계정이에요 (영구 정지)");
   });

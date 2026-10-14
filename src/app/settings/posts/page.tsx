@@ -3,7 +3,7 @@ import { Pagination } from "@/components/blog/Pagination";
 import { PostRowActions } from "@/components/settings/PostRowActions";
 import { parseSearchQuery, SEARCH_EMPTY, SEARCH_MAX } from "@/lib/blog-search";
 import { parseId, parsePage } from "@/lib/ids";
-import { formatDate } from "@/lib/text";
+import { formatDateTime } from "@/lib/time";
 import { getCategoryTree } from "@/server/category";
 import { getMyBlog, requireMember } from "@/server/dal";
 import { countMyPosts, listBlogPosts } from "@/server/post";
@@ -137,7 +137,7 @@ export default async function ManagePostsPage({ searchParams }: PageProps<"/sett
                   <p className="text-sm text-ink-soft">
                     {post.isPublic ? "🌐 공개" : post.publishAt ? `⏰ ${scheduleLabel(post.publishAt)} 공개 예약` : "🔒 비공개"}
                     {categoryName && ` · ${subcategoryName ? `${categoryName} › ${subcategoryName}` : categoryName}`}
-                    {` · ${formatDate(post.createdAt)} · 👀 ${post.viewCount} · 💬 ${commentCount}`}
+                    {` · ${formatDateTime(post.createdAt)} · 👀 ${post.viewCount} · 💬 ${commentCount}`}
                   </p>
                 </div>
                 <PostRowActions postId={post.id} title={post.title} isPublic={post.isPublic} />

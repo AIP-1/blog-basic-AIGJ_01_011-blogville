@@ -36,7 +36,7 @@
 
 ```mermaid
 flowchart LR
-  U[브라우저] --> P["bv8400-proxy<br/>:8400"]
+  U[브라우저] --> P["nginx<br/>bv8400-nginx :8400"]
   P -->|지금 쪽| B["bv8400-blue :8401"]
   P -.->|배포 때 교체| G["bv8400-green :8402"]
   B --> DB[(PostgreSQL)]
@@ -54,8 +54,8 @@ flowchart LR
 | `src/db/` | Drizzle 스키마와 DB 연결 |
 | `drizzle/` | DB 마이그레이션 SQL |
 | `tests/` | `unit/` Vitest, `e2e/` Playwright, `perf/` 성능 측정 |
-| `scripts/` | 시드, 관리자 만들기, 운영 마이그레이션, 프록시, 정리 작업 |
-| `deploy/run.sh` | 서버에서 블루·그린 교체를 하는 스크립트 |
+| `scripts/` | 시드, 관리자 만들기, 운영 마이그레이션, 백업, 정리 작업 |
+| `deploy/` | 운영 서버 구성: `compose.yml`(nginx + 앱 두 벌), `deploy.env`(포트), `nginx/`(설정), `run.sh`(블루·그린 교체), `rollback.sh` |
 | `.github/workflows/` | `ci.yml` 검사, `deploy.yml` 배포, `status.yml` 서버 상태 보기 |
 
 ## 실행
@@ -115,7 +115,20 @@ E2E는 DB와 브라우저가 필요하고 전체가 약 25분 걸려서 CI에서
 - `APP_URL`이 없으면 `http://SSH_ADDRESS:8400`을 로그인 주소로 씁니다. 도메인·https를 붙이면 `APP_URL`을 그 주소로 등록합니다.
 - 서버에는 docker가 있어야 하고, SSH 계정이 docker를 쓸 수 있어야 합니다(docker 그룹 또는 비밀번호 없는 sudo).
 - 컨테이너는 시작할 때 `scripts/migrate.mjs`(drizzle 마이그레이터, 실패하면 DB 오류를 그대로 보여 줌)로 DB를 맞춘 뒤 `next start -p 8400`으로 뜹니다.
-- **무중단(블루·그린) 배포**: 8400번 포트는 작은 프록시(`bv8400-proxy`, `scripts/proxy.mjs`)가 받고, 앱은 `bv8400-blue`(8401)·`bv8400-green`(8402) 중 하나가 서비스합니다. 새 버전은 쉬고 있는 쪽에 띄워 응답을 확인한 뒤 `~/blogville/state/active-port`를 바꿔 넘기고, 이전 버전은 15초 뒤 멈춥니다. 새 버전이 뜨지 않으면 이전 버전이 그대로 서비스합니다. 서버의 도커를 다른 사람도 같이 쓰므로 컨테이너·이미지 이름은 `bv8400-`로 시작하고, 스크립트는 자기 이미지로 만든 컨테이너만 지웁니다. 프록시는 처음 한 번만 띄우므로 `scripts/proxy.mjs`를 고쳤다면 서버에서 `docker rm -f bv8400-proxy` 뒤 다시 배포합니다.
+- **무중단(블루·그린) 배포**: 서버에서 docker compose(`deploy/compose.yml`, 프로젝트 이름 `bv8400`)로 세 컨테이너를 띄웁니다.
+
+  | 컨테이너 | 포트 | 하는 일 |
+  |---|---|---|
+  | `bv8400-nginx` | 8400 (`PROXY_PORT`) | 사용자 요청을 받아 지금 서비스 중인 앱으로 넘김 |
+  | `bv8400-blue` | 8401 (`BLUE_PORT`) | 앱 한 벌 |
+  | `bv8400-green` | 8402 (`GREEN_PORT`) | 앱 다른 한 벌 |
+
+  - 환경 파일: 포트·nginx 이미지·기다리는 시간은 `deploy/deploy.env`(공개, 서버의 `~/blogville/.env`로 복사), 비밀 값은 배포 때 GitHub 시크릿으로 만드는 `~/blogville/app.env`(권한 600)에 들어갑니다.
+  - 트래픽 전환: nginx는 `~/blogville/nginx/conf.d/upstream.conf`에 적힌 앱 하나로만 보냅니다. 새 버전은 쉬고 있는 색에 띄워 응답을 확인한 뒤, 이 파일의 포트를 바꾸고 `nginx -s reload`를 합니다. reload는 새 요청부터 새 쪽으로 보내고 하던 요청은 원래 쪽에서 끝내므로 끊기지 않습니다. 그다음 nginx를 거쳐 새 버전이 답하는지(응답 머리 `X-Bv8400-Upstream`) 확인하고, 이전 버전은 15초 뒤 멈춰 둡니다(되돌리기용).
+  - 새 버전이 뜨지 않거나 nginx 설정 검사(`nginx -t`)가 실패하면 아무것도 바꾸지 않고 이전 버전이 그대로 서비스합니다.
+  - 지금 어느 쪽이 답하는지: 서버에서 `curl -sI http://127.0.0.1:8400/ | grep -i x-bv8400-upstream`
+  - 서버의 도커를 다른 사람도 같이 쓰므로 컨테이너·이미지 이름은 `bv8400-`로 시작하고, 스크립트는 자기 것(compose 프로젝트 `bv8400` 또는 자기 이미지)만 지웁니다. nginx 이미지는 배포 때 앱 이미지와 함께 올라가고, 서버에 docker compose가 없으면 함께 올린 `bin/docker-compose`를 씁니다.
+  - nginx 설정(`deploy/nginx/blogville.conf.template`)을 고치면 다음 배포 때 reload로 바로 적용됩니다. nginx 이미지를 바꿀 때만 nginx 컨테이너를 다시 만들며 1초쯤 끊깁니다.
 - 서버의 `~/blogville/`에 로그인 비밀키(`auth-secret`, 처음 한 번 생성), 환경 변수(`app.env`), 올린 파일(`uploads/`)이 남습니다.
 - `DB_SCHEMA`가 `public`이 아니면 `scripts/migrate.mjs`가 SQL의 `"public".`을 그 스키마로 바꿔 적용합니다. 스키마를 새로 만들지 않으므로 미리 있는 스키마를 씁니다.
 

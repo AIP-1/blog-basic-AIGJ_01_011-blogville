@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AdminDeleteButton } from "@/components/admin/AdminDeleteButton";
 import { ResetPasswordButton } from "@/components/admin/ResetPasswordButton";
-import { formatDateTime } from "@/lib/comment-rules";
+import { formatDateTime } from "@/lib/time";
 import { normalizeName } from "@/lib/names";
 import { findMemberByUsername, getAdminStats, listRecentMembers, listRecentPosts, RECENT_MEMBERS, RECENT_POST_DAYS } from "@/server/admin";
 import { requireAdmin } from "@/server/dal";
