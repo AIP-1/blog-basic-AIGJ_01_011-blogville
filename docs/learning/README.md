@@ -27,8 +27,8 @@ Blogville 저장소의 **실제 파일**을 예로 들어, 함께 개발하고 �
 | 문서 | 내용 |
 |---|---|
 | [08. 무중단 배포](08-zero-downtime.md) | nginx + blue/green 컨테이너, `run.sh` 교체 순서, 되돌리기 |
-| 09. MSA로 서비스 나누기 | 준비 중 |
-| 10. API Gateway | 준비 중 |
-| 11. Service Discovery | 준비 중 |
+| [09. MSA로 서비스 나누기](09-msa.md) | 시세·날씨 서비스를 떼어 낸 로컬 실습 (`docker compose --profile msa`) |
+| [10. API Gateway](10-api-gateway.md) | 바깥 문 하나(nginx 8080)로 경로별로 나눠 보내기 |
+| [11. Service Discovery](11-service-discovery.md) | 이름으로 찾기, `--scale`로 늘리고 줄이기, 헬스 체크 |
 
 함께 보면 좋은 문서: [개발환경](../dev-environment.md), [CONTRIBUTING.md](../../CONTRIBUTING.md), [저장소 README](../../README.md)
