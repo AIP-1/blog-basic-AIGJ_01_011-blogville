@@ -552,15 +552,6 @@ async function RegionTab({
   const region = mine && isFoodRegion(mine.city) ? mine.city : pickedRegion;
   const area = mine ? null : isFoodArea(region, rawArea) ? rawArea : null;
   const place = mine?.dong ?? area ?? region;
-  const result = await regionHot(place, kind);
-  const list =
-    result.status === "ok"
-      ? sortRegion(
-          result.value.filter((p) => kind === "all" || p.kind === kind),
-          sort,
-        ).slice(0, FOOD_REGION_TOP)
-      : [];
-  const save = await saveButtons(list);
   const tail = (k: FoodKindFilter, o: RegionSort) =>
     `${k === "all" ? "" : `&kind=${k}`}${o === "best" ? "" : `&sort=${o}`}`;
   const href = (
@@ -641,6 +632,44 @@ async function RegionTab({
         으로 보여 줘요. 백화점·쇼핑몰·큰 체인점은 빼고, 체험단·협찬 글과 가게
         이야기가 아닌 글은 세지 않아요.
       </p>
+      <Suspense
+        key={`${place}|${kind}|${sort}`}
+        fallback={
+          <div className="space-y-3" aria-busy="true" data-region-loading>
+            <p className="animate-pulse text-sm text-ink-soft">
+              {place} 인기 식당을 모으는 중…
+            </p>
+            <div className="h-72 animate-pulse rounded-2xl bg-bg sm:h-96" />
+          </div>
+        }
+      >
+        <RegionList place={place} kind={kind} sort={sort} />
+      </Suspense>
+    </div>
+  );
+}
+
+/** 지역 인기 목록·지도 (블로그 수·검색 관심을 받느라 처음엔 몇 초 걸려 단추와 따로 그린다) */
+async function RegionList({
+  place,
+  kind,
+  sort,
+}: {
+  place: string;
+  kind: FoodKindFilter;
+  sort: RegionSort;
+}) {
+  const result = await regionHot(place, kind);
+  const list =
+    result.status === "ok"
+      ? sortRegion(
+          result.value.filter((p) => kind === "all" || p.kind === kind),
+          sort,
+        ).slice(0, FOOD_REGION_TOP)
+      : [];
+  const save = await saveButtons(list);
+  return (
+    <div className="space-y-3">
       {result.status !== "ok" ? (
         <Notice>{failText(result)}</Notice>
       ) : list.length === 0 ? (
