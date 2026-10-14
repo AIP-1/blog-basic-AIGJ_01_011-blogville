@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { addBlogStock, removeBlogStock, type StockState } from "@/app/settings/blog/actions";
+import { useRef, useState } from "react";
+import { addBlogStock, removeBlogStock, reorderBlogStock, type StockState } from "@/app/settings/blog/actions";
 import { STOCK_MAX, type StockItem } from "@/lib/stocks";
 
 /**
  * 블로그 설정의 📈 관심 종목: 이름·코드로 찾아(`/api/stocks/search`, 네이버 증권 검색) [넣기], 넣은 종목은 [빼기].
- * 블로그 홈 옆 칸에 넣은 순서대로 보이고 5초마다 시세가 바뀐다.
+ * 순서는 ▲▼(휴대폰·키보드) 또는 끌어 놓기(마우스)로 바꾸면 바로 저장되고, 블로그 홈 옆 📈 증시에 그 순서로 보인다.
  */
 export function StockManager({ stocks }: { stocks: (StockItem & { id: number })[] }) {
   const [query, setQuery] = useState("");
@@ -15,6 +15,53 @@ export function StockManager({ stocks }: { stocks: (StockItem & { id: number })[
   const [busy, setBusy] = useState(false);
   const [state, setState] = useState<StockState>(null);
   const has = new Set(stocks.map((s) => `${s.market}:${s.code}`));
+  // 화면에 보이는 순서 (바꾸면 먼저 그리고 저장한다). 서버가 새 목록을 주면 그걸 따른다
+  const [order, setOrder] = useState(stocks);
+  const [seen, setSeen] = useState(stocks);
+  if (seen !== stocks) {
+    setSeen(stocks);
+    setOrder(stocks);
+  }
+  const dragId = useRef<number | null>(null);
+  const [overId, setOverId] = useState<number | null>(null);
+  const [announce, setAnnounce] = useState("");
+
+  async function reorder(next: typeof stocks, movedId: number) {
+    if (busy) return;
+    const before = order;
+    setOrder(next);
+    const moved = next.findIndex((s) => s.id === movedId);
+    setAnnounce(`${next[moved].name}: ${moved + 1}번째`);
+    setBusy(true);
+    try {
+      const form = new FormData();
+      form.append("ids", next.map((s) => s.id).join(","));
+      const result = await reorderBlogStock(form);
+      setState(result);
+      if (result && "error" in result) setOrder(before);
+    } catch {
+      setOrder(before);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const move = (id: number, delta: -1 | 1) => {
+    const i = order.findIndex((s) => s.id === id);
+    const j = i + delta;
+    if (i < 0 || j < 0 || j >= order.length) return;
+    const next = [...order];
+    [next[i], next[j]] = [next[j], next[i]];
+    void reorder(next, id);
+  };
+  const drop = (from: number, to: number) => {
+    const i = order.findIndex((s) => s.id === from);
+    const j = order.findIndex((s) => s.id === to);
+    if (i < 0 || j < 0 || i === j) return;
+    const next = [...order];
+    const [m] = next.splice(i, 1);
+    next.splice(j, 0, m);
+    void reorder(next, from);
+  };
 
   async function search(e: React.FormEvent) {
     e.preventDefault();
@@ -99,10 +146,48 @@ export function StockManager({ stocks }: { stocks: (StockItem & { id: number })[
           <p className="text-sm text-ink-soft">아직 없어요. 위에서 찾아 넣으면 블로그 홈 옆 칸에 시세가 보여요.</p>
         ) : (
           <ul className="divide-y divide-line rounded-xl border border-line" aria-label="넣은 종목">
-            {stocks.map((s) => (
-              <li key={s.id} className="flex min-h-11 items-center gap-2 px-3 py-1.5" data-my-stock={s.code}>
+            {order.map((s, i) => (
+              <li
+                key={s.id}
+                draggable={!busy}
+                onDragStart={(e) => {
+                  dragId.current = s.id;
+                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData("text/plain", String(s.id));
+                }}
+                onDragOver={(e) => {
+                  if (dragId.current === null) return;
+                  e.preventDefault();
+                  setOverId(s.id);
+                }}
+                onDragLeave={() => setOverId((o) => (o === s.id ? null : o))}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (dragId.current !== null) drop(dragId.current, s.id);
+                  dragId.current = null;
+                  setOverId(null);
+                }}
+                onDragEnd={() => {
+                  dragId.current = null;
+                  setOverId(null);
+                }}
+                className={`flex min-h-11 items-center gap-2 px-3 py-1.5 ${overId === s.id ? "bg-accent/10" : ""}`}
+                data-my-stock={s.code}
+              >
+                <span aria-hidden className="cursor-grab select-none text-ink-soft max-sm:hidden" title="끌어서 옮기기">
+                  ⠿
+                </span>
+                <span className="w-5 shrink-0 text-center text-sm font-semibold tabular-nums text-ink-soft">{i + 1}</span>
                 <span className="min-w-0 flex-1 truncate">
                   {s.name} <span className="text-sm text-ink-soft">· {s.market === "KR" ? "국내" : "미국"} {s.code}</span>
+                </span>
+                <span className="inline-flex">
+                  <button type="button" className="btn btn-ghost min-w-11 px-2" aria-label={`${s.name} 위로`} disabled={busy || i === 0} onClick={() => move(s.id, -1)}>
+                    ▲
+                  </button>
+                  <button type="button" className="btn btn-ghost min-w-11 px-2" aria-label={`${s.name} 아래로`} disabled={busy || i === order.length - 1} onClick={() => move(s.id, 1)}>
+                    ▼
+                  </button>
                 </span>
                 <button type="button" className="btn" disabled={busy} onClick={() => void run(removeBlogStock, { id: String(s.id) })}>
                   빼기
@@ -113,7 +198,10 @@ export function StockManager({ stocks }: { stocks: (StockItem & { id: number })[
         )}
       </div>
 
-      <p className="text-sm text-ink-soft">시세는 네이버 증권의 공개 시세예요. 공식 API가 아니라서 네이버 쪽 사정으로 잠시 안 보일 수 있어요.</p>
+      <p className="sr-only" aria-live="polite">
+        {announce}
+      </p>
+      <p className="text-sm text-ink-soft">순서는 ▲▼나 끌어 놓기로 바꾸면 바로 저장돼요. 시세는 네이버 증권의 공개 시세예요. 공식 API가 아니라서 네이버 쪽 사정으로 잠시 안 보일 수 있어요.</p>
       {state && "error" in state && (
         <p role="alert" className="form-error">
           {state.error}

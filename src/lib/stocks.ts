@@ -58,6 +58,8 @@ export const STOCK_ERRORS = {
   duplicate: "이미 넣은 종목이에요.",
   added: "관심 종목에 넣었어요",
   removed: "관심 종목에서 뺐어요",
+  reordered: "순서를 바꿨어요",
+  stale: "종목 목록이 그새 바뀌었어요. 새로 고침한 뒤 다시 해 주세요.",
 } as const;
 
 const KR_CODE = /^[0-9A-Z]{6}$/;

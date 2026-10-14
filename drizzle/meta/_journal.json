@@ -302,6 +302,13 @@
       "when": 1791943473512,
       "tag": "0048_weather_city",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1791955679824,
+      "tag": "0049_blog_stocks_position",
+      "breakpoints": true
     }
   ]
 }
