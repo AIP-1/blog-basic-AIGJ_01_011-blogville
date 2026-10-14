@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { SECRET_PLACEHOLDER } from "@/lib/comment-rules";
 import { excerpt } from "@/lib/text";
 import { SEARCH_MAX } from "@/lib/blog-search";
 import { guestbookPath } from "@/lib/guestbook-rules";
 import type { getBlogSidebar } from "@/server/sidebar";
 import type { VisitStats } from "@/server/stats";
+import { BlogStocks } from "./BlogStocks";
 import { VisitCount } from "./VisitCount";
 
 type Props = {
@@ -18,10 +20,11 @@ type Props = {
   townSearch?: string;
   activeTag: string | null;
   categoryNav: React.ReactNode;
+  isOwner?: boolean;
 };
 
 /** 블로그 홈 오른쪽 옆 칸 (BLOG-09). 휴대폰에서는 글 목록 아래. */
-export function BlogSidebar({ blogId, slug, sidebar, visits, recordVisit, search, townSearch, activeTag, categoryNav }: Props) {
+export function BlogSidebar({ blogId, slug, sidebar, visits, recordVisit, search, townSearch, activeTag, categoryNav, isOwner = false }: Props) {
   const empty = <p className="px-1 text-sm text-ink-soft">아직 없어요</p>;
   const linkClass = "flex min-h-11 items-center gap-2 rounded-lg px-2 hover:bg-bg";
   return (
@@ -30,6 +33,11 @@ export function BlogSidebar({ blogId, slug, sidebar, visits, recordVisit, search
       <Link href={guestbookPath(slug)} className="widget flex min-h-11 items-center gap-2 font-semibold hover:bg-bg" data-guestbook-link>
         <span aria-hidden>📖</span> 방명록 <span className="ml-auto text-sm font-normal text-ink-soft">{sidebar.guestbookCount}</span>
       </Link>
+
+      {/* 📈 관심 종목: 시세를 받는 동안 나머지 옆 칸을 막지 않는다 */}
+      <Suspense fallback={null}>
+        <BlogStocks blogId={blogId} slug={slug} isOwner={isOwner} />
+      </Suspense>
 
       <section className="widget" aria-labelledby="w-search">
         <h2 id="w-search" className="widget-title">

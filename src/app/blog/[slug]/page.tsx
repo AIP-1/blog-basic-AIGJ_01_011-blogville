@@ -315,6 +315,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
           sidebar={sidebar}
           visits={visits}
           recordVisit={!isOwner}
+          isOwner={isOwner}
           search={search ?? ""}
           townSearch={isOwner ? (town ?? "") : undefined}
           activeTag={tag}
