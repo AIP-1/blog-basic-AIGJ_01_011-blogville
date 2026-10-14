@@ -55,8 +55,12 @@ test.describe("POST-01 에디터 도구", () => {
     await expect(tool(page, "밑줄")).toHaveAttribute("aria-pressed", "true");
     // 도구를 누르면 에디터가 다음 그리기 때 초점을 되찾는다. 그 전에 친 키는 버튼으로 간다
     await expect(body(page)).toBeFocused();
-    await page.keyboard.press("ControlOrMeta+End");
-    await page.keyboard.press("Shift+Home");
+    // 초점을 되찾으며 예전 선택이 되살아나 Shift+Home이 묻힐 때가 있어(바쁜 CI), 둘째 줄이 정말 골라질 때까지 다시 누른다
+    await expect(async () => {
+      await page.keyboard.press("ControlOrMeta+End");
+      await page.keyboard.press("Shift+Home");
+      expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("취소");
+    }).toPass({ timeout: 5_000 });
     await tool(page, "취소선").click();
     await expect(tool(page, "취소선")).toHaveAttribute("aria-pressed", "true");
     // 에디터 안에 두 꾸밈이 다 들어간 뒤에 발행한다
