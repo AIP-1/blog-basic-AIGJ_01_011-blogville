@@ -1,0 +1,60 @@
+// 🍽 블로그 글 본문이 정말 그 식당 이야기인지: 제목·요약만으로는 "마피아 게임"·"서구사회" 같은 글이 섞이므로,
+// 글을 열었을 때 본문에 그 식당의 전화번호·도로명·지도 링크가 있는지 본다.
+// 하나라도 있으면 확실한 후기, 없으면 이름과 먹은 이야기가 여러 번 나와야 남기고, 그것도 아니면 뺀다.
+import type { FoodPlace } from "./food";
+
+export type BodyMatch = "match" | "weak" | "mismatch" | "unknown";
+
+const squash = (s: string) => s.toLowerCase().replace(/[\s·.,!?'"()[\]{}<>~\-_/|]+/g, "");
+
+const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", "#39": "'" };
+
+/** HTML에서 읽을 글자만 (스크립트·스타일은 빼되 지도 카드 등의 data 속성 값은 남긴다) */
+export function htmlText(html: string): string {
+  const attrs = [...html.matchAll(/data-linkdata\s*=\s*(["'])(.*?)\1/gi)].map((m) => m[2]);
+  const body = html
+    .replace(/<(script|style|noscript)[^>]*>[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<[^>]+>/g, " ");
+  return `${body} ${attrs.join(" ")}`
+    .replace(/&(#?\w+);/g, (m, e: string) => ENTITIES[e] ?? (e.startsWith("#") ? String.fromCharCode(Number(e.slice(1)) || 32) : m))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** 도로명 낱말 (예: "광주 서구 상무오월로15번길 28-15" → ["상무오월로15번길", "상무오월로"]) */
+export function roadWords(address: string): string[] {
+  return address
+    .split(/\s+/)
+    .filter((w) => /^[가-힣][가-힣0-9]*(로|길)$/.test(w) && w.length >= 3)
+    .flatMap((w) => {
+      const base = w.replace(/\d+(번)?(길|가길)$/, "");
+      return base !== w && base.length >= 3 && /(로|길)$/.test(base) ? [w, base] : [w];
+    });
+}
+
+/** 전화번호가 글에 그대로(붙임표·띄어쓰기는 달라도) 있는지 */
+function hasPhone(text: string, phone: string): boolean {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 8) return false;
+  const loose = new RegExp(`(^|\\D)${digits.split("").join("[\\s.\\-)]*")}(\\D|$)`);
+  return loose.test(text);
+}
+
+// 식당에 다녀온 글에 자주 나오는 말 (흔한 "후기·방문"은 빼고 먹은 이야기만)
+const DINING = /메뉴|맛있|먹었|먹어|주문|웨이팅|영업시간|라스트\s*오더|주차|포장|재방문|가격|사장님|매장|테이블|예약|웨이팅|존맛|맛집/g;
+
+/** 본문으로 본 판정. 글이 너무 짧거나 못 읽었으면 unknown */
+export function bodyMatch(html: string, place: Pick<FoodPlace, "id" | "name" | "address" | "phone" | "category">): BodyMatch {
+  const text = htmlText(html);
+  if (text.length < 300) return "unknown";
+  if (place.phone && hasPhone(text, place.phone)) return "match";
+  const flat = squash(text);
+  if (roadWords(place.address).some((w) => flat.includes(squash(w)))) return "match";
+  if (/^\d+$/.test(place.id) && new RegExp(`place\\.map\\.kakao\\.com/(m/)?${place.id}(\\D|$)|/place/${place.id}(\\D|$)`).test(html)) return "match";
+  const name = squash(place.name.replace(/\s*(본점|지점|[가-힣]+점)$/, ""));
+  if (!name) return "unknown";
+  const named = flat.split(name).length - 1;
+  const menu = place.category ? place.category.split(">").pop()!.trim() : "";
+  const dining = new Set([...text.matchAll(DINING)].map((m) => m[0])).size + (menu && text.includes(menu) ? 1 : 0);
+  return named >= 2 && dining >= 3 ? "weak" : "mismatch";
+}

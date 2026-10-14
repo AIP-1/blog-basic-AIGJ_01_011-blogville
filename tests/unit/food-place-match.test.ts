@@ -1,0 +1,28 @@
+import { describe, expect, it } from "vitest";
+import { bodyMatch, htmlText, roadWords } from "@/lib/food-place-match";
+
+const mafia = { id: "123456", name: "마피아", address: "광주 서구 상무오월로15번길 28-15", phone: "0507-1424-1778", category: "양식 > 피자" };
+const page = (body: string) => `<html><head><script>var x="상무오월로";</script></head><body><div class="se-main-container">${body}</div></body></html>`;
+const filler = "오늘은 날씨가 정말 좋았어요. ".repeat(20);
+
+describe("글 본문으로 식당 확인 (bodyMatch)", () => {
+  it("도로명 낱말", () => expect(roadWords("광주 서구 상무오월로15번길 28-15")).toEqual(["상무오월로15번길", "상무오월로"]));
+  it("본문 글자만 (스크립트 빼고, 지도 카드 data는 남김)", () => {
+    expect(htmlText(page("<p>안녕&amp;하세요</p>"))).toBe("안녕&하세요");
+    expect(htmlText(`<a data-linkdata='{"name":"마피아","address":"상무오월로"}'>지도</a>`)).toContain("상무오월로");
+  });
+  it("전화번호·도로명·지도 링크가 있으면 그 식당 후기", () => {
+    expect(bodyMatch(page(`${filler}<p>마피아 050714241778 피자</p>`), mafia)).toBe("match");
+    expect(bodyMatch(page(`${filler}<p>마피아 전남광주통합특별시 서구 상무오월로15번길 28-15 1층</p>`), mafia)).toBe("match");
+    expect(bodyMatch(page(`${filler}<a href="https://place.map.kakao.com/123456">지도</a>`), mafia)).toBe("match");
+  });
+  it("이름만 지나가는 글(게임·연극·사회 이야기)은 뺀다", () => {
+    expect(bodyMatch(page(`${filler}<p>언니들이랑 마피아도 하고 화투도 쳤어요</p>`), mafia)).toBe("mismatch");
+    expect(bodyMatch(page(`${filler}<p>코믹추리연극 마피아 게임, 상무중앙로 90 기분좋은극장. 마피아 역할이 재밌었어요</p>`), mafia)).toBe("mismatch");
+    expect(bodyMatch(page(`${filler}<p>이민사회, 마피아, 서구사회 이야기</p>`), mafia)).toBe("mismatch");
+  });
+  it("주소가 없어도 이름과 먹은 이야기가 여러 번이면 남긴다", () => {
+    expect(bodyMatch(page(`${filler}<p>마피아 메뉴는 피자. 주문하고 웨이팅 조금. 마피아 또 갈래요 맛있었어요</p>`), mafia)).toBe("weak");
+  });
+  it("짧거나 못 읽은 글은 모른다", () => expect(bodyMatch("<p>마피아</p>", mafia)).toBe("unknown"));
+});
