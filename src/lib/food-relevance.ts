@@ -22,18 +22,27 @@ export function areaWords(address: string): string[] {
     .slice(0, 3);
 }
 
-/** 이 후기가 그 식당 이야기인지 (이름이 제목·요약에 있고, 흔한 이름이면 동네·먹은 이야기도 있어야). 광고·스팸은 늘 뺀다 */
-export function isRelevantReview(r: Pick<FoodReview, "title" | "summary">, place: Pick<FoodPlace, "name" | "address" | "category">): boolean {
+export type ReviewVerdict = { keep: true } | { keep: false; reason: "spam" | "no-name" | "off-topic" };
+
+export const VERDICT_LABELS = { spam: "광고·스팸", "no-name": "식당 이름 없음", "off-topic": "다른 이야기" } as const;
+
+/** 이 후기가 그 식당 이야기인지와, 아니면 왜 뺐는지 */
+export function reviewVerdict(r: Pick<FoodReview, "title" | "summary">, place: Pick<FoodPlace, "name" | "address" | "category">): ReviewVerdict {
   const text = `${r.title} ${r.summary}`;
-  if (SPAM.test(text)) return false;
+  if (SPAM.test(text)) return { keep: false, reason: "spam" };
   const name = squash(place.name.replace(/\s*(본점|지점|[가-힣]+점)$/, ""));
   const flat = squash(text);
-  if (!name || !flat.includes(name)) return false;
+  if (!name || !flat.includes(name)) return { keep: false, reason: "no-name" };
   const area = areaWords(place.address).some((w) => flat.includes(squash(w)));
   const food = FOOD_WORDS.test(text) || (place.category ? text.includes(place.category.split(">").pop()!.trim()) : false);
   // 이름이 짧거나(3자 이하) 흔한 낱말과 겹치는 다른 분야 이야기가 보이면 동네·먹은 이야기가 둘 다 있어야
-  if ([...name].length <= 3 || OFF_TOPIC.test(text)) return area && food;
-  return area || food;
+  const ok = [...name].length <= 3 || OFF_TOPIC.test(text) ? area && food : area || food;
+  return ok ? { keep: true } : { keep: false, reason: "off-topic" };
+}
+
+/** 이 후기가 그 식당 이야기인지 (이름이 제목·요약에 있고, 흔한 이름이면 동네·먹은 이야기도 있어야). 광고·스팸은 늘 뺀다 */
+export function isRelevantReview(r: Pick<FoodReview, "title" | "summary">, place: Pick<FoodPlace, "name" | "address" | "category">): boolean {
+  return reviewVerdict(r, place).keep;
 }
 
 /** 후기 목록 거르기 */

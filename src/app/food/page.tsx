@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { NearbyLocator } from "@/components/food/NearbyLocator";
+import { VERDICT_LABELS } from "@/lib/food-relevance";
 import {
   FOOD_KINDS,
   FOOD_RADII,
@@ -14,6 +15,7 @@ import {
   FoodMap,
   type MapProvider,
 } from "@/components/food/FoodMap";
+import { InterestSpark } from "@/components/food/InterestSpark";
 import { PlaceCard } from "@/components/food/PlaceCard";
 import { ReviewCards } from "@/components/food/ReviewCards";
 import { SaveButton } from "@/components/food/SaveButton";
@@ -45,6 +47,7 @@ import {
   naverFoodEnabled,
   nearbyPlaces,
   placeDetail,
+  placeInterest,
   regionHot,
   searchPlaces,
   type FoodResult,
@@ -174,6 +177,7 @@ export default async function FoodPage({ searchParams }: PageProps<"/food">) {
           kind={
             isFoodKind(one(sp.kind)) ? (one(sp.kind) as FoodKindFilter) : "all"
           }
+          page={Number(one(sp.p)) || 1}
         />
       ) : tab === "region" ? (
         <RegionTab
@@ -205,17 +209,19 @@ async function NearTab({
   sort,
   radius,
   kind,
+  page,
 }: {
   lat?: string;
   lng?: string;
   sort: "distance" | "buzz";
   radius: number;
   kind: FoodKindFilter;
+  page: number;
 }) {
   if (!kakaoEnabled()) return <Notice>{FOOD_MESSAGES.nearOff}</Notice>;
   const at = parseCoords(lat, lng);
-  const result = at ? await nearbyPlaces(at, sort, radius, kind) : null;
-  const href = (o: { sort?: string; r?: number; kind?: string }) => {
+  const result = at ? await nearbyPlaces(at, sort, radius, kind, page) : null;
+  const href = (o: { sort?: string; r?: number; kind?: string; p?: number }) => {
     const q = new URLSearchParams({
       tab: "near",
       lat: String(at!.lat),
@@ -227,10 +233,12 @@ async function NearTab({
     if (r !== 500) q.set("r", String(r));
     if (k !== "all") q.set("kind", k);
     if (so === "buzz") q.set("sort", "buzz");
+    if (o.p && o.p > 1) q.set("p", String(o.p));
     return `/food?${q}`;
   };
   const base = at ? href({ sort: "distance" }) : "";
-  const save = await saveButtons(result?.status === "ok" ? result.value : []);
+  const list = result?.status === "ok" ? result.value : null;
+  const save = await saveButtons(list?.items ?? []);
   return (
     <div className="mt-4 space-y-3">
       <NearbyLocator sort={sort} located={!!at} radius={radius} kind={kind} />
@@ -282,7 +290,7 @@ async function NearTab({
       {result &&
         (result.status !== "ok" ? (
           <Notice>{failText(result)}</Notice>
-        ) : result.value.length === 0 ? (
+        ) : list!.total === 0 ? (
           <Notice>
             {radiusLabel(radius)} 안에{" "}
             {kind === "all"
@@ -310,23 +318,24 @@ async function NearTab({
               {kind === "all"
                 ? "가게"
                 : FOOD_KINDS.find((k) => k.key === kind)!.label}{" "}
-              {result.value.length}곳
-              {result.value.length >= 30 ? " (가까운 30곳까지)" : ""}
+              {list!.total}곳{list!.total >= 200 ? " (가까운 200곳까지)" : ""}
+              {list!.pages > 1 && ` · ${(list!.page - 1) * 20 + 1}~${(list!.page - 1) * 20 + list!.items.length}번째`}
             </p>
             {mapProviders() && (
               <FoodMap
                 providers={mapProviders()!}
-                places={result.value}
+                places={list!.items}
                 me={at}
                 researchSort={sort}
+                firstNumber={(list!.page - 1) * 20 + 1}
               />
             )}
             <ol className="space-y-3" data-food-list="near">
-              {result.value.map((p, i) => (
+              {list!.items.map((p, i) => (
                 <li key={p.id}>
                   <PlaceCard
                     place={p}
-                    rank={mapProviders() ? i + 1 : undefined}
+                    rank={mapProviders() ? (list!.page - 1) * 20 + i + 1 : undefined}
                     recent={naverFoodEnabled() ? p.recent : undefined}
                     detailHref={detailHref(p.name, p)}
                     actions={save(p)}
@@ -337,6 +346,20 @@ async function NearTab({
                 </li>
               ))}
             </ol>
+            {list!.pages > 1 && (
+              <nav aria-label="쪽" className="flex flex-wrap justify-center gap-1" data-near-pages>
+                {Array.from({ length: list!.pages }, (_, i) => i + 1).map((n) => (
+                  <Link
+                    key={n}
+                    href={href({ p: n })}
+                    aria-current={n === list!.page ? "page" : undefined}
+                    className={`inline-flex size-9 items-center justify-center rounded-lg text-sm ${n === list!.page ? "bg-ink font-bold text-surface" : "hover:bg-bg"}`}
+                  >
+                    {n}
+                  </Link>
+                ))}
+              </nav>
+            )}
           </>
         ))}
     </div>
@@ -540,7 +563,10 @@ async function PlaceDetailView({
   actions: React.ReactNode;
   page: number;
 }) {
-  const d = await placeDetail(place, page);
+  const [d, interest] = await Promise.all([
+    placeDetail(place, page),
+    placeInterest(place),
+  ]);
   const pageHref = (n: number) =>
     `${backHref}&place=${encodeURIComponent(place.id)}${n > 1 ? `&rp=${n}` : ""}#food-reviews`;
   return (
@@ -556,6 +582,7 @@ async function PlaceDetailView({
       {mapProviders() && place.lat !== null && (
         <FoodMap providers={mapProviders()!} places={[place]} />
       )}
+      {interest && <InterestSpark interest={interest} />}
 
       {d.local.length > 0 && (
         <section
@@ -613,6 +640,21 @@ async function PlaceDetailView({
                 ` · 이름만 같거나 광고로 보이는 글 ${d.reviewHidden}편은 뺐어요`}
             </p>
             <ReviewCards reviews={d.reviews.value} />
+            {d.hiddenSample.length > 0 && (
+              <details className="mt-3 rounded-lg bg-bg px-3 py-2 text-sm" data-hidden-reviews>
+                <summary className="cursor-pointer text-ink-soft">뺀 글 {d.reviewHidden}편 중 {d.hiddenSample.length}편 보기 (왜 뺐는지)</summary>
+                <ul className="mt-2 space-y-1">
+                  {d.hiddenSample.map((h) => (
+                    <li key={h.url} className="flex items-center gap-2">
+                      <span className="shrink-0 rounded-full border border-line px-1.5 text-xs text-ink-soft">{VERDICT_LABELS[h.reason]}</span>
+                      <a href={h.url} target="_blank" rel="noopener noreferrer nofollow" className="min-w-0 truncate hover:underline">
+                        {h.title}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
             {d.reviewPages > 1 && (
               <nav
                 aria-label="후기 쪽"

@@ -48,3 +48,28 @@ describe("후기 거르기 (isRelevantReview)", () => {
     expect(isRelevantReview(r("스타벅스 금남로 신메뉴", "커피 마심"), place)).toBe(true);
   });
 });
+
+describe("넓은 반경 나누기 (gridRects)", () => {
+  it("n×n 칸, 칸은 반경을 덮는다", async () => {
+    const { gridRects } = await import("@/server/food");
+    const rects = gridRects({ lat: 35.147, lng: 126.915 }, 2000, 3);
+    expect(rects).toHaveLength(9);
+    const [x1, y1] = rects[0].split(",").map(Number);
+    const [, , x2, y2] = rects[8].split(",").map(Number);
+    expect(y1).toBeCloseTo(35.147 - 2000 / 111000, 4);
+    expect(y2).toBeCloseTo(35.147 + 2000 / 111000, 4);
+    expect(x1).toBeLessThan(126.915);
+    expect(x2).toBeGreaterThan(126.915);
+  });
+});
+
+describe("뺀 까닭 (reviewVerdict)", () => {
+  it("광고·이름 없음·다른 이야기", async () => {
+    const { reviewVerdict } = await import("@/lib/food-relevance");
+    const mafia = { name: "마피아", address: "광주 동구 금남로 18", category: "양식 > 피자" };
+    expect(reviewVerdict({ title: "마피아 근처 분양", summary: "" }, mafia)).toEqual({ keep: false, reason: "spam" });
+    expect(reviewVerdict({ title: "광주 피자 맛집", summary: "" }, mafia)).toEqual({ keep: false, reason: "no-name" });
+    expect(reviewVerdict({ title: "마피아 게임", summary: "보드게임" }, mafia)).toEqual({ keep: false, reason: "off-topic" });
+    expect(reviewVerdict({ title: "동구 마피아 피자 후기", summary: "" }, mafia)).toEqual({ keep: true });
+  });
+});

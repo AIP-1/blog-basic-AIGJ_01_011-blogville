@@ -6,7 +6,7 @@ import { likePattern } from "@/lib/blog-search";
 import { countBuzz, interestKeywords, isRegionCandidate, isRising, rankRegion, summarizeInterest, type RankedPlace } from "@/lib/food-quality";
 import { detectSponsor, pickOgImage, reviewFetchUrl } from "@/lib/food-sponsor";
 import { placeKind, type FoodKind, type FoodKindFilter } from "@/lib/food-kind";
-import { relevantReviews, REVIEW_PAGE_MAX, REVIEW_PAGE_SIZE } from "@/lib/food-relevance";
+import { relevantReviews, reviewVerdict, REVIEW_PAGE_MAX, REVIEW_PAGE_SIZE } from "@/lib/food-relevance";
 import { todayKST } from "@/lib/kst";
 import {
   FOOD_RADIUS_M,
@@ -33,7 +33,7 @@ const FAIL_TTL_MS = 60_000;
 const TIMEOUT_MS = 5_000;
 const PAGE_TTL_MS = 24 * 3_600_000;
 const PAGE_MAX_BYTES = 1_500_000;
-const NEAR_MAX = 30;
+const NEAR_MAX = 200;
 // 지역 인기 후보를 모으는 검색어 (네이버 지역 검색은 한 번에 5곳까지라 여러 번 묻는다).
 // 백화점·체인을 거르고도 열 곳이 넘게 남도록 식사·카페·술집을 고루 묻는다.
 const REGION_QUERIES = ["맛집", "현지인 맛집", "한식 맛집", "고기 맛집", "일식 맛집", "중식 맛집", "양식 맛집", "술집", "카페", "디저트", "빵집", "브런치"];
@@ -152,41 +152,86 @@ async function kakaoPages(path: string, params: Record<string, string | number>,
   return out;
 }
 
-/** 분류마다 카카오에 묻는 방법: 식당은 음식점(FD6), 카페·디저트는 카페(CE7)+베이커리, 술집은 "술집" 키워드 */
-function nearSources(kind: FoodKindFilter, at: { lat: number; lng: number }, radius: number, sort: NearSort) {
-  // 가까운 순은 가까운 곳부터, 인기 순은 반경 안에서 고르게 (카카오 정확도 순) 받아 블로그 글 수로 다시 줄 세운다
-  const base = { x: at.lng, y: at.lat, radius, sort: sort === "distance" ? "distance" : "accuracy" };
-  const cat = (code: string, pages: number) => () => kakaoPages("/v2/local/search/category.json", { ...base, category_group_code: code }, pages);
-  const kw = (query: string, pages: number) => () => kakaoPages("/v2/local/search/keyword.json", { ...base, query, category_group_code: "FD6" }, pages);
-  if (kind === "meal") return [cat("FD6", 3)];
-  if (kind === "cafe") return [cat("CE7", 3), kw("베이커리", 1), kw("디저트", 1)];
-  if (kind === "bar") return [kw("술집", 3), kw("포차", 1)];
-  return [cat("FD6", 3), cat("CE7", 2)];
+/** 반경을 n×n 칸으로 나눈 사각형들 ("왼쪽 아래 경도,위도,오른쪽 위 경도,위도") — 카카오는 한 번에 45곳까지라 넓은 반경은 나눠 묻는다 */
+export function gridRects(at: { lat: number; lng: number }, radius: number, n: number): string[] {
+  const dLat = radius / 111_000;
+  const dLng = radius / (111_000 * Math.cos((at.lat * Math.PI) / 180));
+  const out: string[] = [];
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < n; j++) {
+      const x1 = at.lng - dLng + (2 * dLng * i) / n;
+      const y1 = at.lat - dLat + (2 * dLat * j) / n;
+      out.push(`${x1.toFixed(6)},${y1.toFixed(6)},${(x1 + (2 * dLng) / n).toFixed(6)},${(y1 + (2 * dLat) / n).toFixed(6)}`);
+    }
+  return out;
 }
 
-/** 📍 내 주변: 고른 거리(300m~2km)·분류(식당·카페/디저트·술집) 안의 가게 (가까운 순, 또는 최근 블로그 글 많은 순). 많아야 30곳 */
+/** 두 점 사이 거리 (m) */
+function meters(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const r = 6_371_000;
+  const p1 = (a.lat * Math.PI) / 180;
+  const p2 = (b.lat * Math.PI) / 180;
+  const dl = ((b.lng - a.lng) * Math.PI) / 180;
+  const h = Math.sin((p2 - p1) / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+  return Math.round(2 * r * Math.asin(Math.sqrt(h)));
+}
+
+/** 분류마다 카카오에 묻는 방법: 식당은 음식점(FD6), 카페·디저트는 카페(CE7)+베이커리, 술집은 "술집" 키워드.
+ *  1km 넘게 가까운 순으로 볼 때는 반경을 칸으로 나눠(1km 2×2, 2km 3×3) 칸마다 묻는다 */
+function nearSources(kind: FoodKindFilter, at: { lat: number; lng: number }, radius: number, sort: NearSort) {
+  // 인기 순은 반경 안에서 고르게 (카카오 정확도 순) 받아 블로그 글 수로 다시 줄 세운다
+  const areas: Record<string, string | number>[] =
+    sort === "distance" && radius >= 1000
+      ? gridRects(at, radius, radius >= 2000 ? 3 : 2).map((rect) => ({ x: at.lng, y: at.lat, rect, sort: "distance" }))
+      : [{ x: at.lng, y: at.lat, radius, sort: sort === "distance" ? "distance" : "accuracy" }];
+  const cat = (code: string, pages: number) => areas.map((a) => () => kakaoPages("/v2/local/search/category.json", { ...a, category_group_code: code }, pages));
+  const kw = (query: string, pages: number) => areas.map((a) => () => kakaoPages("/v2/local/search/keyword.json", { ...a, query, category_group_code: "FD6" }, pages));
+  if (kind === "meal") return cat("FD6", 3);
+  if (kind === "cafe") return [...cat("CE7", 3), ...kw("베이커리", 1), ...kw("디저트", 1)];
+  if (kind === "bar") return [...kw("술집", 3), ...kw("포차", 1)];
+  return [...cat("FD6", 3), ...cat("CE7", 2)];
+}
+
+export const NEAR_PAGE_SIZE = 20;
+
+function paged<T>(list: T[], page: number) {
+  const pages = Math.max(1, Math.ceil(list.length / NEAR_PAGE_SIZE));
+  const p = Math.min(Math.max(1, Math.floor(page) || 1), pages);
+  return { items: list.slice((p - 1) * NEAR_PAGE_SIZE, p * NEAR_PAGE_SIZE), total: list.length, page: p, pages };
+}
+
+type NearPlace = BuzzPlace & { kind: FoodKind };
+
+/** 📍 내 주변: 고른 거리(300m~2km)·분류(식당·카페/디저트·술집) 안의 가게 (가까운 순, 또는 최근 블로그 글 많은 순). 20곳씩 쪽 */
 export function nearbyPlaces(
   at: { lat: number; lng: number },
   sort: NearSort,
   radius: number = FOOD_RADIUS_M,
   kind: FoodKindFilter = "all",
-): Promise<FoodResult<(BuzzPlace & { kind: FoodKind })[]>> {
+  page = 1,
+): Promise<FoodResult<{ items: NearPlace[]; total: number; page: number; pages: number }>> {
   if (!kakaoEnabled()) return Promise.resolve({ status: "off" });
   return settle(async () => {
-    const found = await remember(`near2|${at.lat},${at.lng}|${radius}|${kind}|${sort}`, async () => {
-      const lists = await Promise.all(nearSources(kind, at, radius, sort).map((load) => load()));
+    const found = await remember(`near3|${at.lat},${at.lng}|${radius}|${kind}|${sort}`, async () => {
+      const lists = await mapLimit(nearSources(kind, at, radius, sort), 6, (load) => load());
       const seen = new Set<string>();
       return lists
         .flat()
         .filter((p) => !seen.has(p.id) && !!seen.add(p.id))
+        // 카카오가 준 거리(x,y 기준)를 쓰고, 없으면 직접 잰다
+        .map((p) => ({ ...p, distance: p.distance ?? (p.lat !== null && p.lng !== null ? meters(at, { lat: p.lat, lng: p.lng }) : null) }))
         .filter((p) => p.distance === null || p.distance <= radius)
         .map((p) => ({ ...p, kind: placeKind(p.category, p.name) }))
         .filter((p) => kind === "all" || p.kind === kind)
         .sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0))
         .slice(0, NEAR_MAX);
     });
-    const buzz = (await withBuzz(found)) as (BuzzPlace & { kind: FoodKind })[];
-    return (sort === "buzz" ? rankByBuzz(buzz) : buzz) as (BuzzPlace & { kind: FoodKind })[];
+    if (sort === "buzz") {
+      // 인기 순: 후보(많아야 45곳 남짓) 모두의 블로그 글 수를 세어 줄 세운 뒤 쪽을 자른다
+      return paged(rankByBuzz((await withBuzz(found)) as BuzzPlace[]) as NearPlace[], page);
+    }
+    const pg = paged(found, page);
+    return { ...pg, items: (await withBuzz(pg.items)) as NearPlace[] };
   }, "주변 식당");
 }
 
@@ -195,11 +240,30 @@ export function nearbyPlaces(
  * 한 번에 다섯 묶음까지라 묶음마다 "<지역> 맛집"을 기준으로 넣고, 기준 대비 비율로 바꿔 서로 비교한다.
  * 못 받으면 null (순위는 후기 수만 쓴다)
  */
+/** 데이터랩 검색어 트렌드: 묶음 이름 → 주간 검색 비율(같은 요청 안에서 가장 큰 값이 100) */
+async function trendSeries(groups: { groupName: string; keywords: string[] }[], weeks: number, today: string): Promise<Map<string, number[]>> {
+  const start = new Date(`${today}T00:00:00Z`);
+  start.setUTCDate(start.getUTCDate() - weeks * 7);
+  const res = await fetch(`${TREND()}/search-trend/v1/search`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "X-NCP-APIGW-API-KEY-ID": (process.env.NAVER_TREND_CLIENT_ID || process.env.NAVER_SEARCH_CLIENT_ID)!,
+      "X-NCP-APIGW-API-KEY": (process.env.NAVER_TREND_CLIENT_SECRET || process.env.NAVER_SEARCH_CLIENT_SECRET)!,
+    },
+    body: JSON.stringify({ startDate: start.toISOString().slice(0, 10), endDate: today, timeUnit: "week", keywordGroups: groups }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`search-trend ${res.status}`);
+  const json = (await res.json()) as { results?: { title?: string; data?: { ratio?: number }[] }[] };
+  return new Map((json.results ?? []).map((r) => [r.title ?? "", (r.data ?? []).map((d) => Number(d.ratio) || 0)]));
+}
+
 async function searchInterest(region: string, places: FoodPlace[]): Promise<Map<string, { value: number; rising: boolean }> | null> {
   if (!naverFoodEnabled() || places.length === 0) return null;
   const today = todayKST();
-  const start = new Date(`${today}T00:00:00Z`);
-  start.setUTCDate(start.getUTCDate() - TREND_WEEKS * 7);
   const anchor = { groupName: "__anchor", keywords: [`${region} 맛집`] };
   const batches: FoodPlace[][] = [];
   for (let i = 0; i < places.length; i += 4) batches.push(places.slice(i, i + 4));
@@ -208,26 +272,7 @@ async function searchInterest(region: string, places: FoodPlace[]): Promise<Map<
       remember(
         `interest|${today}|${region}|${batch.map((p) => p.id).join(",")}`,
         async () => {
-          const res = await fetch(`${TREND()}/search-trend/v1/search`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-              "X-NCP-APIGW-API-KEY-ID": (process.env.NAVER_TREND_CLIENT_ID || process.env.NAVER_SEARCH_CLIENT_ID)!,
-              "X-NCP-APIGW-API-KEY": (process.env.NAVER_TREND_CLIENT_SECRET || process.env.NAVER_SEARCH_CLIENT_SECRET)!,
-            },
-            body: JSON.stringify({
-              startDate: start.toISOString().slice(0, 10),
-              endDate: today,
-              timeUnit: "week",
-              keywordGroups: [anchor, ...batch.map((p) => ({ groupName: p.id, keywords: interestKeywords(p) }))],
-            }),
-            signal: AbortSignal.timeout(TIMEOUT_MS),
-            cache: "no-store",
-          });
-          if (!res.ok) throw new Error(`search-trend ${res.status}`);
-          const json = (await res.json()) as { results?: { title?: string; data?: { ratio?: number }[] }[] };
-          const series = new Map((json.results ?? []).map((r) => [r.title ?? "", (r.data ?? []).map((d) => Number(d.ratio) || 0)]));
+          const series = await trendSeries([anchor, ...batch.map((p) => ({ groupName: p.id, keywords: interestKeywords(p) }))], TREND_WEEKS, today);
           const base = summarizeInterest(series.get("__anchor") ?? []).average || 1;
           return batch.map((p) => {
             const s = summarizeInterest(series.get(p.id) ?? []);
@@ -242,6 +287,24 @@ async function searchInterest(region: string, places: FoodPlace[]): Promise<Map<
     console.error("맛집 검색 관심도를 못 받았어요", e instanceof Error ? e.message : e);
     return null;
   }
+}
+
+export type PlaceInterest = { weeks: number[]; rising: boolean; falling: boolean };
+
+/** 식당 한 곳의 최근 12주 네이버 검색 관심 (가장 많던 주가 100). 검색이 거의 없거나 못 받으면 null */
+export function placeInterest(place: FoodPlace): Promise<PlaceInterest | null> {
+  if (!naverFoodEnabled()) return Promise.resolve(null);
+  const today = todayKST();
+  return remember(
+    `pinterest|${today}|${place.id}`,
+    async () => {
+      const weeks = (await trendSeries([{ groupName: "p", keywords: interestKeywords(place) }], 12, today)).get("p") ?? [];
+      if (weeks.filter((w) => w > 0).length < 3) return null;
+      const s = summarizeInterest(weeks);
+      return { weeks, rising: isRising(s), falling: s.before >= 1 && s.recent < s.before * 0.7 };
+    },
+    TREND_TTL_MS,
+  ).catch(() => null);
 }
 
 /**
@@ -335,6 +398,8 @@ export type PlaceDetail = {
   reviewPages: number;
   /** 이름만 같고 다른 이야기라 뺀 글 수 */
   reviewHidden: number;
+  /** 뺀 글 몇 편과 그 까닭 (확인용, 많아야 10편) */
+  hiddenSample: { title: string; url: string; reason: "spam" | "no-name" | "off-topic" }[];
   recent: number;
   local: { id: number; title: string; slug: string; nickname: string; createdAt: Date }[];
 };
@@ -343,6 +408,7 @@ export type PlaceDetail = {
 export async function placeDetail(place: FoodPlace, page = 1): Promise<PlaceDetail> {
   let reviewTotal = 0;
   let reviewHidden = 0;
+  let hiddenSample: PlaceDetail["hiddenSample"] = [];
   let reviewPage = 1;
   let reviewPages = 1;
   const reviews: FoodResult<FoodReview[]> = naverFoodEnabled()
@@ -352,6 +418,10 @@ export async function placeDetail(place: FoodPlace, page = 1): Promise<PlaceDeta
         );
         const kept = relevantReviews(all, place);
         reviewHidden = all.length - kept.length;
+        hiddenSample = all
+          .map((r) => ({ r, v: reviewVerdict(r, place) }))
+          .flatMap(({ r, v }) => (v.keep ? [] : [{ title: r.title, url: r.url, reason: v.reason }]))
+          .slice(0, 10);
         reviewTotal = kept.length;
         reviewPages = Math.max(1, Math.min(REVIEW_PAGE_MAX, Math.ceil(kept.length / REVIEW_PAGE_SIZE)));
         reviewPage = Math.min(Math.max(1, Math.floor(page) || 1), reviewPages);
@@ -359,7 +429,7 @@ export async function placeDetail(place: FoodPlace, page = 1): Promise<PlaceDeta
       }, "블로그 후기")
     : { status: "off" };
   const [recent, local] = await Promise.all([recentCount(place), blogvillePosts(place.name)]);
-  return { place, reviews, reviewTotal, reviewPage, reviewPages, reviewHidden, recent, local };
+  return { place, reviews, reviewTotal, reviewPage, reviewPages, reviewHidden, hiddenSample, recent, local };
 }
 
 /** Blogville 공개 글 중 식당 이름이 든 글 (최신 5편) */
