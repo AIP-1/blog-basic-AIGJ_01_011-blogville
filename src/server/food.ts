@@ -8,6 +8,7 @@ import { detectSponsor, pickOgImage, reviewFetchUrl, sponsorImageUrls } from "@/
 import { queueSponsorOcr, sponsorOcrState } from "@/server/food-ocr";
 import { placeKind, type FoodKind, type FoodKindFilter } from "@/lib/food-kind";
 import { relevantReviews, reviewVerdict, REVIEW_DAYS, REVIEW_PAGE_SIZE } from "@/lib/food-relevance";
+import { bodyMatch, type BodyMatch } from "@/lib/food-place-match";
 import { todayKST } from "@/lib/kst";
 import {
   FOOD_RADIUS_M,
@@ -404,9 +405,18 @@ export function searchPlaces(q: string, kind: FoodKindFilter = "all"): Promise<F
 }
 
 const pageCache = new Map<string, { at: number; value: Promise<{ image: string | null; sponsor: FoodReview["sponsor"] }> }>();
+// 글 본문이 그 식당 이야기인지 (식당|글 주소 → 판정, 24시간 기억). 본문을 읽을 때 함께 정한다
+const bodyCache = new Map<string, { at: number; match: BodyMatch }>();
+const bodyKey = (place: FoodPlace, url: string) => `${place.id}|${reviewFetchUrl(url) ?? url}`;
 
-/** 블로그 글 한 편을 열어 대표 사진과 협찬 표시를 읽는다 (24시간 기억). 못 읽으면 둘 다 null */
-function readReviewPage(url: string): Promise<{ image: string | null; sponsor: FoodReview["sponsor"] }> {
+/** 이미 본문을 읽어 정한 판정 (모르면 null) */
+function knownBody(place: FoodPlace, url: string): BodyMatch | null {
+  const hit = bodyCache.get(bodyKey(place, url));
+  return hit && Date.now() - hit.at < PAGE_TTL_MS ? hit.match : null;
+}
+
+/** 블로그 글 한 편을 열어 대표 사진과 협찬 표시를 읽는다 (24시간 기억). 못 읽으면 둘 다 null. place를 주면 본문 판정도 남긴다 */
+function readReviewPage(url: string, place?: FoodPlace): Promise<{ image: string | null; sponsor: FoodReview["sponsor"] }> {
   const target = reviewFetchUrl(url);
   if (!target) return Promise.resolve({ image: null, sponsor: null });
   const hit = pageCache.get(target);
@@ -424,20 +434,24 @@ function readReviewPage(url: string): Promise<{ image: string | null; sponsor: F
     const buf = await res.arrayBuffer();
     const html = new TextDecoder().decode(buf.byteLength > PAGE_MAX_BYTES ? buf.slice(0, PAGE_MAX_BYTES) : buf);
     const sponsor = detectSponsor(html);
+    if (place) bodyCache.set(bodyKey(place, url), { at: Date.now(), match: bodyMatch(html, place) });
     // 문구로 협찬을 못 찾았으면 글 앞뒤 그림의 글자를 뒤에서 읽어 본다 (화면은 기다리지 않는다)
     if (sponsor !== "sponsored") queueSponsorOcr(url, sponsorImageUrls(html));
     return { image: pickOgImage(html), sponsor };
   })().catch(() => ({ image: null, sponsor: null }) as const);
   pageCache.set(target, { at: Date.now(), value });
   if (pageCache.size > 3_000) for (const [k, v] of pageCache) if (Date.now() - v.at >= PAGE_TTL_MS) pageCache.delete(k);
+  if (bodyCache.size > 6_000) for (const [k, v] of bodyCache) if (Date.now() - v.at >= PAGE_TTL_MS) bodyCache.delete(k);
   return value;
 }
 
-function enrichReviews(list: FoodReview[]): Promise<FoodReview[]> {
+function enrichReviews(list: FoodReview[], place?: FoodPlace): Promise<FoodReview[]> {
   // 네이버 블로그는 글을 열어 사진·협찬 표시를 읽고, 다른 곳은 받은 썸네일을 두고 요약 글로만 협찬 표시를 본다
   return mapLimit(list, 4, async (r) => {
-    const page = await readReviewPage(r.url);
-    const sponsor = page.sponsor ?? r.sponsor ?? (r.source && r.source !== "naver" ? detectSponsor(r.summary) : null);
+    const page = await readReviewPage(r.url, place);
+    // 글 본문·검색 요약 중 한 곳이라도 협찬이면 협찬 (요약에만 "제공받아 작성"이 보이는 글도 있다)
+    const fromSummary = detectSponsor(`${r.title} ${r.summary}`);
+    const sponsor = [page.sponsor, r.sponsor, fromSummary].includes("sponsored") ? "sponsored" : (page.sponsor ?? r.sponsor ?? fromSummary);
     const ocr = sponsor === "sponsored" ? null : sponsorOcrState(r.url);
     return { ...r, image: page.image ?? r.image ?? null, sponsor: ocr === "sponsored" ? "sponsored" : sponsor, sponsorCheck: ocr === "pending" ? ("pending" as const) : undefined };
   });
@@ -460,6 +474,22 @@ export type PlaceDetail = {
   local: { id: number; title: string; slug: string; nickname: string; createdAt: Date }[];
 };
 
+/**
+ * 한 쪽(10편) 후기: 본문을 열어 보니 그 식당 이야기가 아닌 글은 빼고, 빈자리는 다음 글로 채운다 (많아야 두 번 더).
+ * 뺀 글은 기억해 두어 다음부터는 목록·쪽 수에서도 빠진다
+ */
+async function pageOfReviews(shown: FoodReview[], page: number, place: FoodPlace): Promise<FoodReview[]> {
+  const out: FoodReview[] = [];
+  let from = (page - 1) * REVIEW_PAGE_SIZE;
+  for (let round = 0; round < 3 && out.length < REVIEW_PAGE_SIZE && from < shown.length; round++) {
+    const batch = shown.slice(from, from + REVIEW_PAGE_SIZE - out.length);
+    from += batch.length;
+    const read = await enrichReviews(batch, place);
+    out.push(...read.filter((r) => knownBody(place, r.url) !== "mismatch"));
+  }
+  return out;
+}
+
 /** 오늘부터 1년 전 (한국 날짜 YYYY-MM-DD) */
 function yearAgo(today: string): string {
   const d = new Date(`${today}T00:00:00Z`);
@@ -469,23 +499,36 @@ function yearAgo(today: string): string {
 
 /** 네이버 블로그: 최신순 100편씩, 1년보다 오래된 글이 나오거나 1,000편(네이버 한도)까지 */
 async function naverYear(place: FoodPlace, since: string): Promise<FoodReview[]> {
-  const out: FoodReview[] = [];
-  for (let start = 1; start <= 901; start += 100) {
-    const list = parseReviews(await naver("/search/v1/blog", { query: reviewQuery(place), display: 100, start, sort: "date" })).map((r) => ({ ...r, source: "naver" as const }));
-    out.push(...list);
-    if (list.length < 100 || list.some((r) => r.date && r.date < since)) break;
-  }
-  return out;
+  return pagesUntil(10, async (i) => {
+    const list = parseReviews(await naver("/search/v1/blog", { query: reviewQuery(place), display: 100, start: i * 100 + 1, sort: "date" })).map((r) => ({ ...r, source: "naver" as const }));
+    return { list, last: list.length < 100 || list.some((r) => r.date && r.date < since) };
+  });
 }
 
 /** 카카오(다음) 블로그·카페: 최신순 50편씩, 1년보다 오래된 글이 나오거나 쪽 한도까지 */
 async function kakaoYear(place: FoodPlace, since: string, kind: "blog" | "cafe", pages: number): Promise<FoodReview[]> {
-  const out: FoodReview[] = [];
-  for (let page = 1; page <= pages; page++) {
-    const json = (await kakao(`/v2/search/${kind}`, { query: reviewQuery(place), sort: "recency", size: 50, page })) as { meta?: { is_end?: boolean } };
+  return pagesUntil(pages, async (i) => {
+    const json = (await kakao(`/v2/search/${kind}`, { query: reviewQuery(place), sort: "recency", size: 50, page: i + 1 })) as { meta?: { is_end?: boolean } };
     const list = parseKakaoReviews(json, kind === "blog" ? "daum" : "cafe");
-    out.push(...list);
-    if (json?.meta?.is_end !== false || list.some((r) => r.date && r.date < since)) break;
+    return { list, last: json?.meta?.is_end !== false || list.some((r) => r.date && r.date < since) };
+  });
+}
+
+/**
+ * 최신순 쪽들을 끝(1년보다 오래된 글·마지막 쪽)이 나올 때까지. 첫 쪽 뒤에는 2쪽·3쪽…씩 한꺼번에 불러
+ * 후기가 많은 식당도 빨리 모은다 (끝 쪽 뒤에 미리 받은 쪽은 버린다)
+ */
+async function pagesUntil<T>(max: number, load: (i: number) => Promise<{ list: T[]; last: boolean }>): Promise<T[]> {
+  const out: T[] = [];
+  let i = 0;
+  for (let batch = 1; i < max; batch = Math.min(batch * 2, 4)) {
+    const idx = Array.from({ length: Math.min(batch, max - i) }, (_, k) => i + k);
+    const pages = await Promise.all(idx.map(load));
+    for (const p of pages) {
+      out.push(...p.list);
+      if (p.last) return out;
+    }
+    i += idx.length;
   }
   return out;
 }
@@ -534,7 +577,8 @@ export async function placeDetail(place: FoodPlace, page = 1, source: ReviewSour
     naverFoodEnabled() || kakaoEnabled()
       ? await settle(async () => {
           const { all } = await yearReviews(place);
-          const kept = relevantReviews(all, place);
+          // 제목·요약으로 거르고, 본문을 이미 읽어 그 식당 이야기가 아니라고 본 글도 뺀다
+          const kept = relevantReviews(all, place).filter((r) => knownBody(place, r.url) !== "mismatch");
           reviewHidden = all.length - kept.length;
           hiddenSample = all
             .map((r) => ({ r, v: reviewVerdict(r, place) }))
@@ -546,7 +590,7 @@ export async function placeDetail(place: FoodPlace, page = 1, source: ReviewSour
           reviewTotal = shown.length;
           reviewPages = Math.max(1, Math.ceil(shown.length / REVIEW_PAGE_SIZE));
           reviewPage = Math.min(Math.max(1, Math.floor(page) || 1), reviewPages);
-          return enrichReviews(shown.slice((reviewPage - 1) * REVIEW_PAGE_SIZE, reviewPage * REVIEW_PAGE_SIZE));
+          return pageOfReviews(shown, reviewPage, place);
         }, "블로그 후기")
       : { status: "off" };
   const [recent, local] = await Promise.all([recentCount(place), blogvillePosts(place.name)]);
