@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { NearbyLocator } from "@/components/food/NearbyLocator";
+import { PendingHint } from "@/components/food/PendingHint";
 import { VERDICT_LABELS } from "@/lib/food-relevance";
 import { REVIEW_SOURCES, type ReviewSource } from "@/lib/food";
 import {
@@ -132,7 +133,7 @@ function PageLinks({ page, pages, href, label = "쪽", data = "near" }: { page: 
             aria-current={n === page ? "page" : undefined}
             className={`${cell} ${n === page ? "bg-ink font-bold text-surface" : "hover:bg-bg"}`}
           >
-            {n}
+            {n}<PendingHint />
           </Link>
         </span>
       ))}
@@ -167,7 +168,7 @@ function Chips({
           data-chip={it.data}
           className={`inline-flex min-h-9 items-center rounded-full border px-3 text-sm ${it.on ? "border-ink bg-ink font-bold text-surface" : "border-line hover:border-accent"}`}
         >
-          {it.text}
+          {it.text}<PendingHint />
         </Link>
       ))}
     </nav>
@@ -238,7 +239,7 @@ export default async function FoodPage({ searchParams }: PageProps<"/food">) {
             aria-current={t.key === tab ? "page" : undefined}
             className={`btn ${t.key === tab ? "btn-current" : ""}`}
           >
-            {t.label}
+            {t.label}<PendingHint />
           </Link>
         ))}
       </nav>
@@ -378,7 +379,7 @@ async function NearTab({
             aria-current={sort === "distance" ? "page" : undefined}
             className={`btn ${sort === "distance" ? "btn-current" : ""}`}
           >
-            가까운 순
+            가까운 순 <PendingHint />
           </Link>
           {naverFoodEnabled() && (
             <Link
@@ -386,7 +387,7 @@ async function NearTab({
               aria-current={sort === "buzz" ? "page" : undefined}
               className={`btn ${sort === "buzz" ? "btn-current" : ""}`}
             >
-              요즘 블로그에 많이 올라온 순
+              요즘 블로그에 많이 올라온 순 <PendingHint />
             </Link>
           )}
         </nav>
@@ -527,7 +528,7 @@ async function RegionTab({
             aria-current={r === region ? "page" : undefined}
             className={`rounded-full border px-3 py-1 text-sm ${r === region ? "border-ink bg-ink font-bold text-surface" : "border-line hover:border-accent"}`}
           >
-            {r}
+            {r}<PendingHint />
           </Link>
         ))}
       </nav>
