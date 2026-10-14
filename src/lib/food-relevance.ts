@@ -51,4 +51,5 @@ export function relevantReviews<T extends Pick<FoodReview, "title" | "summary">>
 }
 
 export const REVIEW_PAGE_SIZE = 10;
-export const REVIEW_PAGE_MAX = 10;
+/** 후기는 오늘부터 1년 안 글을 모두 (쪽 수는 정하지 않는다) */
+export const REVIEW_DAYS = 365;

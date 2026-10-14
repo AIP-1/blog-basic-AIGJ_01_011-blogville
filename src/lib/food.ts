@@ -23,7 +23,47 @@ export type FoodReview = {
   date: string; // YYYY-MM-DD
   image?: string | null; // 글 대표 사진 (og:image)
   sponsor?: "sponsored" | "self" | null; // 협찬 표시 / 내돈내산 / 모름
+  /** 어디서 찾은 글: 네이버 블로그 / 다음 블로그(티스토리·브런치 등) / 다음 카페 */
+  source?: ReviewSource;
 };
+
+export type ReviewSource = "naver" | "daum" | "cafe";
+export const REVIEW_SOURCES: { key: ReviewSource; label: string }[] = [
+  { key: "naver", label: "네이버 블로그" },
+  { key: "daum", label: "티스토리·다음 블로그" },
+  { key: "cafe", label: "다음 카페" },
+];
+
+/** 카카오(다음) 검색 blog·cafe documents → 후기. 날짜는 한국 날짜, 사진은 카카오가 준 썸네일 */
+export function parseKakaoReviews(json: unknown, source: "daum" | "cafe"): FoodReview[] {
+  return rows(json, "documents").flatMap((d) => {
+    const url = typeof d.url === "string" && /^https?:\/\//.test(d.url) ? d.url : null;
+    const title = cleanText(d.title);
+    if (!url || !title) return [];
+    const t = typeof d.datetime === "string" ? new Date(d.datetime) : null;
+    const date = t && !Number.isNaN(t.getTime()) ? new Date(t.getTime() + 9 * 3_600_000).toISOString().slice(0, 10) : "";
+    const thumb = typeof d.thumbnail === "string" && /^https?:\/\//.test(d.thumbnail) ? d.thumbnail.replace(/^http:/, "https:") : null;
+    return [
+      {
+        title,
+        summary: cleanText(d.contents),
+        url,
+        blogger: cleanText(source === "cafe" ? d.cafename : d.blogname),
+        date,
+        image: thumb,
+        sponsor: null,
+        source,
+      },
+    ];
+  });
+}
+
+/** 같은 글을 한 번만 (네이버 블로그는 PC·모바일 주소가 달라도 같은 글) */
+export function reviewKey(url: string): string {
+  const m = /blog\.naver\.com\/([A-Za-z0-9_-]+)\/(\d+)/.exec(url);
+  if (m) return `naver:${m[1]}/${m[2]}`;
+  return url.replace(/^https?:\/\/(www\.|m\.)?/, "").replace(/[?#].*$/, "").replace(/\/$/, "");
+}
 
 export const FOOD_TABS = [
   { key: "near", label: "📍 내 주변" },
