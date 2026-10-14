@@ -135,3 +135,16 @@ describe("후기 거르기 v3 (짧은 이름 낱말 경계·다른 업종)", () 
     expect(isRelevantReview({ title: "[여수 맛집] 아이랑 가기 좋은 식당 '고향집뚝배기' 내돈내산 후기", summary: "" }, place)).toBe(true);
   });
 });
+
+describe("후기 거르기 v4 (두 글자 이하 흔한 낱말 이름)", () => {
+  it("정원(한정식)·봄(호프): 분류어·따옴표·○○ 식당일 때만", async () => {
+    const { isRelevantReview } = await import("@/lib/food-relevance");
+    const garden = { name: "정원", address: "전남 순천시 해룡면 매안로 137", category: "한식 > 한정식" };
+    expect(isRelevantReview({ title: "순천 미각당 ㅣ 순천만 정원박람회 근처 게장맛집", summary: "" }, garden)).toBe(false);
+    expect(isRelevantReview({ title: "순천 해룡면 한정식 '정원' 상견례 후기", summary: "" }, garden)).toBe(true);
+    expect(isRelevantReview({ title: "순천 정원 한정식 다녀왔어요", summary: "" }, garden)).toBe(true);
+    const spring = { name: "봄", address: "광주 서구 화개중앙로86번길 1", category: "술집 > 호프,요리주점" };
+    expect(isRelevantReview({ title: "광주 서구 봄 신메뉴 카페 투어", summary: "봄 맞이 딸기" }, spring)).toBe(false);
+    expect(isRelevantReview({ title: "광주 화정동 술집 [봄] 요리주점 후기", summary: "" }, spring)).toBe(true);
+  });
+});

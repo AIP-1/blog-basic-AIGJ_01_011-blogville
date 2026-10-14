@@ -76,9 +76,18 @@ export function reviewVerdict(
   const inTitle = squash(r.title).includes(name);
   if (!exact && !inTitle && OTHER_BIZ.test(r.title)) return { keep: false, reason: "off-topic" };
   const catWord = place.category ? place.category.split(">").pop()!.trim().split(",")[0] : "";
+  // 두 글자 이하 이름("정원"·"봄")은 흔한 낱말이라, 곁에 가게 분류어(한정식·호프…)나 "○○ 식당"·따옴표 이름이 있어야 그 가게
+  const tiny = [...name].length <= 2;
   const near = hits.some((m) => {
     const win = text.slice(Math.max(0, m.index! - 15), m.index! + m[0].length + 15);
-    return NEAR_FOOD.test(win) || (catWord.length >= 2 && win.includes(catWord));
+    const cat = catWord.length >= 2 && win.includes(catWord);
+    if (tiny) {
+      const after = text.slice(m.index! + m[0].length, m.index! + m[0].length + 6);
+      const before = text.slice(Math.max(0, m.index! - 1), m.index!);
+      const quoted = /['"‘“「『\[<(]/.test(before) && /^['"’”」』\]>)]/.test(after);
+      return cat || quoted || /^\s*(식당|맛집|레스토랑|가게|본점|한정식|술집|포차|호프|카페|베이커리)/.test(after);
+    }
+    return NEAR_FOOD.test(win) || cat;
   });
   const area = areaWords(place.address).some((w) => flat.includes(squash(w)));
   const food = FOOD_WORDS.test(text) || (catWord.length >= 2 && text.includes(catWord));
