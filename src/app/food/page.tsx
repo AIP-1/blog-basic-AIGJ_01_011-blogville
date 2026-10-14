@@ -411,7 +411,7 @@ async function RegionTab({
   const region = mine && isFoodRegion(mine.city) ? mine.city : pickedRegion;
   const area = mine ? null : isFoodArea(region, rawArea) ? rawArea : null;
   const place = mine?.dong ?? area ?? region;
-  const result = await regionHot(place);
+  const result = await regionHot(place, kind);
   const list =
     result.status === "ok"
       ? sortRegion(

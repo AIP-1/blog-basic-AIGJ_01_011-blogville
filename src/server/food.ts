@@ -37,6 +37,12 @@ const NEAR_MAX = 200;
 // 지역 인기 후보를 모으는 검색어 (네이버 지역 검색은 한 번에 5곳까지라 여러 번 묻는다).
 // 백화점·체인을 거르고도 열 곳이 넘게 남도록 식사·카페·술집을 고루 묻는다.
 const REGION_QUERIES = ["맛집", "현지인 맛집", "한식 맛집", "고기 맛집", "일식 맛집", "중식 맛집", "양식 맛집", "술집", "카페", "디저트", "빵집", "브런치"];
+// 분류를 고르면 그 분류만 더 깊게 묻는다 (전체 검색어로는 카페·술집 후보가 몇 곳 안 남는다)
+const REGION_KIND_QUERIES: Record<FoodKind, string[]> = {
+  meal: ["맛집", "현지인 맛집", "한식 맛집", "고기 맛집", "일식 맛집", "중식 맛집", "양식 맛집", "점심 맛집", "국밥", "면 맛집"],
+  cafe: ["카페", "디저트", "빵집", "베이커리 카페", "디저트 카페", "브런치 카페", "케이크", "감성 카페"],
+  bar: ["술집", "이자카야", "포차", "와인바", "요리주점", "칵테일바", "막걸리", "호프"],
+};
 const TREND = () => process.env.TREND_API_BASE ?? "https://naverapihub.apigw.ntruss.com";
 const TREND_TTL_MS = 24 * 3_600_000;
 const TREND_WEEKS = 8;
@@ -311,26 +317,30 @@ export function placeInterest(place: FoodPlace): Promise<PlaceInterest | null> {
  * 🔥 지역 인기: 후기 많은 곳을 모아 식당·카페·술집만 남기고(백화점·쇼핑몰·큰 체인 빼기),
  * 최근 한 달 진짜 후기 수와 네이버 검색 관심도를 반씩 섞은 순. 분류마다 TOP 10을 고를 수 있게 넉넉히 돌려준다
  */
-export function regionHot(region: string): Promise<FoodResult<RankedPlace[]>> {
+export function regionHot(region: string, kind: FoodKindFilter = "all"): Promise<FoodResult<RankedPlace[]>> {
+  const queries = kind === "all" ? REGION_QUERIES : REGION_KIND_QUERIES[kind];
   if (!naverFoodEnabled()) return Promise.resolve({ status: "off" });
   return settle(async () => {
-    const lists = await remember(`region2|${region}`, () =>
+    const lists = await remember(`region2|${region}|${kind}`, () =>
       Promise.all(
-        REGION_QUERIES.map((q) =>
+        queries.map((q) =>
           naver("/search/v1/local", { query: `${region} ${q}`, display: 5, sort: "comment" }).then(parseNaverPlaces, (e) => {
-            if (q === REGION_QUERIES[0]) throw e; // 첫 질문부터 막히면 열쇠·권한 문제로 본다
+            if (q === queries[0]) throw e; // 첫 질문부터 막히면 열쇠·권한 문제로 본다
             return [] as FoodPlace[];
           }),
         ),
       ),
     );
-    const candidates = dedupePlaces(lists.flat()).filter(isRegionCandidate);
-    const buzz = await withBuzz(candidates);
+    // 고른 분류만 남기고 센다 (블로그·데이터랩을 덜 부르고, 순위도 그 분류 안에서 맞춘다)
+    const candidates = dedupePlaces(lists.flat())
+      .filter(isRegionCandidate)
+      .map((p) => ({ ...p, kind: placeKind(p.category, p.name) }))
+      .filter((p) => kind === "all" || p.kind === kind);
+    const buzz = (await withBuzz(candidates)) as (BuzzPlace & { kind: FoodKind })[];
     const interest = await searchInterest(region, buzz);
     return rankRegion(
       buzz.map((p) => ({
         ...p,
-        kind: placeKind(p.category, p.name),
         interest: interest?.get(p.id)?.value ?? null,
         rising: interest?.get(p.id)?.rising ?? false,
         growth: interest?.get(p.id)?.growth ?? null,
