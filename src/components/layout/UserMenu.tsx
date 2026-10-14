@@ -2,9 +2,30 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { formatNumber } from "@/lib/game";
+
+// 처음 온 회원에게 한 번만 "여기를 누르면 내 메뉴" 말풍선 (이 브라우저에 기억)
+const HINT_KEY = "bv-my-menu-hint";
+const hintListeners = new Set<() => void>();
+function hintSeen(): boolean {
+  try {
+    return localStorage.getItem(HINT_KEY) === "1";
+  } catch {
+    return true;
+  }
+}
+function markHintSeen() {
+  try {
+    localStorage.setItem(HINT_KEY, "1");
+  } catch {}
+  hintListeners.forEach((f) => f());
+}
+function subscribeHint(f: () => void) {
+  hintListeners.add(f);
+  return () => hintListeners.delete(f);
+}
 
 type Props = {
   userId: string;
@@ -32,6 +53,8 @@ export function UserMenu({ userId, nickname, slug, isAdmin, level, ratio, isMax,
   const box = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const id = useId();
+  // 서버·첫 그리기에서는 본 것으로 (말풍선은 브라우저에서만)
+  const seen = useSyncExternalStore(subscribeHint, hintSeen, () => true);
 
   // 화면을 옮기면 닫는다
   if (seenPath !== pathname) {
@@ -68,12 +91,31 @@ export function UserMenu({ userId, nickname, slug, isAdmin, level, ratio, isMax,
         aria-expanded={open}
         aria-controls={id}
         aria-label="내 메뉴"
-        onClick={() => setOpen((v) => !v)}
-        className={`flex size-11 items-center justify-center overflow-hidden rounded-full border bg-bg transition ${open ? "border-accent ring-2 ring-accent/30" : "border-line hover:border-ink-soft"}`}
+        title="내 메뉴 (내 블로그·설정·로그아웃)"
+        onClick={() => {
+          setOpen((v) => !v);
+          if (!seen) markHintSeen();
+        }}
+        className={`group flex min-h-11 items-center gap-1.5 rounded-full border py-1 pl-1 pr-2.5 transition ${
+          open ? "border-accent bg-accent/5 ring-2 ring-accent/30" : "border-line bg-surface hover:border-ink-soft hover:bg-bg"
+        }`}
         data-user-menu-button
       >
-        {avatar}
+        <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-bg">{avatar}</span>
+        <span className="max-w-[7rem] truncate text-sm font-semibold max-md:hidden">{nickname}</span>
+        <svg viewBox="0 0 12 12" aria-hidden className={`size-3 shrink-0 text-ink-soft transition-transform ${open ? "rotate-180" : ""}`}>
+          <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </button>
+      {!seen && !open && (
+        <div role="note" className="absolute right-0 top-full z-50 mt-2 w-60 rounded-xl bg-ink p-3 text-sm text-surface shadow-lg" data-my-menu-hint>
+          <span aria-hidden className="absolute -top-1.5 right-5 size-3 rotate-45 bg-ink" />
+          👋 여기를 누르면 <b>내 블로그·블로그 관리·내 정보·상점·출석·로그아웃</b>이 모여 있어요.
+          <button type="button" onClick={markHintSeen} className="mt-2 block min-h-9 w-full rounded-lg bg-surface/15 font-semibold hover:bg-surface/25">
+            알겠어요
+          </button>
+        </div>
+      )}
       {open && (
         <div
           id={id}
