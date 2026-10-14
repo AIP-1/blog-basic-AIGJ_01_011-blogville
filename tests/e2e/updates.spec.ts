@@ -30,7 +30,11 @@ test.describe("업데이트 소식", () => {
   });
 
   test("없는 버전·이상한 주소는 404", async ({ page }) => {
-    expect((await page.goto("/updates/v0.0.0"))!.status()).toBe(404);
+    // 버전 모양이 아닌 주소는 GitHub에 묻지 않고 404
     expect((await page.goto("/updates/latest"))!.status()).toBe(404);
+    // 모양은 맞지만 없는 버전: GitHub에서 목록을 받았으면 404, 못 받았으면(CI의 API 한도 등) 안내 화면
+    const res = await page.goto("/updates/v0.0.0");
+    if (await page.locator("[data-updates-error]").count()) test.info().annotations.push({ type: "note", description: "GitHub 목록을 받지 못해 404 대신 안내" });
+    else expect(res!.status()).toBe(404);
   });
 });
