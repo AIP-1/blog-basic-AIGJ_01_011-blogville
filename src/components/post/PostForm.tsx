@@ -33,6 +33,8 @@ type Props = {
   draftOwnerId?: string;
   /** 🔎 키워드 도우미를 보일지 (네이버 검색어 트렌드 열쇠가 있을 때) */
   keywordHelper?: boolean;
+  /** 새 글 화면만: 처음 채워 둘 본문·태그 (🍽 맛집 [후기 쓰기]의 식당 카드). 임시 글을 불러오면 그것이 이긴다 */
+  prefill?: { contentHtml: string; tags: string };
 };
 
 type Start = {
@@ -56,15 +58,16 @@ function rewardHint(visibility: Visibility, length: number): string {
   return `저장하면 ✨ 경험치 ${exp} · 🪙 ${coin} 보상 (하루 ${dailyLimit}번까지)`;
 }
 
-export function PostForm({ categories, seriesOptions, initial, draftOwnerId, keywordHelper = false }: Props) {
-  const [start, setStart] = useState<Start | null>(draftOwnerId ? null : EMPTY);
+export function PostForm({ categories, seriesOptions, initial, draftOwnerId, keywordHelper = false, prefill }: Props) {
+  const base = useMemo<Start>(() => (prefill ? { ...EMPTY, ...prefill } : EMPTY), [prefill]);
+  const [start, setStart] = useState<Start | null>(draftOwnerId ? null : base);
 
   // 그린 뒤에 임시 글을 읽고 한 번 묻는다. 고른 값으로 에디터를 처음부터 만들기 위해 그때까지 폼을 그리지 않는다.
   useEffect(() => {
     if (!draftOwnerId) return;
     const timer = setTimeout(() => {
       const draft = readDraft(draftOwnerId);
-      if (!draft || !window.confirm(DRAFT_ASK)) return setStart(EMPTY);
+      if (!draft || !window.confirm(DRAFT_ASK)) return setStart(base);
       // 그 사이 지워진 대분류·소분류는 비운다 (BLOG-05)
       const category = categories.find((c) => c.id === draft.categoryId);
       const sub = category?.subs.find((s) => s.id === draft.subcategoryId);
@@ -78,7 +81,7 @@ export function PostForm({ categories, seriesOptions, initial, draftOwnerId, key
       });
     }, 0);
     return () => clearTimeout(timer);
-  }, [draftOwnerId, categories]);
+  }, [draftOwnerId, categories, base]);
 
   if (!start) return <div aria-busy="true" aria-label="글쓰기 준비 중" className="min-h-96" />;
   return <Form categories={categories} seriesOptions={seriesOptions} initial={initial} draftOwnerId={draftOwnerId} keywordHelper={keywordHelper} start={start} />;
