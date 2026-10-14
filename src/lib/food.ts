@@ -180,7 +180,7 @@ export function shortCategory(raw: unknown): string {
 
 /** 주소에서 "광주 서구"처럼 시·구 두 마디 (같은 가게 묶기·지도 검색에 쓴다) */
 export function areaOf(address: string): string {
-  return address.split(" ").slice(0, 2).join(" ");
+  return shortCity(address).split(" ").slice(0, 2).join(" ");
 }
 
 /**
@@ -188,7 +188,7 @@ export function areaOf(address: string): string {
  * 큰 도시는 "광주 서구", 도 아래 시·군은 "목포"·"해남"처럼 시·군 이름만 ("전남 목포시"로 찾으면 거의 안 잡힌다)
  */
 export function reviewArea(address: string): string {
-  const [first = "", second = ""] = address.split(" ");
+  const [first = "", second = ""] = shortCity(address).split(" ");
   if (PROVINCES.includes(first) && /^[가-힣]{1,6}(시|군)$/.test(second)) return second.replace(/(시|군)$/, "");
   return areaOf(address);
 }
@@ -205,18 +205,32 @@ const PROVINCE_NAMES: [RegExp, string][] = [
   [/^경상남도/, "경남"],
   [/^제주특별자치도/, "제주"],
 ];
-const GWANGJU_GU = /^(동구|서구|남구|북구|광산구)$/;
 
-/** 주소 시·도 이름을 짧게: "광주광역시" → "광주", "전라남도" → "전남", "전남광주통합특별시 서구" → "광주 서구", "전남광주통합특별시 목포시" → "전남 목포시" */
+// 광역시 안의 구·군 (통합특별시 주소에서 어느 쪽인지 고를 때)
+const METRO_DISTRICTS: Record<string, string[]> = {
+  광주: ["동구", "서구", "남구", "북구", "광산구"],
+  대구: ["중구", "동구", "서구", "남구", "북구", "수성구", "달서구", "달성군", "군위군"],
+  부산: ["중구", "서구", "동구", "영도구", "부산진구", "동래구", "남구", "북구", "해운대구", "사하구", "금정구", "강서구", "연제구", "수영구", "사상구", "기장군"],
+  대전: ["동구", "중구", "서구", "유성구", "대덕구"],
+  울산: ["중구", "남구", "동구", "북구", "울주군"],
+};
+
+/**
+ * 주소 시·도 이름을 블로그에서 흔히 쓰는 짧은 이름으로: "광주광역시" → "광주", "전라남도" → "전남", "강원특별자치도" → "강원".
+ * 행정 통합으로 생긴 "전남광주통합특별시 서구"는 구가 광주 쪽이면 "광주 서구", 아니면 "전남 순천시" (블로그 글은 예전 이름으로 쓴다)
+ */
 export function shortCity(address: string): string {
-  let a = address
+  const merged = /^(\S+?)(\S{2})통합특별시\s+(\S+)/.exec(address);
+  if (merged) {
+    const [, a, b, district] = merged;
+    const pick = METRO_DISTRICTS[b]?.includes(district) ? b : a;
+    return address.replace(/^\S+통합특별시/, pick);
+  }
+  let out = address
     .replace(/^(서울|부산|대구|인천|광주|대전|울산)(특별시|광역시)/, "$1")
     .replace(/^(세종)특별자치시/, "$1");
-  for (const [re, short] of PROVINCE_NAMES) a = a.replace(re, short);
-  // 2026 통합 시: 광주의 구는 "광주", 옛 전남 시·군은 "전남"으로 (블로그에 흔히 쓰는 말)
-  const m = /^전남광주통합특별시\s+(\S+)/.exec(a);
-  if (m) return a.replace(/^전남광주통합특별시/, GWANGJU_GU.test(m[1]) ? "광주" : "전남");
-  return a.replace(/^(?:전남|전북|경남|경북|충남|충북|강원|경기)?(서울|부산|대구|인천|광주|대전|울산)?\S*통합특별시/, (whole, city) => city ?? whole);
+  for (const [re, short] of PROVINCE_NAMES) out = out.replace(re, short);
+  return out;
 }
 
 function num(v: unknown): number | null {
