@@ -3,6 +3,7 @@ import { and, desc, eq, ilike, or } from "drizzle-orm";
 import { db } from "@/db";
 import { blogs, posts, profiles } from "@/db/schema";
 import { likePattern } from "@/lib/blog-search";
+import { countBuzz, interestKeywords, isRegionCandidate, isRising, rankRegion, summarizeInterest, type RankedPlace } from "@/lib/food-quality";
 import { detectSponsor, pickOgImage, reviewFetchUrl } from "@/lib/food-sponsor";
 import { placeKind, type FoodKind, type FoodKindFilter } from "@/lib/food-kind";
 import { relevantReviews, REVIEW_PAGE_MAX, REVIEW_PAGE_SIZE } from "@/lib/food-relevance";
@@ -10,9 +11,7 @@ import { todayKST } from "@/lib/kst";
 import {
   FOOD_RADIUS_M,
   FOOD_RECENT_CAP,
-  FOOD_REGION_TOP,
   areaOf,
-  countRecent,
   dedupePlaces,
   parseKakaoPlaces,
   parseNaverPlaces,
@@ -34,9 +33,13 @@ const FAIL_TTL_MS = 60_000;
 const TIMEOUT_MS = 5_000;
 const PAGE_TTL_MS = 24 * 3_600_000;
 const PAGE_MAX_BYTES = 1_500_000;
-// 지역 인기 후보를 모으는 검색어 (네이버 지역 검색은 한 번에 5곳까지라 여러 번 묻는다)
 const NEAR_MAX = 30;
-const REGION_QUERIES = ["맛집", "한식 맛집", "고기 맛집", "일식 맛집", "중식 맛집", "양식 맛집"];
+// 지역 인기 후보를 모으는 검색어 (네이버 지역 검색은 한 번에 5곳까지라 여러 번 묻는다).
+// 백화점·체인을 거르고도 열 곳이 넘게 남도록 식사·카페·술집을 고루 묻는다.
+const REGION_QUERIES = ["맛집", "현지인 맛집", "한식 맛집", "고기 맛집", "일식 맛집", "중식 맛집", "양식 맛집", "술집", "카페", "디저트", "빵집", "브런치"];
+const TREND = () => process.env.TREND_API_BASE ?? "https://naverapihub.apigw.ntruss.com";
+const TREND_TTL_MS = 24 * 3_600_000;
+const TREND_WEEKS = 8;
 
 export type FoodResult<T> = { status: "ok"; value: T } | { status: "off" | "forbidden" | "error" };
 
@@ -56,10 +59,10 @@ export function foodEnabled(): boolean {
 
 const cache = new Map<string, { at: number; ttl: number; value: Promise<unknown> }>();
 
-function remember<T>(key: string, load: () => Promise<T>): Promise<T> {
+function remember<T>(key: string, load: () => Promise<T>, ttl = TTL_MS): Promise<T> {
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < hit.ttl) return hit.value as Promise<T>;
-  const entry = { at: Date.now(), ttl: TTL_MS, value: load() as Promise<unknown> };
+  const entry = { at: Date.now(), ttl, value: load() as Promise<unknown> };
   entry.value.catch(() => {
     entry.ttl = FAIL_TTL_MS;
   });
@@ -119,13 +122,16 @@ function reviewQuery(p: Pick<FoodPlace, "name" | "address">): string {
   return `${p.name} ${areaOf(p.address)}`.trim();
 }
 
-/** 최근 30일 블로그 글 수 (최신순 100편 중). 네이버 열쇠가 없거나 못 받으면 0 */
+/**
+ * 최근 30일 진짜 후기 수 (최신순 100편 중). 그 가게 이야기가 아닌 글, 체험단·협찬 글은 빼고
+ * 같은 블로거는 한 번만 센다. 네이버 열쇠가 없거나 못 받으면 0
+ */
 function recentCount(p: FoodPlace): Promise<number> {
   if (!naverFoodEnabled()) return Promise.resolve(0);
   const today = todayKST();
-  return remember(`recent|${today}|${reviewQuery(p)}`, async () => {
+  return remember(`buzz|${today}|${reviewQuery(p)}`, async () => {
     const json = await naver("/search/v1/blog", { query: reviewQuery(p), display: FOOD_RECENT_CAP, sort: "date" });
-    return countRecent(parseReviews(json), today);
+    return countBuzz(parseReviews(json), p, today);
   }).catch(() => 0);
 }
 
@@ -184,15 +190,88 @@ export function nearbyPlaces(
   }, "주변 식당");
 }
 
-/** 🔥 지역 인기: 후기 많은 곳을 모아 최근 한 달 블로그 글 많은 순 TOP 10 */
-export function regionHot(region: string): Promise<FoodResult<BuzzPlace[]>> {
+/**
+ * 네이버 데이터랩 검색어 트렌드로 가게마다 요즘 검색 관심도를 잰다.
+ * 한 번에 다섯 묶음까지라 묶음마다 "<지역> 맛집"을 기준으로 넣고, 기준 대비 비율로 바꿔 서로 비교한다.
+ * 못 받으면 null (순위는 후기 수만 쓴다)
+ */
+async function searchInterest(region: string, places: FoodPlace[]): Promise<Map<string, { value: number; rising: boolean }> | null> {
+  if (!naverFoodEnabled() || places.length === 0) return null;
+  const today = todayKST();
+  const start = new Date(`${today}T00:00:00Z`);
+  start.setUTCDate(start.getUTCDate() - TREND_WEEKS * 7);
+  const anchor = { groupName: "__anchor", keywords: [`${region} 맛집`] };
+  const batches: FoodPlace[][] = [];
+  for (let i = 0; i < places.length; i += 4) batches.push(places.slice(i, i + 4));
+  try {
+    const parts = await mapLimit(batches, 3, (batch) =>
+      remember(
+        `interest|${today}|${region}|${batch.map((p) => p.id).join(",")}`,
+        async () => {
+          const res = await fetch(`${TREND()}/search-trend/v1/search`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              "X-NCP-APIGW-API-KEY-ID": (process.env.NAVER_TREND_CLIENT_ID || process.env.NAVER_SEARCH_CLIENT_ID)!,
+              "X-NCP-APIGW-API-KEY": (process.env.NAVER_TREND_CLIENT_SECRET || process.env.NAVER_SEARCH_CLIENT_SECRET)!,
+            },
+            body: JSON.stringify({
+              startDate: start.toISOString().slice(0, 10),
+              endDate: today,
+              timeUnit: "week",
+              keywordGroups: [anchor, ...batch.map((p) => ({ groupName: p.id, keywords: interestKeywords(p) }))],
+            }),
+            signal: AbortSignal.timeout(TIMEOUT_MS),
+            cache: "no-store",
+          });
+          if (!res.ok) throw new Error(`search-trend ${res.status}`);
+          const json = (await res.json()) as { results?: { title?: string; data?: { ratio?: number }[] }[] };
+          const series = new Map((json.results ?? []).map((r) => [r.title ?? "", (r.data ?? []).map((d) => Number(d.ratio) || 0)]));
+          const base = summarizeInterest(series.get("__anchor") ?? []).average || 1;
+          return batch.map((p) => {
+            const s = summarizeInterest(series.get(p.id) ?? []);
+            return [p.id, { value: s.average / base, rising: isRising(s) }] as const;
+          });
+        },
+        TREND_TTL_MS,
+      ),
+    );
+    return new Map(parts.flat());
+  } catch (e) {
+    console.error("맛집 검색 관심도를 못 받았어요", e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
+/**
+ * 🔥 지역 인기: 후기 많은 곳을 모아 식당·카페·술집만 남기고(백화점·쇼핑몰·큰 체인 빼기),
+ * 최근 한 달 진짜 후기 수와 네이버 검색 관심도를 반씩 섞은 순. 분류마다 TOP 10을 고를 수 있게 넉넉히 돌려준다
+ */
+export function regionHot(region: string): Promise<FoodResult<RankedPlace[]>> {
   if (!naverFoodEnabled()) return Promise.resolve({ status: "off" });
   return settle(async () => {
-    const lists = await remember(`region|${region}`, () =>
-      Promise.all(REGION_QUERIES.map(async (q) => parseNaverPlaces(await naver("/search/v1/local", { query: `${region} ${q}`, display: 5, sort: "comment" })))),
+    const lists = await remember(`region2|${region}`, () =>
+      Promise.all(
+        REGION_QUERIES.map((q) =>
+          naver("/search/v1/local", { query: `${region} ${q}`, display: 5, sort: "comment" }).then(parseNaverPlaces, (e) => {
+            if (q === REGION_QUERIES[0]) throw e; // 첫 질문부터 막히면 열쇠·권한 문제로 본다
+            return [] as FoodPlace[];
+          }),
+        ),
+      ),
     );
-    const candidates = dedupePlaces(lists.flat());
-    return rankByBuzz(await withBuzz(candidates)).slice(0, FOOD_REGION_TOP);
+    const candidates = dedupePlaces(lists.flat()).filter(isRegionCandidate);
+    const buzz = await withBuzz(candidates);
+    const interest = await searchInterest(region, buzz);
+    return rankRegion(
+      buzz.map((p) => ({
+        ...p,
+        kind: placeKind(p.category, p.name),
+        interest: interest?.get(p.id)?.value ?? null,
+        rising: interest?.get(p.id)?.rising ?? false,
+      })),
+    );
   }, "지역 인기 식당");
 }
 
