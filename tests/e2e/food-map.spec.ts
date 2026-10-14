@@ -64,3 +64,18 @@ test("내 주변: 지도에 내 위치와 번호 핀, 핀·[지도에서 보기]
   await page.locator("[data-food-research]").click();
   await expect(page).toHaveURL(/\/food\?tab=near&lat=35\.160&lng=126\.850$/);
 });
+
+test("네이버 지도 인증이 실패하면 카카오맵으로 바꿔 보여 준다", async ({ page }) => {
+  await page.route("https://dapi.kakao.com/v2/maps/sdk.js**", (route) => route.fulfill({ contentType: "text/javascript", body: FAKE_SDK }));
+  // 네이버는 지도를 그린 뒤 인증 실패를 알린다
+  await page.route("https://oapi.map.naver.com/openapi/v3/maps.js**", (route) =>
+    route.fulfill({ contentType: "text/javascript", body: `${FAKE_NAVER}; setTimeout(() => window.navermap_authFailure && window.navermap_authFailure(), 300);` }),
+  );
+  await page.goto("/food?tab=near&lat=35.147&lng=126.915");
+  const map = page.locator("[data-food-map]");
+  test.skip((await map.count()) === 0, "열쇠가 없는 시험 서버");
+  await expect(map).toHaveAttribute("data-food-map", "ready");
+  await expect.poll(() => page.evaluate(() => !!(window as unknown as { kakao?: unknown }).kakao)).toBe(true);
+  await expect(map).toHaveAttribute("data-food-map", "ready");
+  await expect(map.locator("[data-food-pin]")).toHaveCount(await page.locator('[data-food-list="near"] > li').count());
+});
