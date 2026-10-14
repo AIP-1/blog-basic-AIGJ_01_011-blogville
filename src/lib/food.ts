@@ -184,8 +184,12 @@ export function areaOf(address: string): string {
 }
 
 /** 주소 시·도 이름을 짧게: "광주광역시" → "광주" */
-function shortCity(address: string): string {
-  return address.replace(/^(서울|부산|대구|인천|광주|대전|울산)(특별시|광역시)/, "$1").replace(/^(세종)특별자치시/, "$1");
+export function shortCity(address: string): string {
+  return address
+    .replace(/^(서울|부산|대구|인천|광주|대전|울산)(특별시|광역시)/, "$1")
+    .replace(/^(세종)특별자치시/, "$1")
+    // 통합 시("전남광주통합특별시")는 블로그에 흔히 쓰는 도시 이름("광주")으로
+    .replace(/^(?:전남|전북|경남|경북|충남|충북|강원|경기)?(서울|부산|대구|인천|광주|대전|울산)?\S*통합특별시/, (m, city) => city ?? m);
 }
 
 function num(v: unknown): number | null {

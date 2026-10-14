@@ -30,7 +30,6 @@ import { ReviewCards } from "@/components/food/ReviewCards";
 import { SaveButton } from "@/components/food/SaveButton";
 import { SavedList } from "@/components/food/SavedList";
 import {
-  buzzLabel,
   FOOD_MESSAGES,
   FOOD_REGION_TOP,
   FOOD_QUERY_MAX,
@@ -787,7 +786,9 @@ async function PlaceDetailRest({ place, page, source, backHref }: DetailProps) {
             📝 블로그·카페 후기
           </h2>
           {d.reviews.status === "ok" && (
-            <span className="text-xs text-ink-soft">{buzzLabel(d.recent)}</span>
+            <span className="text-xs text-ink-soft" data-review-year>
+              최근 1년 {totalKept}편
+            </span>
           )}
         </div>
         {d.reviews.status !== "ok" ? (
@@ -797,8 +798,10 @@ async function PlaceDetailRest({ place, page, source, backHref }: DetailProps) {
               : failText(d.reviews)}
           </p>
         ) : d.reviews.value.length === 0 ? (
-          <p className="mt-2 text-sm text-ink-soft">
-            아직 블로그 후기가 없어요. 첫 후기를 남겨 보세요!
+          <p className="mt-2 text-sm text-ink-soft" data-review-empty>
+            {d.reviewHidden > 0
+              ? `최근 1년 글 ${d.reviewHidden}편을 찾았지만 이름만 같거나 광고로 보여서 뺐어요. 첫 후기를 남겨 보세요!`
+              : "최근 1년 안에 네이버·티스토리·다음에 올라온 후기가 없어요. 첫 후기를 남겨 보세요!"}
           </p>
         ) : (
           <>
