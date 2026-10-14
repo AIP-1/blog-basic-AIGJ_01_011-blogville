@@ -10,6 +10,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 FROM node:22-alpine
+# GHCR 이미지를 저장소와 이어 준다(저장소 화면 Packages에 보임)
+LABEL org.opencontainers.image.source=https://github.com/handsomeguen/blogville
 WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
@@ -20,4 +22,7 @@ COPY --from=build /app ./
 RUN mkdir -p storage/uploads && chown -R node:node storage
 USER node
 EXPOSE 8400
+# 상태 확인: /api/health가 DB까지 닿는지 본다 (docker ps의 healthy/unhealthy, compose depends_on)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
+  CMD wget -qO- "http://127.0.0.1:${PORT}/api/health" >/dev/null || exit 1
 CMD ["sh", "-c", "node scripts/migrate.mjs && exec npx next start -p ${PORT}"]

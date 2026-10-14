@@ -1,0 +1,63 @@
+# SonarCloud 품질 게이트: 테스트 커버리지(lcov)와 함께 코드를 분석하고, 게이트를 통과하지 못하면 이 검사가 빨갛게 된다.
+# 저장소 시크릿 SONAR_TOKEN이 없으면 아무것도 하지 않고 넘어간다(설정 방법은 docs/learning/03-sonar.md).
+# 조직 이름이 handsomeguen이 아니면 저장소 변수(Variables) SONAR_ORGANIZATION에 넣는다.
+name: sonar
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: sonar-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sonar:
+    runs-on: ubuntu-latest
+    # 다른 저장소(포크·AIP-1 제출 미러)에서는 돌지 않는다
+    if: github.repository == 'handsomeguen/blogville'
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - name: 토큰 확인
+        id: token
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "::notice::SONAR_TOKEN 시크릿이 없어 SonarCloud 분석을 건너뜁니다 (docs/learning/03-sonar.md 참고)"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.token.outputs.ok == 'true'
+        with:
+          fetch-depth: 0  # 새 코드(바뀐 줄) 판단에 기록이 필요하다
+
+      - uses: actions/setup-node@v4
+        if: steps.token.outputs.ok == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 패키지 설치
+        if: steps.token.outputs.ok == 'true'
+        run: npm ci
+
+      - name: 단위 테스트 + 커버리지
+        if: steps.token.outputs.ok == 'true'
+        run: npm run test:coverage
+
+      - name: SonarCloud 분석과 품질 게이트
+        if: steps.token.outputs.ok == 'true'
+        env:
+          SONAR_HOST_URL: https://sonarcloud.io
+        run: >
+          npm run sonar --
+          -Dsonar.organization=${{ vars.SONAR_ORGANIZATION || 'handsomeguen' }}
+          -Dsonar.qualitygate.wait=true
+          -Dsonar.qualitygate.timeout=300

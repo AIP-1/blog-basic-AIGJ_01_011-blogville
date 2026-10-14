@@ -26,13 +26,32 @@ Docker는 앱과 앱이 도는 데 필요한 것(OS 파일, Node, 라이브러�
 | | `ENV NODE_ENV=production PORT=8400 ...` | 운영 환경 변수 |
 | | `COPY --from=build /app ./` | 빌드 단계 결과를 가져옴. 마이그레이션(drizzle-kit)과 정리 작업(tsx)도 컨테이너에서 돌려서 `node_modules`째 가져옵니다 |
 | | `USER node` | root가 아닌 계정으로 실행(보안) |
+| | `HEALTHCHECK ... /api/health` | 30초마다 앱이 DB까지 닿는지 확인. `docker ps`에 `(healthy)`로 보임 |
 | | `EXPOSE 8400` / `CMD ...` | 시작할 때 `scripts/migrate.mjs`로 DB를 맞춘 뒤 `next start -p 8400` |
 
 - 이미지에 넣지 않을 파일은 [.dockerignore](../../.dockerignore)에 적습니다(`node_modules`, `.next`, `.env*` 등).
-- 저장소 맨 위 [docker-compose.yml](../../docker-compose.yml)은 지금 **개발용 PostgreSQL**(`db` 서비스)만 띄웁니다. 앱까지 함께 띄우는 `app` 서비스는 클라우드 쪽에서 추가 중이라, 들어오면 `docker compose up`만으로 앱과 DB가 같이 뜹니다.
+- 저장소 맨 위 [docker-compose.yml](../../docker-compose.yml)에는 서비스 셋이 있습니다. 평소엔 `db`만 뜨고, 나머지는 **프로필**을 줄 때만 뜹니다.
+
+  | 서비스 | 프로필 | 하는 일 |
+  |---|---|---|
+  | `db` | (없음) | 개발용 PostgreSQL 16, `localhost:5432`. `npm run dev`와 같이 씀 |
+  | `app` | `app` | 운영과 같은 Dockerfile로 만든 앱, `localhost:8400`. DB는 서비스 이름 `db`로 찾아감(`postgres://blog:blog@db:5432/blogville`) |
+  | `sonarqube` | `sonar` | 품질 검사 서버, `localhost:9000` ([03-sonar.md](03-sonar.md)) |
+
+- `app`은 `db`의 healthcheck(`pg_isready`)가 통과한 뒤에 뜨고(`depends_on: condition: service_healthy`), 뜰 때 마이그레이션을 먼저 합니다.
 - 운영 서버의 구성(nginx + 앱 두 벌)은 [deploy/compose.yml](../../deploy/compose.yml)로 따로 있습니다. [08-zero-downtime.md](08-zero-downtime.md)에서 다룹니다.
 
 ## 직접 해 보기
+
+가장 빠른 길 (명령 하나):
+
+```bash
+docker compose --profile app up --build        # 처음엔 이미지 만드느라 몇 분. http://localhost:8400
+docker compose exec app npm run db:seed        # (다른 터미널) 예시 회원 demo / demo1234, 블로그 /@demo
+docker compose --profile app down              # 정리 (DB·올린 파일은 볼륨에 남음, 지우려면 down -v)
+```
+
+한 단계씩 (이미지와 컨테이너를 직접 다뤄 보기):
 
 ```bash
 # 1. 개발용 DB 띄우기

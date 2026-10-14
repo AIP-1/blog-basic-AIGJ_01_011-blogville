@@ -40,9 +40,16 @@ test.describe("TOWN-19 걸어 다니는 이웃", () => {
     await expect.poll(async () => Number(await canvas(page).getAttribute("data-npc-walking")), { timeout: 10_000 }).toBeGreaterThan(0);
     const first = (await npcAt(page)).find((n) => n.lot === 1);
     expect(first).toBeTruthy();
-    await page.waitForTimeout(1000);
-    const later = (await npcAt(page)).find((n) => n.lot === 1);
-    expect(later && Math.hypot(later.x - first!.x, later.y - first!.y)).toBeGreaterThan(10);
+    // 갈림길에서 잠깐 쉬기도 하므로(NPC_PAUSE) 정해진 1초가 아니라 움직일 때까지 기다린다
+    await expect
+      .poll(
+        async () => {
+          const later = (await npcAt(page)).find((n) => n.lot === 1);
+          return later ? Math.hypot(later.x - first!.x, later.y - first!.y) : 0;
+        },
+        { timeout: 10_000 },
+      )
+      .toBeGreaterThan(10);
 
     // 누르면 그 이웃 집 우체통 (움직이므로 좌표를 읽자마자 누른다)
     const box = (await canvas(page).boundingBox())!;

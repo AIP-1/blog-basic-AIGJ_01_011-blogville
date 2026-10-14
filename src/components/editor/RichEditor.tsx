@@ -73,8 +73,8 @@ export function RichEditor({ initialHtml, onChange, onUploadingChange, postId = 
 
   const { upload, pasteHtml, progress, problems, dismiss } = useUpload(editor, (busy) => onUploadingChange?.(busy), postId);
   useEffect(() => {
-    uploadRef.current = upload;
-    pasteRef.current = pasteHtml;
+    uploadRef.current = (files, at) => void upload(files, at);
+    pasteRef.current = (html) => void pasteHtml(html);
   }, [upload, pasteHtml]);
 
   return (

@@ -52,7 +52,7 @@ try {
     done.add(t);
     order.push(t);
   };
-  [...tables].sort().forEach(visit);
+  [...tables].sort((a, b) => a.localeCompare(b)).forEach(visit);
 
   const identity = await sql`
     select table_name, column_name from information_schema.columns
