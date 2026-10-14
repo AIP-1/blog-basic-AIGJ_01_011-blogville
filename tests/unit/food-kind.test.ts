@@ -102,3 +102,18 @@ describe("통합특별시 주소 (shortCity · areaOf)", () => {
     expect(shortCity("강원특별자치도 강릉시 교동 1")).toBe("강원 강릉시 교동 1");
   });
 });
+
+describe("후기 거르기 강화 (마피아 실제 사례)", () => {
+  const mafia = { name: "마피아", address: "광주 서구 상무오월로15번길 28-15", category: "양식 > 피자", phone: "0507-1424-1778" };
+  const v = async (title: string, summary: string) => (await import("@/lib/food-relevance")).isRelevantReview({ title, summary }, mafia);
+  it.each([
+    ["[광주] 광주 쌍촌동 맛집 마피아 후기", "짝궁이랑 피맥이 땡겨서 방문한 쌍촌동 맛집 마피아 후기 입니다", true],
+    ["쌍촌동 맛집 마피아 상무지구 피자 크림파스타 후기", "마피아 전남광주통합특별시 서구 상무오월로15번길 28-15", true],
+    ["상무지구 데이트", "마피아 0507-1424-1778 영업시간 화-목", true],
+    ["20260823 광주 마피아게임 연극 기분좋은극장 후기", "보고 싶었던 마피아 게임 연극! 상무지구 기분좋은극장", false],
+    ["영화 gpt", "이민사회, 마피아, 가족 죽은 시인의 사회 1989 미국 교육문화", false],
+    ["[2026청년정책] 광주 서구 청년 축제 무한도ZONE", "슈가토끼와 함께하는 마피아 게임으로 진행되었습니다! 서구 청년크리에이터단", false],
+    ["전남광주 2026년 서구 청년 축제 참여 솔직후기", "공연 관람과 마피아게임은 참여 못했지만 무료", false],
+    ["기어이 기적이 찾아오는 영화처럼", "스플랜더 했는데 제가이겼습니다. 마피아도 하고 언니들 화투치는거 구경도 하고", false],
+  ] as const)("%s → %s", async (title, summary, want) => expect(await v(title, summary)).toBe(want));
+});
