@@ -26,3 +26,16 @@ describe("글 본문으로 식당 확인 (bodyMatch)", () => {
   });
   it("짧거나 못 읽은 글은 모른다", () => expect(bodyMatch("<p>마피아</p>", mafia)).toBe("unknown"));
 });
+
+describe("다른 지역 여행 글 (otherRegionTitle)", () => {
+  it("광주 식당인데 제목이 강릉 여행이면 뺀다, 광주 이야기가 같이 있으면 둔다", async () => {
+    const { otherRegionTitle } = await import("@/lib/food-place-match");
+    const { areaWords } = await import("@/lib/food-relevance");
+    const local = areaWords(mafia.address);
+    expect(otherRegionTitle("7/29-31 강릉야호~", mafia, local)).toBe(true);
+    expect(otherRegionTitle("오사카 여행 3일차", mafia, local)).toBe(true);
+    expect(otherRegionTitle("강릉 다녀와서 광주 쌍촌동 마피아", mafia, local)).toBe(false);
+    expect(otherRegionTitle("[광주] 광주 쌍촌동 맛집 마피아 후기", mafia, local)).toBe(false);
+    expect(otherRegionTitle("공주님 생일 파티 마피아 피자", mafia, local)).toBe(false);
+  });
+});
