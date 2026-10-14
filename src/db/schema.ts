@@ -4,6 +4,7 @@ import {
   jsonb,
   check,
   date,
+  doublePrecision,
   foreignKey,
   index,
   integer,
@@ -1007,5 +1008,32 @@ export const errorLogs = pgTable(
     check("error_logs_stack_check", sql`${t.stack} is null or char_length(${t.stack}) <= 4000`),
     check("error_logs_user_agent_check", sql`${t.userAgent} is null or char_length(${t.userAgent}) <= 300`),
     check("error_logs_count_check", sql`${t.count} >= 1`),
+  ],
+);
+
+// 🍽 맛집의 ⭐ 가고 싶은 곳. 식당은 카카오·네이버에서 그때그때 찾으므로 저장할 때의 정보를 그대로 적어 둔다.
+// place_id는 FoodPlace.id (카카오 장소 id 또는 네이버 이름+주소 키). 한 회원은 한 곳을 한 번만 저장한다.
+export const foodSaved = pgTable(
+  "food_saved",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    placeId: text("place_id").notNull(),
+    name: text("name").notNull(),
+    category: text("category").notNull().default(""),
+    address: text("address").notNull().default(""),
+    phone: text("phone").notNull().default(""),
+    mapUrl: text("map_url").notNull().default(""),
+    lat: doublePrecision("lat"),
+    lng: doublePrecision("lng"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("food_saved_user_place_unique").on(t.userId, t.placeId),
+    index("food_saved_user_created_idx").on(t.userId, t.createdAt.desc()),
+    check("food_saved_place_id_check", sql`char_length(${t.placeId}) between 1 and 200`),
+    check("food_saved_name_check", sql`char_length(${t.name}) between 1 and 100`),
   ],
 );
