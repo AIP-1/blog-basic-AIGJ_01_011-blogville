@@ -2,7 +2,6 @@ import { expect, test } from "./fixtures";
 import { signUpOk, sql } from "./helpers";
 
 // ☀️ 날씨·📅 캘린더 위젯 화면 (블로그 홈 위젯 보드). Open-Meteo는 부르지 않는다 — 브라우저가 부르는 /api/weather를 가짜 응답으로 바꾼다.
-// 위젯 보드(BlogSidebar)에 두 위젯을 끼우는 PR에서 아래 test.fixme를 test로 바꾼다.
 test.describe.configure({ timeout: 90_000 });
 
 const hours = Array.from({ length: 5 }, (_, i) => `2026-10-14T${String(11 + i * 2).padStart(2, "0")}:00`);
@@ -17,7 +16,7 @@ const WEATHER = {
   },
 };
 
-test.fixme("날씨·캘린더 위젯", async ({ page, browser }) => {
+test("날씨·캘린더 위젯", async ({ page, browser }) => {
   const me = await signUpOk(page);
   const [blog] = await sql`select b.id from blogs b join users u on u.id = b.owner_id where u.username = ${me}`;
   await sql`insert into posts (blog_id, title, content_html, content_text, is_public, created_at) values

@@ -3,14 +3,16 @@ import { and, asc, count, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { blogs, blogStocks } from "@/db/schema";
 import { isUniqueViolation } from "./names";
-import { parseNaverQuote, parseNaverSearchItem, STOCK_ERRORS, STOCK_MAX, type StockItem, type StockQuote } from "@/lib/stocks";
+import { parseIndexChart, parseNaverQuote, parseNaverSearchItem, STOCK_ERRORS, STOCK_INDEXES, STOCK_MAX, type StockIndex, type StockIndexCode, type StockItem, type StockQuote } from "@/lib/stocks";
 
 // 블로그 관심 종목 (📈 위젯). 시세는 네이버 증권이 화면에 쓰는 공개 주소에서 서버가 받아 잠깐 기억해 둔다.
 // 공식 API가 아니라 응답 모양이 바뀌거나 막히면 price가 null인 줄로 보여 준다(위젯이 "시세를 못 받았어요").
 // 시험은 STOCK_QUOTE_BASE·STOCK_SEARCH_BASE로 가짜 서버를 가리킨다.
 const QUOTE_BASE = () => process.env.STOCK_QUOTE_BASE ?? "https://polling.finance.naver.com";
+const CHART_BASE = () => process.env.STOCK_CHART_BASE ?? "https://api.stock.naver.com";
 const SEARCH_BASE = () => process.env.STOCK_SEARCH_BASE ?? "https://ac.stock.naver.com";
-const QUOTE_TTL_MS = 4_000;
+// 실시간 스트림(1.5초마다)이 같은 종목을 여러 화면에 보내도 네이버에는 종목마다 1초에 한 번만 묻는다
+const QUOTE_TTL_MS = 1_000;
 const SEARCH_TTL_MS = 60_000;
 const TIMEOUT_MS = 3_000;
 const HEADERS = {
@@ -100,6 +102,40 @@ export async function getQuotes(items: StockItem[]): Promise<StockQuote[]> {
       status: q?.status ?? null,
     };
   });
+}
+
+const indexCache = new Map<string, { at: number; value: Promise<Parsed | null> }>();
+const chartCache = new Map<string, { at: number; value: Promise<number[]> }>();
+const CHART_TTL_MS = 60_000;
+
+/** 증시 지수 (코스피·코스닥): 지금 값은 1초, 오늘 흐름(분 단위)은 1분 동안 함께 쓴다 */
+export async function getIndex(code: StockIndexCode): Promise<StockIndex> {
+  const name = STOCK_INDEXES.find((i) => i.code === code)!.name;
+  let hit = indexCache.get(code);
+  if (!hit || Date.now() - hit.at >= QUOTE_TTL_MS) {
+    hit = {
+      at: Date.now(),
+      value: getJson(`${QUOTE_BASE()}/api/realtime/domestic/index/${code}`)
+        .then((json) => {
+          const datas = (json as { datas?: unknown[] } | null)?.datas;
+          return Array.isArray(datas) ? parseNaverQuote(datas[0]) : null;
+        })
+        .catch(() => null),
+    };
+    indexCache.set(code, hit);
+  }
+  let chart = chartCache.get(code);
+  if (!chart || Date.now() - chart.at >= CHART_TTL_MS) {
+    chart = {
+      at: Date.now(),
+      value: getJson(`${CHART_BASE()}/chart/domestic/index/${code}/minute`)
+        .then((json) => parseIndexChart(json))
+        .catch(() => [] as number[]),
+    };
+    chartCache.set(code, chart);
+  }
+  const [q, points] = await Promise.all([hit.value, chart.value]);
+  return { code, name, price: q?.price ?? null, change: q?.change ?? null, rate: q?.rate ?? null, status: q?.status ?? null, chart: points };
 }
 
 /** 종목 검색 (국내·미국 주식만, 최대 10개). 못 받으면 빈 목록 */

@@ -292,6 +292,13 @@
     {
       "idx": 41,
       "version": "7",
+      "when": 1791942958493,
+      "tag": "0047_blog_widgets",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
       "when": 1791943473512,
       "tag": "0048_weather_city",
       "breakpoints": true

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkStock, formatChange, formatPrice, parseNaverQuote, parseNaverSearchItem, toNumber } from "@/lib/stocks";
+import { checkStock, formatChange, formatPrice, parseIndexChart, parseNaverQuote, parseNaverSearchItem, toNumber } from "@/lib/stocks";
 
 describe("관심 종목 규칙", () => {
   it("국내 6자리·미국 로이터 코드만 받는다", () => {
@@ -59,5 +59,17 @@ describe("관심 종목 규칙", () => {
     expect(formatChange(-1.25, -0.55, "USD")).toBe("▼ 1.25 (-0.55%)");
     expect(formatChange(0, 0, "KRW")).toBe("0 (0.00%)");
     expect(formatChange(null, null, "KRW")).toBe("");
+  });
+});
+
+describe("parseIndexChart (지수 하루 흐름)", () => {
+  it("currentPrice만 모으고, 많으면 처음·끝을 지키며 고르게 솎는다", () => {
+    expect(parseIndexChart([{ currentPrice: 1 }, { currentPrice: "2" }, { x: 1 }, null])).toEqual([1, 2]);
+    const many = Array.from({ length: 391 }, (_, i) => ({ currentPrice: i }));
+    const out = parseIndexChart(many, 80);
+    expect(out).toHaveLength(80);
+    expect(out[0]).toBe(0);
+    expect(out.at(-1)).toBe(390);
+    expect(parseIndexChart({ error: 1 })).toEqual([]);
   });
 });

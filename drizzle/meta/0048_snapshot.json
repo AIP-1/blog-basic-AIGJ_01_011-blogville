@@ -1,6 +1,6 @@
 {
   "id": "c07440e1-ed8d-4d91-a10a-a6d2d7d06fc5",
-  "prevId": "ea1c1577-acc0-41d6-bf9f-fda0e61b8c2f",
+  "prevId": "882d8bdd-2bef-4d08-a0c9-0b35d7aac125",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1223,6 +1223,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "widget_layout": {
+          "name": "widget_layout",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
