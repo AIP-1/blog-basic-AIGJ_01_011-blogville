@@ -130,7 +130,8 @@ async function naverAdapter(key: string, box: HTMLElement, start: LL, onAuthFail
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 type Props = {
-  provider: MapProvider;
+  /** 쓸 지도 순서 (앞의 것이 열쇠·주소 문제로 실패하면 다음 것으로 바꾼다) */
+  providers: MapProvider[];
   places: FoodPlace[];
   /** 내 위치 (파란 점). 없으면 식당들이 다 보이게 */
   me?: { lat: number; lng: number } | null;
@@ -139,11 +140,13 @@ type Props = {
   className?: string;
 };
 
-export function FoodMap({ provider, places, me = null, researchSort, className = "" }: Props) {
+export function FoodMap({ providers, places, me = null, researchSort, className = "" }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const api = useRef<{ map: Adapter; open: (i: number) => void } | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [moved, setMoved] = useState(false);
+  const [which, setWhich] = useState(0);
+  const provider = providers[Math.min(which, providers.length - 1)];
   const router = useRouter();
   // 번호는 목록 순서 그대로 (좌표가 없는 곳은 핀만 빠진다)
   const pins = places.map((p, i) => ({ ...p, n: i + 1 })).filter((p) => p.lat !== null && p.lng !== null) as (FoodPlace & { n: number; lat: number; lng: number })[];
@@ -153,7 +156,18 @@ export function FoodMap({ provider, places, me = null, researchSort, className =
     let alive = true;
     const removers: (() => void)[] = [];
     const start = me ?? (pins[0] ? { lat: pins[0].lat, lng: pins[0].lng } : { lat: 37.5665, lng: 126.978 });
-    const fail = () => alive && setState("error");
+    // 실패하면 다음 지도로 (네이버 인증 실패는 지도를 그린 뒤에도 올 수 있다)
+    const fail = () => {
+      if (!alive) return;
+      if (which + 1 < providers.length) {
+        alive = false;
+        removers.forEach((r) => r());
+        if (box.current) box.current.innerHTML = "";
+        setState("loading");
+        setWhich(which + 1);
+      } else setState("error");
+    };
+    if (box.current) box.current.innerHTML = "";
     (provider.kind === "naver" ? naverAdapter(provider.key, box.current!, start, fail) : kakaoAdapter(provider.key, box.current!, start))
       .then((map) => {
         if (!alive) return;
@@ -196,7 +210,7 @@ export function FoodMap({ provider, places, me = null, researchSort, className =
       api.current = null;
     };
     // 장소·내 위치·지도 종류가 바뀔 때만 다시 그린다
-  }, [provider.kind, provider.key, key]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [provider.kind, provider.key, which, key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 목록의 [🗺 지도에서 보기]
   useEffect(() => {
