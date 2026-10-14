@@ -25,7 +25,7 @@ window.naver = { maps: {
   Map: class { constructor(el, o) { this.el = el; this.c = o.center; window.__map = this; } fitBounds() {} panTo(p) { this.c = p; } getCenter() { return this.c; } },
   Marker: class { constructor(o) { this.el = o.icon.content; o.map.el.appendChild(this.el); } setMap(m) { if (!m) this.el.remove(); } },
   InfoWindow: class { constructor() {} setContent(c) { this.c = c; } open(map) { if (this.el) this.el.remove(); this.el = this.c; map.el.appendChild(this.el); } close() { if (this.el) this.el.remove(); this.el = null; } },
-  Event: { addListener(t, name, fn) { (t.handlers ||= {})[name] = fn; if (t.el && name === "click" && !(t instanceof window.naver.maps.Map)) t.el.addEventListener("click", fn); } },
+  Event: { once(t, name, fn) { if (name === "init" && !window.__naverNoInit) setTimeout(fn, 0); }, addListener(t, name, fn) { (t.handlers ||= {})[name] = fn; if (t.el && name === "click" && !(t instanceof window.naver.maps.Map)) t.el.addEventListener("click", fn); } },
 } };`;
 
 async function fakeKakao(page: Page) {
@@ -76,6 +76,19 @@ test("네이버 지도 인증이 실패하면 카카오맵으로 바꿔 보여 �
   test.skip((await map.count()) === 0, "열쇠가 없는 시험 서버");
   await expect(map).toHaveAttribute("data-food-map", "ready");
   await expect.poll(() => page.evaluate(() => !!(window as unknown as { kakao?: unknown }).kakao)).toBe(true);
+  await expect(map).toHaveAttribute("data-food-map", "ready");
+  await expect(map.locator("[data-food-pin]")).toHaveCount(await page.locator('[data-food-list="near"] > li').count());
+});
+
+test("네이버 지도가 인증 실패 그림만 깔고 아무 소식이 없어도 6초 뒤 카카오맵으로", async ({ page }) => {
+  await page.route("https://dapi.kakao.com/v2/maps/sdk.js**", (route) => route.fulfill({ contentType: "text/javascript", body: FAKE_SDK }));
+  await page.route("https://oapi.map.naver.com/openapi/v3/maps.js**", (route) =>
+    route.fulfill({ contentType: "text/javascript", body: `window.__naverNoInit = true; ${FAKE_NAVER}` }),
+  );
+  await page.goto("/food?tab=near&lat=35.147&lng=126.915");
+  const map = page.locator("[data-food-map]");
+  test.skip((await map.count()) === 0, "열쇠가 없는 시험 서버");
+  await expect.poll(() => page.evaluate(() => !!(window as unknown as { kakao?: unknown }).kakao), { timeout: 10_000 }).toBe(true);
   await expect(map).toHaveAttribute("data-food-map", "ready");
   await expect(map.locator("[data-food-pin]")).toHaveCount(await page.locator('[data-food-list="near"] > li').count());
 });
