@@ -15,6 +15,12 @@ import {
   FoodMap,
   type MapProvider,
 } from "@/components/food/FoodMap";
+import {
+  isRegionSort,
+  REGION_SORTS,
+  sortRegion,
+  type RegionSort,
+} from "@/lib/food-quality";
 import { MyAreaButton } from "@/components/food/MyAreaButton";
 import { InterestSpark } from "@/components/food/InterestSpark";
 import { PlaceCard } from "@/components/food/PlaceCard";
@@ -188,6 +194,9 @@ export default async function FoodPage({ searchParams }: PageProps<"/food">) {
           }
           area={one(sp.area)}
           at={parseCoords(one(sp.lat), one(sp.lng))}
+          sort={
+            isRegionSort(one(sp.sort)) ? (one(sp.sort) as RegionSort) : "best"
+          }
           kind={
             isFoodKind(one(sp.kind)) ? (one(sp.kind) as FoodKindFilter) : "all"
           }
@@ -387,11 +396,13 @@ async function RegionTab({
   region: pickedRegion,
   area: rawArea,
   at,
+  sort,
   kind,
 }: {
   region: string;
   area?: string;
   at: { lat: number; lng: number } | null;
+  sort: RegionSort;
   kind: FoodKindFilter;
 }) {
   if (!naverFoodEnabled()) return <Notice>{FOOD_MESSAGES.off}</Notice>;
@@ -403,17 +414,26 @@ async function RegionTab({
   const result = await regionHot(place);
   const list =
     result.status === "ok"
-      ? result.value
-          .filter((p) => kind === "all" || p.kind === kind)
-          .slice(0, FOOD_REGION_TOP)
+      ? sortRegion(
+          result.value.filter((p) => kind === "all" || p.kind === kind),
+          sort,
+        ).slice(0, FOOD_REGION_TOP)
       : [];
   const save = await saveButtons(list);
-  const href = (r: string, k: FoodKindFilter, a: string | null = null) =>
-    `/food?tab=region&region=${encodeURIComponent(r)}${a ? `&area=${encodeURIComponent(a)}` : ""}${k === "all" ? "" : `&kind=${k}`}`;
-  const kindHref = (k: FoodKindFilter) =>
+  const tail = (k: FoodKindFilter, o: RegionSort) =>
+    `${k === "all" ? "" : `&kind=${k}`}${o === "best" ? "" : `&sort=${o}`}`;
+  const href = (
+    r: string,
+    k: FoodKindFilter,
+    a: string | null = null,
+    o: RegionSort = sort,
+  ) =>
+    `/food?tab=region&region=${encodeURIComponent(r)}${a ? `&area=${encodeURIComponent(a)}` : ""}${tail(k, o)}`;
+  // 분류·정렬을 바꿀 때는 지금 보고 있는 곳(내 동네 / 도시·동네)을 그대로 둔다
+  const hereHref = (k: FoodKindFilter, o: RegionSort) =>
     mine && at
-      ? `/food?tab=region&lat=${at.lat}&lng=${at.lng}${k === "all" ? "" : `&kind=${k}`}`
-      : href(region, k, area);
+      ? `/food?tab=region&lat=${at.lat}&lng=${at.lng}${tail(k, o)}`
+      : href(region, k, area, o);
   return (
     <div className="mt-4 space-y-3">
       <nav aria-label="지역" className="flex flex-wrap gap-1.5">
@@ -452,19 +472,32 @@ async function RegionTab({
       <Chips
         label="분류"
         items={FOOD_KINDS.map((k) => ({
-          href: kindHref(k.key),
+          href: hereHref(k.key, sort),
           text: `${k.icon} ${k.label}`,
           on: k.key === kind,
           data: `kind-${k.key}`,
         }))}
       />
+      <Chips
+        label="정렬"
+        items={REGION_SORTS.map((o) => ({
+          href: hereHref(kind, o.key),
+          text: o.label,
+          on: o.key === sort,
+          data: `sort-${o.key}`,
+        }))}
+      />
       <p className="text-sm text-ink-soft">
         {place}에서 후기가 많은 식당·카페를 모아{" "}
         <strong className="text-ink">
-          최근 한 달 진짜 후기 수와 네이버 검색 관심도
+          {sort === "rising"
+            ? "요즘 2주 네이버 검색이 그 전보다 많이 늘어난 순"
+            : sort === "reviews"
+              ? "최근 한 달 진짜 후기가 많은 순"
+              : "최근 한 달 진짜 후기 수와 네이버 검색 관심도를 반씩 섞은 순"}
         </strong>
-        를 반씩 섞은 순으로 보여 줘요. 백화점·쇼핑몰·큰 체인점은 빼고,
-        체험단·협찬 글과 가게 이야기가 아닌 글은 세지 않아요.
+        으로 보여 줘요. 백화점·쇼핑몰·큰 체인점은 빼고, 체험단·협찬 글과 가게
+        이야기가 아닌 글은 세지 않아요.
       </p>
       {result.status !== "ok" ? (
         <Notice>{failText(result)}</Notice>
