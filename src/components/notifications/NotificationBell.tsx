@@ -40,12 +40,12 @@ export function useUnreadCount(unread: { count: number }): number {
 }
 
 /** 헤더 🔔 (GAME-08) */
-export function NotificationBell({ unread }: { unread: { count: number } }) {
+export function NotificationBell({ unread, className = "btn btn-ghost relative px-2", iconOnly = false }: { unread: { count: number }; className?: string; iconOnly?: boolean }) {
   const count = useUnreadCount(unread);
   const badge = unreadBadge(count);
   return (
-    <Link href="/notifications" className="btn btn-ghost relative px-2" aria-label={badge ? `알림, 안 읽은 알림 ${badge}개` : "알림"}>
-      🔔<span className="hidden sm:inline">알림</span>
+    <Link href="/notifications" className={className} aria-label={badge ? `알림, 안 읽은 알림 ${badge}개` : "알림"} title="알림">
+      🔔{!iconOnly && <span className="hidden sm:inline">알림</span>}
       {badge && (
         <span
           className="absolute right-0 top-0.5 min-w-5 rounded-full bg-danger px-1 text-center text-xs leading-5 font-bold text-white"

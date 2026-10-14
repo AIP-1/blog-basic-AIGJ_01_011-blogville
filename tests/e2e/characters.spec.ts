@@ -48,7 +48,7 @@ test.describe("GAME-01 기본 캐릭터 받기", () => {
     expect((await owned(username)).map((r) => r.code).sort()).toEqual(["bg_meadow", "char_girl", "furn_chair", "furn_plant"]);
     const [p] = await sql`select i.code from profiles p join users u on u.id = p.user_id join items i on i.id = p.character_item_id where u.username = ${username}`;
     expect(p.code).toBe("char_girl");
-    await expect(page.locator("header [data-wallet] svg")).toHaveAttribute("data-art", "char.girl");
+    await expect(page.locator("header [data-user-menu-button] svg").first()).toHaveAttribute("data-art", "char.girl");
     await expect(page.locator("main header [data-avatar-character] svg")).toHaveAttribute("data-art", "char.girl");
   });
 

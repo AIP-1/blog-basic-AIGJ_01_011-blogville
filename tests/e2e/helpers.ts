@@ -59,3 +59,10 @@ export async function insertPosts(username: string, count: number, isPublic = tr
       values (${blog.id}, ${"글 " + i}, ${"<p>본문 " + i + "</p>"}, ${"본문 " + i}, ${isPublic}, now() - make_interval(mins => ${count - i}))`;
   }
 }
+
+/** 헤더의 내 캐릭터 버튼 → 내 메뉴 (내 블로그·블로그 관리·내 정보·상점·출석·경험치 내역·관리자·로그아웃). 열린 메뉴를 돌려준다 */
+export async function openMyMenu(page: Page) {
+  const button = page.locator("header").getByRole("button", { name: "내 메뉴" });
+  if ((await button.getAttribute("aria-expanded")) !== "true") await button.click();
+  return page.locator("[data-user-menu]");
+}

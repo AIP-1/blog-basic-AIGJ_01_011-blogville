@@ -98,7 +98,7 @@ test.describe("TOWN-11 휴대폰 아래 탭", () => {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
     const username = await signUpOk(page);
     await expect(page.locator("[data-phone-tabs]")).toBeHidden();
-    await expect(page.locator(`body > header a.btn[href="/@${username}"]`)).toBeVisible();
+    await expect(page.locator("body > header [data-user-menu-button]")).toBeVisible();
     await page.goto("/town?menu=1");
     await expect(page.locator("[data-town] canvas")).toHaveAttribute("data-ready", "1");
     await expect(page.locator("[data-town-panel]")).toBeHidden();
