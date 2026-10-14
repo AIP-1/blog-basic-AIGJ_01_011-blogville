@@ -8,6 +8,7 @@ import { checkPostInput, CONTENT_BYTES_MAX, POST_ERRORS, SERIES_TITLE_MAX, TAGS_
 import { defaultScheduleValue, formatKstLocal } from "@/lib/schedule";
 import { postTextLength } from "@/lib/text-length";
 import { RichEditor } from "../editor/RichEditor";
+import { KeywordHelper } from "./KeywordHelper";
 
 export type CategoryOption = { id: number; name: string; subs: { id: number; name: string }[] };
 export type SeriesOption = { id: number; title: string };
@@ -30,6 +31,8 @@ type Props = {
   };
   /** 새 글 화면만: 이 회원의 임시 글을 이 브라우저에 저장하고 불러온다 (POST-08) */
   draftOwnerId?: string;
+  /** 🔎 키워드 도우미를 보일지 (네이버 검색어 트렌드 열쇠가 있을 때) */
+  keywordHelper?: boolean;
 };
 
 type Start = {
@@ -53,7 +56,7 @@ function rewardHint(visibility: Visibility, length: number): string {
   return `저장하면 ✨ 경험치 ${exp} · 🪙 ${coin} 보상 (하루 ${dailyLimit}번까지)`;
 }
 
-export function PostForm({ categories, seriesOptions, initial, draftOwnerId }: Props) {
+export function PostForm({ categories, seriesOptions, initial, draftOwnerId, keywordHelper = false }: Props) {
   const [start, setStart] = useState<Start | null>(draftOwnerId ? null : EMPTY);
 
   // 그린 뒤에 임시 글을 읽고 한 번 묻는다. 고른 값으로 에디터를 처음부터 만들기 위해 그때까지 폼을 그리지 않는다.
@@ -78,10 +81,10 @@ export function PostForm({ categories, seriesOptions, initial, draftOwnerId }: P
   }, [draftOwnerId, categories]);
 
   if (!start) return <div aria-busy="true" aria-label="글쓰기 준비 중" className="min-h-96" />;
-  return <Form categories={categories} seriesOptions={seriesOptions} initial={initial} draftOwnerId={draftOwnerId} start={start} />;
+  return <Form categories={categories} seriesOptions={seriesOptions} initial={initial} draftOwnerId={draftOwnerId} keywordHelper={keywordHelper} start={start} />;
 }
 
-function Form({ categories, seriesOptions = [], initial, draftOwnerId, start }: Props & { start: Start }) {
+function Form({ categories, seriesOptions = [], initial, draftOwnerId, keywordHelper = false, start }: Props & { start: Start }) {
   const [state, action] = useActionState<PostFormState, FormData>(savePost, null);
   const [pending, startTransition] = useTransition();
   const [title, setTitle] = useState(initial?.title ?? start.title);
@@ -305,6 +308,15 @@ function Form({ categories, seriesOptions = [], initial, draftOwnerId, start }: 
           setTags(e.target.value);
         }}
       />
+      {keywordHelper && (
+        <KeywordHelper
+          tags={tags}
+          onAddTag={(keyword) => {
+            touch();
+            setTags((t) => (t.trim() ? `${t.replace(/[,\s]+$/, "")}, ${keyword}` : keyword));
+          }}
+        />
+      )}
 
       <fieldset className="flex flex-wrap items-center gap-2">
         <legend className="sr-only">공개 설정</legend>

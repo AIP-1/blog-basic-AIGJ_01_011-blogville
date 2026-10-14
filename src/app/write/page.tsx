@@ -2,6 +2,7 @@ import { PostForm } from "@/components/post/PostForm";
 import { getCategoryOptions } from "@/server/category";
 import { getSeriesOptions } from "@/server/series";
 import { getMyBlog, requireMember } from "@/server/dal";
+import { trendEnabled } from "@/server/keyword-trend";
 
 export const metadata = { title: "새 글 쓰기 | Blogville" };
 
@@ -11,7 +12,7 @@ export default async function WritePage() {
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="sr-only">새 글 쓰기</h1>
-      <PostForm categories={await getCategoryOptions(blog.id)} seriesOptions={await getSeriesOptions(blog.id)} draftOwnerId={member.userId} />
+      <PostForm keywordHelper={trendEnabled()} categories={await getCategoryOptions(blog.id)} seriesOptions={await getSeriesOptions(blog.id)} draftOwnerId={member.userId} />
     </div>
   );
 }
