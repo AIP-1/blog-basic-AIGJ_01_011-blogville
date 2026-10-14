@@ -124,3 +124,17 @@ describe("🍽 후기 카드: 협찬·사진", () => {
     expect(reviewFetchUrl("https://evil.example.com/a")).toBeNull();
   });
 });
+
+describe("그림·태그로만 밝힌 협찬", () => {
+  it("협찬 배너 그림의 파일 이름이나 대체 글로 협찬을 찾는다", () => {
+    expect(detectSponsor('<p>맛있어요</p><img src="https://postfiles.pstatic.net/a/%ED%98%91%EC%B0%AC%EB%B0%B0%EB%84%88.png?type=w80">')).toBe("sponsored");
+    expect(detectSponsor('<img data-lazy-src="https://x/y.png" alt="본 포스팅은 협찬을 포함합니다">')).toBe("sponsored");
+    expect(detectSponsor('<img src="https://x/IMG_1234.jpg" alt="김치찌개">')).toBe(null);
+  });
+
+  it("#협찬 태그로 밝힌 글", () => {
+    expect(detectSponsor('<div class="post_tag"><a>#광주맛집</a> <a>#협찬</a></div>')).toBe("sponsored");
+    expect(detectSponsor('<script>var data = {"tagNames":"광주맛집,협찬"};</script><p>맛있어요</p>')).toBe("sponsored");
+    expect(detectSponsor("<p>#내돈내산 #광주맛집</p>")).toBe("self");
+  });
+});
