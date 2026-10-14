@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "./fixtures";
-import { PASSWORD, signIn, signUpOk, sql, writePost } from "./helpers";
+import { PASSWORD, signIn, signUpOk, sql, writePost, openMyMenu } from "./helpers";
 
 // 블로그 관리 방문자 카드(BLOG-06)·카테고리 글 수(BLOG-05), 비밀번호 바꾸기·헤더 내 정보, specs/015-settings-visits-password
 test.describe.configure({ timeout: 60_000 });
@@ -77,7 +77,7 @@ test.describe("비밀번호 바꾸기", () => {
     await signIn(other, username);
     await expect(other).toHaveURL("/town");
 
-    await page.getByRole("link", { name: "내 정보", exact: true }).click();
+    await (await openMyMenu(page)).getByRole("link", { name: "내 정보", exact: true }).click();
     await expect(page).toHaveURL(/\/settings\/account$/);
     await fill(page, PASSWORD, "newpass123");
     await expect(form(page).getByRole("status")).toHaveText("비밀번호를 바꿨어요");
@@ -89,7 +89,7 @@ test.describe("비밀번호 바꾸기", () => {
     await other.goto("/write");
     await expect(other).toHaveURL(/\/$/);
 
-    await page.getByRole("button", { name: "로그아웃" }).click();
+    await (await openMyMenu(page)).getByRole("button", { name: "로그아웃" }).click();
     await expect(page).toHaveURL(/\/$/);
     await signIn(page, username);
     await expect(page.getByText("아이디 또는 비밀번호가 맞지 않아요")).toBeVisible();
@@ -114,7 +114,7 @@ test.describe("비밀번호 바꾸기", () => {
     expect(await hashOf(username)).toBe(before);
   });
 
-  test("방문자 헤더에는 로그인 링크, 회원 헤더 내 정보는 375px에서 아이콘만·44px", async ({ page, browser }) => {
+  test("방문자 헤더에는 로그인 링크, 회원 헤더 내 메뉴 버튼은 375px에서 44px, 메뉴에 내 정보", async ({ page, browser }) => {
     const visitor = await browser.newPage();
     await visitor.goto("/feed");
     await visitor.getByRole("navigation", { name: "메뉴" }).getByRole("link", { name: "로그인" }).click();
@@ -124,10 +124,10 @@ test.describe("비밀번호 바꾸기", () => {
     const phone = await browser.newContext({ viewport: { width: 375, height: 800 } });
     const p = await phone.newPage();
     await signUpOk(p);
-    const link = p.getByRole("navigation", { name: "메뉴" }).getByRole("link", { name: "내 정보", exact: true });
-    await expect(link).toBeVisible();
-    await expect(link.getByText("내 정보")).toBeHidden();
-    expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    const button = p.getByRole("navigation", { name: "메뉴" }).getByRole("button", { name: "내 메뉴" });
+    await expect(button).toBeVisible();
+    expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await expect((await openMyMenu(p)).getByRole("link", { name: "내 정보", exact: true })).toBeVisible();
     expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
     await phone.close();
     await page.close();

@@ -24,7 +24,7 @@ test.describe("NF-19 오류 화면", () => {
       await page.goto(`/@${username}/${id}`);
       await expect(page.getByRole("heading", { name: "잠깐 문제가 생겼어요" })).toBeVisible();
       await expect(page).toHaveTitle("잠깐 문제가 생겼어요 | Blogville");
-      await expect(page.getByRole("navigation", { name: "메뉴" }).getByRole("link", { name: "내 블로그" })).toBeVisible();
+      await expect(page.getByRole("navigation", { name: "메뉴" }).getByRole("button", { name: "내 메뉴" })).toBeVisible();
       const retry = page.getByRole("button", { name: "다시 시도" });
       expect((await retry.boundingBox())!.height).toBeGreaterThanOrEqual(44);
 
@@ -58,7 +58,7 @@ test.describe("NF-19 오류 화면", () => {
 
       await sql`insert into blogs (owner_id, slug, title) values (${blog.owner_id}, ${blog.slug}, ${blog.title})`;
       await retry.click();
-      await expect(page.getByRole("navigation", { name: "메뉴" }).getByRole("link", { name: "내 블로그" })).toBeVisible();
+      await expect(page.getByRole("navigation", { name: "메뉴" }).getByRole("button", { name: "내 메뉴" })).toBeVisible();
       await expect(page.getByRole("heading", { name: "잠깐 문제가 생겼어요" })).toHaveCount(0);
       await expect(page).toHaveURL(/\/settings\/account$/);
     } finally {

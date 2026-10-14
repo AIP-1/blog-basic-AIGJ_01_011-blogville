@@ -1,5 +1,5 @@
 import { expect, test, type Browser, type Page } from "./fixtures";
-import { signUpOk, sql, uid } from "./helpers";
+import { signUpOk, sql, uid, openMyMenu } from "./helpers";
 
 // 마을 상점 (SHOP-01·02·03), specs/035-shop
 test.describe.configure({ timeout: 90_000 });
@@ -22,7 +22,7 @@ async function member(browser: Browser) {
 test.describe("SHOP-01·02·03 마을 상점", () => {
   test("구역 네 개, 기본 아이템·캐릭터는 없고, 밀짚모자를 사면 안내·보유 중·코인 50이 준다", async ({ browser }) => {
     const { page, id } = await member(browser);
-    await page.getByRole("link", { name: "마을 상점" }).click();
+    await (await openMyMenu(page)).getByRole("link", { name: "마을 상점" }).click();
     await expect(page).toHaveURL(/\/shop$/);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("🏪 마을 상점");
     await expect(page.locator("[data-shop-wallet]")).toHaveText("Lv.1 🪙 110");

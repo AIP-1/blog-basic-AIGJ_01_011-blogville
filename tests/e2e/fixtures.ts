@@ -15,6 +15,13 @@ function closeLevelUps(page: Page) {
 }
 
 function watch(context: BrowserContext) {
+  // 처음 온 회원에게 한 번 뜨는 "내 메뉴" 말풍선은 다른 시험을 가리지 않게 미리 본 것으로 한다.
+  // 말풍선을 보는 시험(header.spec)은 show_hint=1 쿠키를 넣는다
+  void context
+    .addInitScript(() => {
+      if (!document.cookie.includes("show_hint=1")) localStorage.setItem("bv-my-menu-hint", "1");
+    })
+    .catch(() => {});
   context.pages().forEach(closeLevelUps);
   context.on("page", closeLevelUps);
 }

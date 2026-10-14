@@ -54,7 +54,7 @@ test.describe("로그인 뒤 보던 글로", () => {
     await expect(comments(page).getByRole("button", { name: "댓글 등록" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "💬 댓글 0" })).toBeInViewport();
     expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
-    await expect(menu(page).getByRole("button", { name: "로그아웃" })).toBeVisible();
+    await expect(menu(page).getByRole("button", { name: "내 메뉴" })).toBeVisible();
   });
 
   test("공감 안내의 [로그인]과 헤더 [로그인]도 보던 화면으로 돌아온다, 첫 화면에서는 돌아갈 곳이 없다", async ({ browser }) => {

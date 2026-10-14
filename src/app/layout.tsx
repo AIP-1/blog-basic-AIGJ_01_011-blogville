@@ -3,10 +3,11 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { HeaderLoginLink } from "@/components/auth/HeaderLoginLink";
 import { SessionKeeper } from "@/components/auth/SessionKeeper";
-import { SignOutButton } from "@/components/auth/SignOutButton";
 import { AttendanceDayWatcher } from "@/components/game/AttendanceDayWatcher";
 import { LevelUpDialog } from "@/components/game/LevelUpDialog";
+import { MainNav } from "@/components/layout/MainNav";
 import { PhoneTabs } from "@/components/layout/PhoneTabs";
+import { UserMenu } from "@/components/layout/UserMenu";
 import { SiteNoticeBar } from "@/components/layout/SiteNoticeBar";
 import { SupportLink } from "@/components/layout/SupportLink";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
@@ -14,7 +15,7 @@ import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import { UpdatesNewBadge } from "@/components/layout/UpdatesNewBadge";
 import { PixelLayers } from "@/components/game/PixelLayers";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
-import { getMyBlog, getSession } from "@/server/dal";
+import { getMyBlog, getNickname, getSession } from "@/server/dal";
 import { formatNumber } from "@/lib/game";
 import { todayKST } from "@/lib/kst";
 import { countUnreadNotifications, getPendingLevelUp } from "@/server/notifications";
@@ -57,12 +58,15 @@ async function attendToday(userId: string, sessionId: string) {
   }
 }
 
+const HEADER = "sticky top-0 z-40 border-b border-line bg-surface/90 backdrop-blur supports-[backdrop-filter]:bg-surface/75";
+const LOGO = "flex min-h-11 shrink-0 items-center whitespace-nowrap text-xl font-extrabold tracking-tight text-accent";
+
 /** 헤더를 그리는 동안 자리를 지키는 막대 (로고만). 본문은 헤더를 기다리지 않고 먼저 그린다 */
 function HeaderFallback() {
   return (
-    <header className="border-b border-line bg-surface" aria-busy="true">
-      <div className="mx-auto flex max-w-5xl items-center px-4 py-2">
-        <Link href="/" className="flex min-h-11 shrink-0 items-center whitespace-nowrap text-xl font-extrabold text-accent">
+    <header className={HEADER} aria-busy="true">
+      <div className="mx-auto flex h-14 max-w-5xl items-center px-4">
+        <Link href="/" className={LOGO}>
           Blogville
         </Link>
       </div>
@@ -70,85 +74,70 @@ function HeaderFallback() {
   );
 }
 
+/**
+ * 맨 위 막대 (티스토리·네이버 블로그·velog처럼 세 덩어리):
+ *  왼쪽  로고 + 큰 메뉴(마을·마을 소식·인기 글, 지금 보는 곳 밑줄)
+ *  오른쪽 레벨·코인 칩, 🔔 알림, ✏️ 글쓰기, 내 캐릭터 버튼 → 내 메뉴(내 블로그·관리·내 정보·상점·출석·관리자·로그아웃)
+ * 화면을 내리면 위에 붙어 있다. 휴대폰 회원은 큰 메뉴·알림이 아래 탭에 있어 헤더에서 뺀다.
+ */
 async function Header() {
   // 출석은 RootLayout이 먼저 했다 (코인·레벨에 오늘 보상이 들어 있다)
   const member = await getSession();
-  const [blog, unread, wallet, avatar, levelUp] = member
+  const [blog, unread, wallet, avatar, levelUp, nickname] = member
     ? await Promise.all([
         getMyBlog(member.userId),
         countUnreadNotifications(member.userId),
         getWallet(member.userId),
         getAvatar(member.userId),
         getPendingLevelUp(member.userId),
+        getNickname(member.userId),
       ])
-    : [null, 0, null, null, null];
+    : [null, 0, null, null, null, ""];
   return (
     <>
-    <header className="border-b border-line bg-surface">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-2 px-4 py-2">
-        <Link href={blog ? `/@${blog.slug}` : "/"} className="flex min-h-11 shrink-0 items-center whitespace-nowrap text-xl font-extrabold text-accent">
+    <header className={HEADER}>
+      <div className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-4 sm:gap-4">
+        <Link href={blog ? `/@${blog.slug}` : "/"} className={LOGO}>
           Blogville
         </Link>
-        <nav className="flex flex-wrap items-center justify-end gap-1" aria-label="메뉴">
-          {/* 마을(광장)이 아직 없어 마을 소식은 헤더에서 들어간다 (SOC-05, 요구사항 1.34 메모) */}
-          {/* 마을 (TOWN-01). 휴대폰에는 마을이 없다 */}
-          {/* .btn은 유틸리티보다 강해서 감싼 칸으로 숨긴다 */}
-          <span className="contents max-sm:hidden">
-            <Link href="/town" className="btn btn-ghost px-2" aria-label="마을">
-              🏘<span className="hidden md:inline">마을</span>
-            </Link>
-          </span>
-          {/* 휴대폰 회원은 아래 탭에 있는 것(마을 소식·상점·출석·알림·내 블로그)을 헤더에서 뺀다 (TOWN-11) */}
-          <span className={member && blog ? "contents max-sm:hidden" : "contents"}>
-            <Link href="/feed" className="btn btn-ghost px-2" aria-label="마을 소식">
-              📋<span className="hidden sm:inline">마을 소식</span>
-            </Link>
-          </span>
-          {member && blog && (
-            <>
-              {member.role === "admin" && (
-                <Link href="/admin" className="btn btn-ghost px-2" aria-label="관리자">
-                  👑<span className="hidden sm:inline">관리자</span>
-                </Link>
-              )}
-              {wallet && (
-                // 레벨·코인 (GAME-02·03), 누르면 내역 (GAME-07)
+        <nav className="flex min-w-0 flex-1 items-center" aria-label="메뉴">
+          <MainNav member={!!(member && blog)} />
+          <div className="ml-auto flex items-center gap-1 sm:gap-1.5">
+            {member && blog && wallet ? (
+              <>
+                {/* 레벨·코인 (GAME-02·03), 누르면 내역 (GAME-07) */}
                 <Link
                   href="/wallet"
-                  className="btn btn-ghost gap-1 px-2 text-sm"
+                  className="flex min-h-11 items-center gap-1.5 rounded-full px-2 text-sm hover:bg-bg"
                   aria-label={`Lv.${wallet.progress.level}, 코인 ${formatNumber(wallet.coin)}: 경험치·코인 내역`}
                   data-wallet
                 >
-                  {/* 내 캐릭터 (GAME-01), 입은 모자·옷·소품까지 (SHOP-06) */}
-                  <PixelLayers arts={avatar?.layers ?? []} size={28} />
                   <span className="rounded-full bg-accent/10 px-1.5 font-bold text-accent">Lv.{wallet.progress.level}</span>
-                  <span className="whitespace-nowrap">🪙 {formatNumber(wallet.coin)}</span>
+                  <span className="whitespace-nowrap font-semibold tabular-nums">🪙 {formatNumber(wallet.coin)}</span>
                 </Link>
-              )}
-              <span className="contents max-sm:hidden">
-                <Link href="/shop" className="btn btn-ghost px-2" aria-label="마을 상점">
-                  🏪<span className="hidden xl:inline">상점</span>
+                <span className="contents max-sm:hidden">
+                  <NotificationBell unread={{ count: unread }} iconOnly className="relative flex size-11 items-center justify-center rounded-full text-lg hover:bg-bg" />
+                </span>
+                <Link href="/write" className="btn btn-primary gap-1 rounded-full px-4 max-sm:size-11 max-sm:px-0" aria-label="글쓰기">
+                  ✏️<span className="max-sm:hidden">글쓰기</span>
                 </Link>
-                <Link href="/attendance" className="btn btn-ghost px-2" aria-label="출석 체크">
-                  📮<span className="hidden xl:inline">출석</span>
-                </Link>
-                <NotificationBell unread={{ count: unread }} />
-              </span>
-              <Link href="/settings/account" className="btn btn-ghost px-2" aria-label="내 정보">
-                👤<span className="hidden sm:inline">내 정보</span>
-              </Link>
-              <span className="contents max-sm:hidden">
-                <Link href={`/@${blog.slug}`} className="btn btn-ghost">
-                  내 블로그
-                </Link>
-              </span>
-              <Link href="/write" className="btn btn-primary">
-                ✏️ 글쓰기
-              </Link>
-              <SignOutButton userId={member.userId} />
-            </>
-          )}
-          {!member && <HeaderLoginLink />}
+                <UserMenu
+                  userId={member.userId}
+                  nickname={nickname}
+                  slug={blog.slug}
+                  isAdmin={member.role === "admin"}
+                  level={wallet.progress.level}
+                  ratio={wallet.progress.ratio}
+                  isMax={wallet.progress.isMax}
+                  coin={wallet.coin}
+                  // 내 캐릭터 (GAME-01), 입은 모자·옷·소품까지 (SHOP-06)
+                  avatar={<PixelLayers arts={avatar?.layers ?? []} size={30} />}
+                />
+              </>
+            ) : (
+              !member && <HeaderLoginLink />
+            )}
+          </div>
         </nav>
       </div>
     </header>

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "./fixtures";
-import { PASSWORD, signIn, signUpOk, sql, writePost } from "./helpers";
+import { PASSWORD, signIn, signUpOk, sql, writePost, openMyMenu } from "./helpers";
 
 // 임시 저장 (POST-08, specs/009-drafts)
 test.describe.configure({ timeout: 60_000 });
@@ -118,7 +118,7 @@ test.describe("POST-08 임시 저장", () => {
     await page.goto(`/@${a}`);
     // 화면이 다 준비된 뒤 누른다 (준비 전이면 브라우저가 폼을 바로 보내 지우는 코드가 돌지 않는다)
     await page.waitForLoadState("networkidle");
-    await page.getByRole("button", { name: "로그아웃" }).click();
+    await (await openMyMenu(page)).getByRole("button", { name: "로그아웃" }).click();
     await expect(page.getByRole("button", { name: "로그아웃" })).toHaveCount(0);
     expect(await stored(page)).toHaveLength(0);
   });

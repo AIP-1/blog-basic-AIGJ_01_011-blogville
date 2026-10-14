@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "./fixtures";
-import { signUpOk, sql, uid, writePost } from "./helpers";
+import { signUpOk, sql, uid, writePost, openMyMenu } from "./helpers";
 
 // 관리자 (AUTH-08, specs/012-admin)
 test.describe.configure({ timeout: 60_000 });
@@ -27,7 +27,7 @@ test.describe("AUTH-08 관리자", () => {
     const postId = await writePost(page, "지키는 글", "본문");
     expect((await page.goto("/admin"))!.status()).toBe(404);
     await page.goto(`/@${owner}`);
-    await expect(page.getByRole("link", { name: "관리자" })).toHaveCount(0);
+    await expect((await openMyMenu(page)).getByRole("link", { name: "관리자" })).toHaveCount(0);
 
     // 관리자가 누른 삭제 요청을 가로채(보내지 않고) 일반 회원 쿠키로 다시 보낸다
     await sql`update posts set created_at = now() + interval '1 hour' where id = ${postId}`;
@@ -68,7 +68,7 @@ test.describe("AUTH-08 관리자", () => {
 
     const me = await makeAdmin(page);
     await page.goto(`/@${me}`);
-    await page.getByRole("link", { name: "관리자" }).click();
+    await (await openMyMenu(page)).getByRole("link", { name: "관리자" }).click();
     await expect(page).toHaveURL(/\/admin$/);
     await expect(page.getByRole("heading", { name: "👑 관리자" })).toBeVisible();
     await expect(page.locator("[data-stat]")).toHaveCount(4);

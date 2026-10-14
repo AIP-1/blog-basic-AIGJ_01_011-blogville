@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "./fixtures";
-import { signUpOk, sql } from "./helpers";
+import { signUpOk, sql, openMyMenu } from "./helpers";
 
 // 자동 출석 (GAME-04), specs/033-attendance
 test.describe.configure({ timeout: 90_000 });
@@ -34,7 +34,7 @@ test.describe("GAME-04 출석", () => {
     expect(await rows(id)).toHaveLength(1);
     expect(await ledger(id)).toHaveLength(1);
 
-    await page.getByRole("link", { name: "출석 체크" }).click();
+    await (await openMyMenu(page)).getByRole("link", { name: "출석 체크" }).click();
     await expect(page).toHaveURL(/\/attendance$/);
     await expect(page.getByRole("heading", { name: "📮 출석 체크" })).toBeVisible();
     await expect(page.getByRole("status").filter({ hasText: "출석 완료" })).toHaveText("출석 완료! 오늘 1일차");

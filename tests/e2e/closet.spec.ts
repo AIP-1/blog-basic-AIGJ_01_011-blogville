@@ -50,7 +50,7 @@ test.describe("SHOP-04·06 꾸미기", () => {
     await expect(item(page, "밀짚모자")).toHaveAttribute("aria-pressed", "true");
     await expect(notice(page)).toHaveText("밀짚모자 장착을 저장했어요 ✓");
     await expect(miniroom(page).locator("svg[data-art]").last()).toHaveAttribute("data-art", "char.boy hat.straw");
-    await expect(page.locator("header [data-wallet] svg")).toHaveAttribute("data-art", "char.boy hat.straw");
+    await expect(page.locator("header [data-user-menu-button] svg").first()).toHaveAttribute("data-art", "char.boy hat.straw");
     await expect(notice(page)).toHaveCount(0, { timeout: 5_000 }); // 2초 뒤 사라짐
 
     // 같은 부위는 바뀌고, 다른 부위는 함께
