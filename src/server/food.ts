@@ -7,13 +7,14 @@ import { countBuzz, dongFromRegion, parseDaumBlogs, interestGrowth, interestKeyw
 import { detectSponsor, pickOgImage, reviewFetchUrl, sponsorImageUrls } from "@/lib/food-sponsor";
 import { queueSponsorOcr, sponsorOcrState } from "@/server/food-ocr";
 import { placeKind, type FoodKind, type FoodKindFilter } from "@/lib/food-kind";
-import { relevantReviews, reviewVerdict, REVIEW_DAYS, REVIEW_PAGE_SIZE } from "@/lib/food-relevance";
-import { bodyMatch, type BodyMatch } from "@/lib/food-place-match";
+import { areaWords, relevantReviews, reviewVerdict, REVIEW_DAYS, REVIEW_PAGE_SIZE } from "@/lib/food-relevance";
+import { bodyMatch, otherRegionTitle, type BodyMatch } from "@/lib/food-place-match";
 import { todayKST } from "@/lib/kst";
 import {
   FOOD_RADIUS_M,
   FOOD_RECENT_CAP,
   reviewArea,
+  shortCity,
   dedupePlaces,
   parseKakaoPlaces,
   parseNaverPlaces,
@@ -578,7 +579,8 @@ export async function placeDetail(place: FoodPlace, page = 1, source: ReviewSour
       ? await settle(async () => {
           const { all } = await yearReviews(place);
           // 제목·요약으로 거르고, 본문을 이미 읽어 그 식당 이야기가 아니라고 본 글도 뺀다
-          const kept = relevantReviews(all, place).filter((r) => knownBody(place, r.url) !== "mismatch");
+          const local = areaWords(shortCity(place.address));
+          const kept = relevantReviews(all, place).filter((r) => knownBody(place, r.url) !== "mismatch" && !otherRegionTitle(r.title, place, local));
           reviewHidden = all.length - kept.length;
           hiddenSample = all
             .map((r) => ({ r, v: reviewVerdict(r, place) }))

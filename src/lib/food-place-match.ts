@@ -58,3 +58,20 @@ export function bodyMatch(html: string, place: Pick<FoodPlace, "id" | "name" | "
   const dining = new Set([...text.matchAll(DINING)].map((m) => m[0])).size + (menu && text.includes(menu) ? 1 : 0);
   return named >= 2 && dining >= 3 ? "weak" : "mismatch";
 }
+
+// 블로그 제목에 자주 나오는 다른 지역 이름 (여행 일기에 그 식당 이름이 지나가는 글을 가려낸다).
+// 흔한 낱말과 겹치는 이름(공주·부여·진주·세종·동해·남해)은 넣지 않는다
+const REGIONS = [
+  "서울", "부산", "대구", "인천", "광주", "대전", "울산", "제주", "서귀포", "강릉", "속초", "양양", "춘천", "원주", "평창", "여수", "순천", "목포", "전주",
+  "군산", "경주", "포항", "안동", "통영", "거제", "창원", "김해", "청주", "천안", "태안", "보령", "가평", "수원", "담양", "보성",
+  "해남", "완도", "고흥", "울릉", "단양", "제천", "충주", "삼척", "정선", "영월", "오사카", "도쿄", "후쿠오카", "교토", "삿포로", "다낭", "방콕", "대만", "타이베이", "홍콩",
+];
+
+/** 제목이 다른 지역 이야기인지 (예: 광주 식당인데 "7/29-31 강릉야호~"). 그 식당 동네 말이 같이 있으면 아니다 */
+export function otherRegionTitle(title: string, place: Pick<FoodPlace, "address">, localWords: string[]): boolean {
+  const flat = squash(title);
+  const own = squash(place.address);
+  const other = REGIONS.find((r) => flat.includes(r) && !own.includes(r));
+  if (!other) return false;
+  return !localWords.some((w) => w.length >= 2 && flat.includes(squash(w)));
+}
