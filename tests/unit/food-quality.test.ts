@@ -193,3 +193,22 @@ describe("내 동네 이름", async () => {
     expect(dongFromRegion(null)).toBeNull();
   });
 });
+
+describe("지역 인기 정렬", async () => {
+  const { sortRegion, interestGrowth, isRegionSort } = await import("@/lib/food-quality");
+  const p = (id: string, recent: number, growth: number | null): RankedPlace => ({
+    id, name: id, category: "", address: "", phone: "", mapUrl: "", lat: null, lng: null, distance: null, recent, interest: 1, rising: false, growth, kind: "meal",
+  });
+  const list = [p("a", 5, 1), p("b", 20, 0.8), p("c", 3, 2.5)];
+  it("종합·뜨는·후기 순", () => {
+    expect(sortRegion(list, "best").map((x) => x.id)).toEqual(["a", "b", "c"]);
+    expect(sortRegion(list, "rising").map((x) => x.id)).toEqual(["c", "a", "b"]);
+    expect(sortRegion(list, "reviews").map((x) => x.id)).toEqual(["b", "a", "c"]);
+  });
+  it("그 전 검색이 없으면 성장률을 모른다", () => {
+    expect(interestGrowth({ average: 5, recent: 10, before: 0 })).toBeNull();
+    expect(interestGrowth({ average: 5, recent: 10, before: 5 })).toBe(2);
+    expect(isRegionSort("rising")).toBe(true);
+    expect(isRegionSort("x")).toBe(false);
+  });
+});
