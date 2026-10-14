@@ -9,6 +9,8 @@ import { COVER_ERRORS, removeBlogCover, setBlogCover, updateBlogAccent as saveAc
 import { isListStyle, LIST_STYLE_ERROR } from "@/lib/list-style";
 import { ACCENT_ERROR, isBlogAccent } from "@/lib/blog-accent";
 import * as category from "@/server/category";
+import { addBlogStock as saveStock, removeBlogStock as dropStock } from "@/server/stocks";
+import { checkStock, STOCK_ERRORS } from "@/lib/stocks";
 
 export type SettingsState = { error?: string; message?: string; values?: Record<string, string> } | null;
 
@@ -79,6 +81,29 @@ export async function deleteBlogCover(): Promise<CoverState> {
   await removeBlogCover(member.userId);
   refresh((await getMyBlog(member.userId)).slug);
   return { message: COVER_ERRORS.removed };
+}
+
+export type StockState = { error: string } | { message: string } | null;
+
+/** 📈 관심 종목 넣기: 검색 결과에서 고른 종목 (시장·코드·이름) */
+export async function addBlogStock(formData: FormData): Promise<StockState> {
+  const member = await requireMember();
+  const item = checkStock(text(formData, "market"), text(formData, "code"), text(formData, "name"));
+  if (!item) return { error: STOCK_ERRORS.invalid };
+  const error = await saveStock(member.userId, item);
+  if (error) return { error };
+  refresh((await getMyBlog(member.userId)).slug);
+  return { message: STOCK_ERRORS.added };
+}
+
+/** 📈 관심 종목 빼기 */
+export async function removeBlogStock(formData: FormData): Promise<StockState> {
+  const member = await requireMember();
+  const id = parseId(text(formData, "id"));
+  if (id === null) return { error: STOCK_ERRORS.invalid };
+  await dropStock(member.userId, id);
+  refresh((await getMyBlog(member.userId)).slug);
+  return { message: STOCK_ERRORS.removed };
 }
 
 // ── 카테고리 (BLOG-05) ──

@@ -649,6 +649,27 @@ export const follows = pgTable(
   ],
 );
 
+// 블로그 관심 종목 (📈 위젯). 블로그 주인이 넣고 빼며, 방문자도 시세를 본다. 블로그마다 최대 10개(서버가 블로그 행 잠금으로 지킨다).
+// code: 국내는 6자리 종목 코드, 미국은 네이버 증권의 로이터 코드(AAPL.O 등). market: KR·US
+export const blogStocks = pgTable(
+  "blog_stocks",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    blogId: integer("blog_id")
+      .notNull()
+      .references(() => blogs.id, { onDelete: "cascade" }),
+    market: text("market").notNull(),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("blog_stocks_blog_code_uq").on(t.blogId, t.market, t.code),
+    check("blog_stocks_market_check", sql`${t.market} in ('KR', 'US')`),
+    check("blog_stocks_name_check", sql`char_length(${t.name}) between 1 and 60`),
+  ],
+);
+
 export type Blog = typeof blogs.$inferSelect;
 export type Post = typeof posts.$inferSelect;
 export type Category = typeof categories.$inferSelect;

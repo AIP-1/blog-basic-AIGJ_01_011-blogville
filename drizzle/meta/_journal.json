@@ -281,6 +281,13 @@
       "when": 1791907459778,
       "tag": "0045_blog_cover",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1791937371070,
+      "tag": "0046_blog_stocks",
+      "breakpoints": true
     }
   ]
 }
