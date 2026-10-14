@@ -33,7 +33,8 @@ const FAIL_TTL_MS = 60_000;
 const TIMEOUT_MS = 5_000;
 const PAGE_TTL_MS = 24 * 3_600_000;
 const PAGE_MAX_BYTES = 1_500_000;
-const NEAR_MAX = 200;
+// 거리마다 보관할 가게 수 (가까운 순). 2km에서도 1km와 같은 곳만 보이지 않게 넉넉히
+const NEAR_MAX: Record<number, number> = { 300: 120, 500: 200, 1000: 300, 2000: 500 };
 // 지역 인기 후보를 모으는 검색어 (네이버 지역 검색은 한 번에 5곳까지라 여러 번 묻는다).
 // 백화점·체인을 거르고도 열 곳이 넘게 남도록 식사·카페·술집을 고루 묻는다.
 const REGION_QUERIES = ["맛집", "현지인 맛집", "한식 맛집", "고기 맛집", "일식 맛집", "중식 맛집", "양식 맛집", "술집", "카페", "디저트", "빵집", "브런치"];
@@ -213,7 +214,18 @@ export function nearbyPlaces(
   if (!kakaoEnabled()) return Promise.resolve({ status: "off" });
   return settle(async () => {
     const found = await remember(`near3|${at.lat},${at.lng}|${radius}|${kind}|${sort}`, async () => {
-      const lists = await mapLimit(nearSources(kind, at, radius, sort), 6, (load) => load());
+      // 칸 하나가 잠깐 실패해도 나머지로 보여 준다 (모두 실패하면 오류)
+      let failed = 0;
+      let lastError: unknown = null;
+      const sources = nearSources(kind, at, radius, sort);
+      const lists = await mapLimit(sources, 6, (load) =>
+        load().catch((e) => {
+          failed++;
+          lastError = e;
+          return [] as FoodPlace[];
+        }),
+      );
+      if (failed === sources.length) throw lastError;
       const seen = new Set<string>();
       return lists
         .flat()
@@ -224,7 +236,7 @@ export function nearbyPlaces(
         .map((p) => ({ ...p, kind: placeKind(p.category, p.name) }))
         .filter((p) => kind === "all" || p.kind === kind)
         .sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0))
-        .slice(0, NEAR_MAX);
+        .slice(0, NEAR_MAX[radius] ?? 200);
     });
     if (sort === "buzz") {
       // 인기 순: 후보(많아야 45곳 남짓) 모두의 블로그 글 수를 세어 줄 세운 뒤 쪽을 자른다

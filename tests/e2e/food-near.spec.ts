@@ -29,3 +29,13 @@ test("식당 후기는 그 식당 이야기만 남기고 뺀 글 수를 알려 �
     await expect(page.locator("[data-review-pages] a[aria-current=page]")).toHaveText("2");
   }
 });
+
+test("쪽이 많아도 쪽 번호는 처음·끝·앞뒤만, ‹ ›로 넘긴다", async ({ page }) => {
+  await page.goto("/food?tab=near&lat=35.147&lng=126.915&r=2000");
+  const pages = page.locator("[data-near-pages]");
+  test.skip((await pages.count()) === 0, "열쇠가 없거나 쪽이 하나뿐");
+  await pages.getByRole("link", { name: "다음 쪽" }).click();
+  await expect(page).toHaveURL(/p=2/);
+  await expect(pages.locator("a[aria-current=page]")).toHaveText("2");
+  await expect(pages.getByRole("link", { name: "이전 쪽" })).toBeVisible();
+});
