@@ -52,3 +52,32 @@ export function hasNewRelease(releases: Pick<Release, "publishedAt">[] | null, n
   const latest = Math.max(...releases.map((r) => r.publishedAt.getTime()));
   return now.getTime() - latest < RELEASE_NEW_DAYS * 24 * 60 * 60 * 1000;
 }
+
+/** 업데이트 소식 목록에 한 쪽에 보이는 릴리스 수 */
+export const RELEASES_PAGE_SIZE = 10;
+
+/** 버전 주소(/updates/v1.6.0)로 받을 수 있는 태그 모양 */
+export function isReleaseTag(tag: string): boolean {
+  return /^v\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(tag);
+}
+
+/** 목록에 보일 한 줄 요약: 노트의 첫 문단(제목·표·그림 앞)을 글자만 남겨 max자에서 자른다 */
+export function releaseSummary(html: string, max = 90): string {
+  const first = html.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i)?.[1] ?? "";
+  const text = first
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
+}
+
+/** 화면 제목: 릴리스 이름 끝의 "(2026-10-14)"는 날짜 줄과 겹쳐서 뺀다 */
+export function releaseTitle(name: string): string {
+  return name.replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/, "").trim() || name;
+}

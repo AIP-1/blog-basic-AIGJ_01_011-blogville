@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeReleaseHtml } from "@/lib/releases";
+import { isReleaseTag, releaseSummary, releaseTitle, sanitizeReleaseHtml } from "@/lib/releases";
 
 describe("업데이트 소식 (릴리스 노트 HTML)", () => {
   it("글·표·GitHub 그림은 남기고 제목은 한 칸 내린다", () => {
@@ -28,4 +28,22 @@ describe("업데이트 소식: 그림을 감싼 링크", () => {
     expect(out).toContain('<p><img src="https://raw.githubusercontent.com/o/r/a.png" alt="그림" loading="lazy" /></p>');
     expect(out).toContain(">글 링크</a>");
   });
+});
+
+describe("업데이트 소식 목록", () => {
+  it("한 줄 요약은 첫 문단의 글자만, 길면 …로 자른다", () => {
+    expect(releaseSummary("<h3>제목</h3><p>새 기능이 <strong>둘</strong> 생겼어요 &amp; 고쳤어요.</p><p>둘째 문단</p>")).toBe("새 기능이 둘 생겼어요 & 고쳤어요.");
+    expect(releaseSummary(`<p>${"가".repeat(100)}</p>`, 10)).toBe(`${"가".repeat(9)}…`);
+    expect(releaseSummary("<table><tr><td>표만</td></tr></table>")).toBe("");
+  });
+  it("버전 주소는 v숫자.숫자.숫자만", () => {
+    expect(isReleaseTag("v1.6.0")).toBe(true);
+    expect(isReleaseTag("v10.0.12")).toBe(true);
+    for (const bad of ["1.6.0", "v1.6", "v1.6.0-beta", "../etc", "v1.6.0/x"]) expect(isReleaseTag(bad)).toBe(false);
+  });
+});
+
+it("제목 끝의 날짜는 뺀다", () => {
+  expect(releaseTitle("Blogville v1.6.0 (2026-10-14)")).toBe("Blogville v1.6.0");
+  expect(releaseTitle("v1.0.0")).toBe("v1.0.0");
 });
