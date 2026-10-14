@@ -20,7 +20,34 @@ const SPONSOR_WORDS = [
 const SPONSOR_HOSTS = /(revu\.net|dinnerqueen\.net|reviewnote\.co\.kr|mrblog\.net|seoulouba\.co\.kr|ringble\.co\.kr|cometoplay\.kr|popomon\.com|tble\.kr|chvu\.co\.kr|4blog\.net|reviewplace\.co\.kr|xn--939au0g4vj8sq\.net|gangnammatzip|storyn\.kr|modan\.kr)/i;
 const SELF_WORDS = /(내돈내산|내 돈 내 산|내돈 내산|직접 (계산|결제)했|광고 아님|광고 아닙니다|협찬 아님|협찬 아닙니다|협찬 없)/;
 
-/** 글 본문(HTML 그대로)에서 협찬·내돈내산 표시. 협찬 문구가 있으면 협찬이 이긴다 ("협찬 아님"은 빼고) */
+// 협찬을 그림이나 태그로만 밝힌 글: "#협찬" 태그, 그림 파일 이름·대체 글("본 포스팅은 협찬을 포함합니다" 배너)
+const MARK_WORDS = /협찬|체험단|원고료|소정의|제공\s?받|지원\s?받|유료\s?광고|광고\s?포함|sponsor|support(ed)?_?banner/i;
+const TAG_SPONSOR = /#\s?(협찬|체험단|원고료|유료광고|광고포함|제공받음|서포터즈|기자단)(?![가-힣]*(아님|아닙니다|없))/;
+const SCRIPT_TAGS = /tag[A-Za-z]*["']?\s*[:=]\s*["'\[][^"'\]]{0,300}(협찬|체험단|원고료|유료광고)/i;
+
+function safeDecode(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
+
+/** 글 속 그림의 주소·파일 이름·대체 글에 협찬 표시가 있나 (그림 속 글자는 못 읽으니 그림에 붙은 이름으로 본다) */
+export function imageSponsorMark(html: string): boolean {
+  for (const m of html.matchAll(/<img\b[^>]*>/gi)) {
+    const attrs = [...m[0].matchAll(/\b(src|data-src|data-lazy-src|data-original|alt|title)\s*=\s*["']([^"']*)["']/gi)].map((a) => safeDecode(a[2].replace(/&amp;/g, "&")));
+    if (attrs.some((a) => MARK_WORDS.test(a))) return true;
+  }
+  return false;
+}
+
+/** 태그(#협찬)로 밝힌 협찬: 화면 글자와 글 정보(스크립트 속 태그 목록) 둘 다 본다 */
+export function tagSponsorMark(html: string): boolean {
+  return TAG_SPONSOR.test(html.replace(/<[^>]*>/g, " ")) || SCRIPT_TAGS.test(html);
+}
+
+/** 글 본문(HTML 그대로)에서 협찬·내돈내산 표시. 협찬 문구·배너·태그가 있으면 협찬이 이긴다 ("협찬 아님"은 빼고) */
 export function detectSponsor(html: string): Sponsor {
   const text = html
     .replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, " ")
@@ -30,6 +57,7 @@ export function detectSponsor(html: string): Sponsor {
   const self = SELF_WORDS.test(text);
   const cleaned = text.replace(/협찬\s?(아님|아닙니다|없)|광고\s?(아님|아닙니다)/g, " ");
   if (SPONSOR_HOSTS.test(html) || SPONSOR_WORDS.some((re) => re.test(cleaned))) return "sponsored";
+  if (imageSponsorMark(html) || tagSponsorMark(html)) return "sponsored";
   return self ? "self" : null;
 }
 
@@ -65,4 +93,42 @@ export function reviewFetchUrl(url: string): string | null {
   }
   if (/(^|\.)tistory\.com$/.test(host) || host === "brunch.co.kr") return `https://${host}${u.pathname}`;
   return null;
+}
+
+// 그림 속 글자 읽기(OCR)에 쓸 그림: 블로그가 올린 그림 주소만 (아무 주소나 서버가 받지 않게)
+const IMAGE_HOSTS = /^(postfiles|blogfiles|mblogthumb-phinf)\.pstatic\.net$|^blog\.kakaocdn\.net$|^(t1|img1)\.daumcdn\.net$/;
+
+/**
+ * 협찬 배너가 있을 법한 그림 주소: 글의 맨 앞 2장과 맨 끝 4장 (배너는 보통 글 처음이나 끝에 붙는다).
+ * 네이버 그림은 가로 400px로 작게 받아 빨리 읽는다
+ */
+export function sponsorImageUrls(html: string): string[] {
+  const urls: string[] = [];
+  for (const m of html.matchAll(/<img\b[^>]*>/gi)) {
+    const tag = m[0];
+    const raw = tag.match(/\bdata-lazy-src\s*=\s*["']([^"']+)["']/i)?.[1] ?? tag.match(/\bdata-src\s*=\s*["']([^"']+)["']/i)?.[1] ?? tag.match(/\bsrc\s*=\s*["']([^"']+)["']/i)?.[1];
+    if (!raw) continue;
+    let u: URL;
+    try {
+      u = new URL(raw.replace(/&amp;/g, "&"));
+    } catch {
+      continue;
+    }
+    if (u.protocol !== "https:" || !IMAGE_HOSTS.test(u.hostname)) continue;
+    if (/\.gif$/i.test(u.pathname)) continue; // 움짤·스티커는 건너뛴다
+    if (u.hostname.endsWith("pstatic.net")) {
+      u.search = "";
+      u.searchParams.set("type", "w400");
+    }
+    const s = u.toString();
+    if (!urls.includes(s)) urls.push(s);
+  }
+  return urls.length <= 6 ? urls : [...urls.slice(0, 2), ...urls.slice(-4)];
+}
+
+/** 그림에서 읽은 글자가 협찬 표시인가 (띄어쓰기를 잘못 읽어도 되게 빈칸을 지우고 본다) */
+export function ocrSaysSponsored(text: string): boolean {
+  const flat = text.replace(/\s+/g, "");
+  if (/협찬(아님|아닙니다|없)|광고아님|내돈내산/.test(flat)) return false;
+  return /협찬|원고료|체험단|제공받|지원받|유료광고|광고를?포함|소정의|파트너스활동/.test(flat);
 }

@@ -13,13 +13,18 @@ const OFF_TOPIC = /게임|보드게임|마피아\s*게임|영화|드라마|웹�
 
 /** 주소에서 동네 낱말 (예: "광주 동구 금남로 18" → ["동구", "금남로"]). 숫자·시·도는 뺀다 */
 export function areaWords(address: string): string[] {
-  return address
-    .split(/\s+/)
+  const parts = address.split(/\s+/);
+  const words = parts
     .slice(1)
     .filter((w) => /[가-힣]/.test(w) && !/^\d/.test(w))
     .map((w) => w.replace(/\d+.*$/, ""))
     .filter((w) => w.length >= 2)
-    .slice(0, 3);
+    .slice(0, 3)
+    // "목포시"·"해남군"은 블로그에 "목포"·"해남"으로 많이 쓴다
+    .flatMap((w) => (/^[가-힣]{2,}(시|군)$/.test(w) ? [w, w.slice(0, -1)] : [w]));
+  // 블로그는 "광주 ○○ 맛집"처럼 도시 이름을 많이 쓴다 (짧은 도시 이름일 때만)
+  const city = parts[0] ?? "";
+  return /^[가-힣]{2}$/.test(city) ? [...words, city] : words;
 }
 
 export type ReviewVerdict = { keep: true } | { keep: false; reason: "spam" | "no-name" | "off-topic" };

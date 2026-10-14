@@ -23,6 +23,7 @@ export type FoodReview = {
   date: string; // YYYY-MM-DD
   image?: string | null; // 글 대표 사진 (og:image)
   sponsor?: "sponsored" | "self" | null; // 협찬 표시 / 내돈내산 / 모름
+  sponsorCheck?: "pending"; // 그림 속 협찬 표시를 아직 읽는 중
   /** 어디서 찾은 글: 네이버 블로그 / 다음 블로그(티스토리·브런치 등) / 다음 카페 */
   source?: ReviewSource;
 };
@@ -178,12 +179,34 @@ export function shortCategory(raw: unknown): string {
   return parts.slice(-2).join(" > ");
 }
 
-/** 주소에서 "광주 서구"처럼 시·구 두 마디 (후기 검색을 좁힐 때 쓴다) */
+/** 주소에서 "광주 서구"처럼 시·구 두 마디 (같은 가게 묶기·지도 검색에 쓴다) */
 export function areaOf(address: string): string {
   return shortCity(address).split(" ").slice(0, 2).join(" ");
 }
 
-/** 주소 시·도 이름을 짧게: "광주광역시" → "광주" */
+/**
+ * 블로그 후기 검색에 붙일 동네 이름. 블로거가 실제로 쓰는 말로:
+ * 큰 도시는 "광주 서구", 도 아래 시·군은 "목포"·"해남"처럼 시·군 이름만 ("전남 목포시"로 찾으면 거의 안 잡힌다)
+ */
+export function reviewArea(address: string): string {
+  const [first = "", second = ""] = shortCity(address).split(" ");
+  if (PROVINCES.includes(first) && /^[가-힣]{1,6}(시|군)$/.test(second)) return second.replace(/(시|군)$/, "");
+  return areaOf(address);
+}
+
+const PROVINCES = ["경기", "강원", "충북", "충남", "전북", "전남", "경북", "경남", "제주"];
+const PROVINCE_NAMES: [RegExp, string][] = [
+  [/^경기도/, "경기"],
+  [/^강원(특별자치도|도)/, "강원"],
+  [/^충청북도/, "충북"],
+  [/^충청남도/, "충남"],
+  [/^(전라북도|전북특별자치도)/, "전북"],
+  [/^전라남도/, "전남"],
+  [/^경상북도/, "경북"],
+  [/^경상남도/, "경남"],
+  [/^제주특별자치도/, "제주"],
+];
+
 // 광역시 안의 구·군 (통합특별시 주소에서 어느 쪽인지 고를 때)
 const METRO_DISTRICTS: Record<string, string[]> = {
   광주: ["동구", "서구", "남구", "북구", "광산구"],
@@ -194,20 +217,21 @@ const METRO_DISTRICTS: Record<string, string[]> = {
 };
 
 /**
- * 주소 시·도 이름을 블로그에서 흔히 쓰는 짧은 이름으로: "광주광역시" → "광주", "강원특별자치도" → "강원".
+ * 주소 시·도 이름을 블로그에서 흔히 쓰는 짧은 이름으로: "광주광역시" → "광주", "전라남도" → "전남", "강원특별자치도" → "강원".
  * 행정 통합으로 생긴 "전남광주통합특별시 서구"는 구가 광주 쪽이면 "광주 서구", 아니면 "전남 순천시" (블로그 글은 예전 이름으로 쓴다)
  */
 export function shortCity(address: string): string {
   const merged = /^(\S+?)(\S{2})통합특별시\s+(\S+)/.exec(address);
   if (merged) {
     const [, a, b, district] = merged;
-    const pick = METRO_DISTRICTS[b]?.includes(district) ? b : METRO_DISTRICTS[a]?.includes(district) ? a : a;
+    const pick = METRO_DISTRICTS[b]?.includes(district) ? b : a;
     return address.replace(/^\S+통합특별시/, pick);
   }
-  return address
+  let out = address
     .replace(/^(서울|부산|대구|인천|광주|대전|울산)(특별시|광역시)/, "$1")
-    .replace(/^(세종)특별자치시/, "$1")
-    .replace(/^(강원|전북|제주)특별자치도/, "$1");
+    .replace(/^(세종)특별자치시/, "$1");
+  for (const [re, short] of PROVINCE_NAMES) out = out.replace(re, short);
+  return out;
 }
 
 function num(v: unknown): number | null {

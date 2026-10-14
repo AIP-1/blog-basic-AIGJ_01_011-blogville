@@ -16,6 +16,8 @@ const pageCsp = "frame-ancestors 'self'; object-src 'none'; base-uri 'self'";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // 글자 인식(협찬 배너 그림)은 worker 파일과 한국어 데이터를 node_modules에서 그대로 읽는다
+  serverExternalPackages: ["tesseract.js"],
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

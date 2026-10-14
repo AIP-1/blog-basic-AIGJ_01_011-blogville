@@ -28,7 +28,7 @@ describe("맛집 분류 (placeKind)", () => {
 describe("후기 거르기 (isRelevantReview)", () => {
   const mafia = { name: "마피아", address: "광주 동구 금남로 18", category: "양식 > 피자" };
   const r = (title: string, summary = "") => ({ title, summary });
-  it("동네 낱말", () => expect(areaWords("광주 동구 금남로 18")).toEqual(["동구", "금남로"]));
+  it("동네 낱말", () => expect(areaWords("광주 동구 금남로 18")).toEqual(["동구", "금남로", "광주"]));
   it("짧은 이름은 동네와 먹은 이야기가 둘 다 있어야", () => {
     expect(isRelevantReview(r("광주 동구 마피아 피자 맛집 후기", "금남로 근처 웨이팅"), mafia)).toBe(true);
     expect(isRelevantReview(r("마피아 게임 규칙 정리", "친구들이랑 보드게임"), mafia)).toBe(false);
