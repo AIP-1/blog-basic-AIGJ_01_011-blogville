@@ -10,6 +10,7 @@
 #             NAVER_TREND_CLIENT_ID·_SECRET (선택, 검색어 트렌드를 다른 API HUB 앱으로 받았을 때만. 없으면 위 NAVER_SEARCH_* 앱으로 🔎 키워드 도우미)
 #             KAKAO_REST_API_KEY (선택, 있으면 🍽 맛집 내 주변·식당 찾기 — 카카오맵 사용 설정을 켠 앱의 REST API 키)
 #             KAKAO_JS_KEY (선택, 있으면 🗺 맛집 지도 — 같은 앱의 JavaScript 키, Web 사이트 도메인 등록 필요)
+#             NAVER_MAP_CLIENT_ID (선택, 있으면 🗺 맛집 지도를 네이버 지도로 — 네이버 클라우드 Maps Web Dynamic Map의 Client ID)
 name: deploy
 
 on:
@@ -136,13 +137,14 @@ jobs:
           NAVER_TREND_CLIENT_SECRET: ${{ secrets.NAVER_TREND_CLIENT_SECRET }}
           KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
           KAKAO_JS_KEY: ${{ secrets.KAKAO_JS_KEY }}
+          NAVER_MAP_CLIENT_ID: ${{ secrets.NAVER_MAP_CLIENT_ID }}
           FEEDBACK_BOT_TOKEN: ${{ secrets.FEEDBACK_BOT_TOKEN }}
         with:
           host: ${{ env.SSH_HOST }}
           port: ${{ env.SSH_PORT }}
           username: ${{ secrets.SSH_ID }}
           password: ${{ secrets.SSH_PASSWORD }}
-          envs: DATABASE_URL,APP_URL,IMAGE,ADMIN_USERNAME,ADMIN_PASSWORD,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,NAVER_SEARCH_CLIENT_ID,NAVER_SEARCH_CLIENT_SECRET,NAVER_TREND_CLIENT_ID,NAVER_TREND_CLIENT_SECRET,KAKAO_REST_API_KEY,KAKAO_JS_KEY,FEEDBACK_BOT_TOKEN
+          envs: DATABASE_URL,APP_URL,IMAGE,ADMIN_USERNAME,ADMIN_PASSWORD,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,NAVER_SEARCH_CLIENT_ID,NAVER_SEARCH_CLIENT_SECRET,NAVER_TREND_CLIENT_ID,NAVER_TREND_CLIENT_SECRET,KAKAO_REST_API_KEY,KAKAO_JS_KEY,NAVER_MAP_CLIENT_ID,FEEDBACK_BOT_TOKEN
           command_timeout: 10m
           script: bash ~/blogville/run.sh
 

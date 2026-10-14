@@ -311,3 +311,4 @@ body {
 .food-map-info { display: grid; gap: 2px; min-width: 180px; max-width: 240px; padding: 10px 12px; border-radius: 12px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 6px 18px rgb(0 0 0 / 0.18); font-size: 13px; white-space: normal; }
 .food-map-info span { color: var(--ink-soft); font-size: 12px; }
 .food-map-info a { color: var(--accent); font-weight: 700; font-size: 12px; }
+.food-map-links { display: flex; gap: 10px; }
