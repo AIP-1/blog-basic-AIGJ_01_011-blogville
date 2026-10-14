@@ -1,9 +1,10 @@
 import "server-only";
 import { NEWS_TABS, pickIssues, type NewsResult, type NewsTab } from "@/lib/news";
 
-// 📰 뉴스 위젯: 네이버 검색 API(뉴스, 최신순 100건)를 탭마다 10분 동안 기억하고 "많이 다룬 이슈" TOP 5를 고른다.
-// 열쇠(NAVER_SEARCH_CLIENT_ID·_SECRET)가 없으면 꺼진다. 시험은 NEWS_API_BASE로 가짜 서버를 가리킨다.
-const BASE = () => process.env.NEWS_API_BASE ?? "https://openapi.naver.com";
+// 📰 뉴스 위젯: 네이버 검색 API(뉴스, 최신순 100건, NAVER API HUB)를 탭마다 10분 동안 기억하고 "많이 다룬 이슈" TOP 5를 고른다.
+// 열쇠(NAVER_SEARCH_CLIENT_ID·_SECRET, API HUB 앱의 인증 정보)가 없으면 꺼진다.
+// 개발자센터(openapi.naver.com) 검색 API는 2026-07-31부터 새 신청을 안 받아 API HUB 주소·헤더를 쓴다. 시험은 NEWS_API_BASE로 가짜 서버를 가리킨다.
+const BASE = () => process.env.NEWS_API_BASE ?? "https://naverapihub.apigw.ntruss.com";
 const TTL_MS = 10 * 60_000;
 const FAIL_TTL_MS = 60_000;
 const cache = new Map<NewsTab, { at: number; ttl: number; value: Promise<NewsResult | null> }>();
@@ -19,10 +20,10 @@ export function getNews(tab: NewsTab): Promise<NewsResult | null> {
   if (hit && Date.now() - hit.at < hit.ttl) return hit.value;
   const query = NEWS_TABS.find((t) => t.key === tab)!.query;
   const entry = { at: Date.now(), ttl: TTL_MS, value: Promise.resolve<NewsResult | null>(null) };
-  entry.value = fetch(`${BASE()}/v1/search/news.json?query=${encodeURIComponent(query)}&display=100&sort=date`, {
+  entry.value = fetch(`${BASE()}/search/v1/news?query=${encodeURIComponent(query)}&display=100&sort=date`, {
     headers: {
-      "X-Naver-Client-Id": process.env.NAVER_SEARCH_CLIENT_ID!,
-      "X-Naver-Client-Secret": process.env.NAVER_SEARCH_CLIENT_SECRET!,
+      "X-NCP-APIGW-API-KEY-ID": process.env.NAVER_SEARCH_CLIENT_ID!,
+      "X-NCP-APIGW-API-KEY": process.env.NAVER_SEARCH_CLIENT_SECRET!,
       Accept: "application/json",
     },
     signal: AbortSignal.timeout(4_000),
