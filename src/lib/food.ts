@@ -27,6 +27,7 @@ export const FOOD_TABS = [
   { key: "near", label: "📍 내 주변" },
   { key: "region", label: "🔥 지역 인기" },
   { key: "search", label: "🔎 식당 찾기" },
+  { key: "saved", label: "⭐ 가고 싶은 곳" },
 ] as const;
 export type FoodTab = (typeof FOOD_TABS)[number]["key"];
 

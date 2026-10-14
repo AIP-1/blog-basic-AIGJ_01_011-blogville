@@ -3,6 +3,8 @@ import Link from "next/link";
 import { NearbyLocator } from "@/components/food/NearbyLocator";
 import { FocusOnMapButton, FoodMap } from "@/components/food/FoodMap";
 import { PlaceCard } from "@/components/food/PlaceCard";
+import { SaveButton } from "@/components/food/SaveButton";
+import { SavedList } from "@/components/food/SavedList";
 import {
   buzzLabel,
   FOOD_MESSAGES,
@@ -17,7 +19,10 @@ import {
   type FoodPlace,
   type FoodTab,
 } from "@/lib/food";
+import { loginHref } from "@/lib/safe-next";
 import { formatDate } from "@/lib/time";
+import { getSession } from "@/server/dal";
+import { listSavedPlaces, savedPlaceIds } from "@/server/food-saved";
 import { foodEnabled, kakaoEnabled, naverFoodEnabled, nearbyPlaces, placeDetail, regionHot, searchPlaces, type FoodResult } from "@/server/food";
 
 export const metadata: Metadata = {
@@ -34,6 +39,15 @@ function mapKey(): string | null {
 
 function detailHref(q: string, p: FoodPlace) {
   return `/food?tab=search&q=${encodeURIComponent(q)}&place=${encodeURIComponent(p.id)}`;
+}
+
+/** 보이는 식당마다 [☆ 가고 싶어요] 버튼 (저장했는지 한 번에 묻는다) */
+async function saveButtons(places: FoodPlace[]): Promise<(p: FoodPlace) => React.ReactNode> {
+  const member = await getSession();
+  const saved = await savedPlaceIds(member?.userId ?? null, places.map((p) => p.id));
+  return function save(p) {
+    return <SaveButton place={p} saved={saved.has(p.id)} />;
+  };
 }
 
 function Notice({ children }: { children: React.ReactNode }) {
@@ -63,7 +77,9 @@ export default async function FoodPage({ searchParams }: PageProps<"/food">) {
           </Link>
         ))}
       </nav>
-      {!foodEnabled() ? (
+      {tab === "saved" ? (
+        <SavedTab />
+      ) : !foodEnabled() ? (
         <Notice>{FOOD_MESSAGES.off}</Notice>
       ) : tab === "near" ? (
         <NearTab lat={one(sp.lat)} lng={one(sp.lng)} sort={one(sp.sort) === "buzz" ? "buzz" : "distance"} />
@@ -81,6 +97,7 @@ async function NearTab({ lat, lng, sort }: { lat?: string; lng?: string; sort: "
   const at = parseCoords(lat, lng);
   const result = at ? await nearbyPlaces(at, sort) : null;
   const base = at ? `/food?tab=near&lat=${at.lat}&lng=${at.lng}` : "";
+  const save = await saveButtons(result?.status === "ok" ? result.value : []);
   return (
     <div className="mt-4 space-y-3">
       <NearbyLocator sort={sort} located={!!at} />
@@ -107,7 +124,7 @@ async function NearTab({ lat, lng, sort }: { lat?: string; lng?: string; sort: "
             <ol className="space-y-3" data-food-list="near">
               {result.value.map((p, i) => (
                 <li key={p.id}>
-                  <PlaceCard place={p} rank={mapKey() ? i + 1 : undefined} recent={naverFoodEnabled() ? p.recent : undefined} detailHref={detailHref(p.name, p)} />
+                  <PlaceCard place={p} rank={mapKey() ? i + 1 : undefined} recent={naverFoodEnabled() ? p.recent : undefined} detailHref={detailHref(p.name, p)} actions={save(p)} />
                   {mapKey() && p.lat !== null && <FocusOnMapButton id={p.id} />}
                 </li>
               ))}
@@ -121,6 +138,7 @@ async function NearTab({ lat, lng, sort }: { lat?: string; lng?: string; sort: "
 async function RegionTab({ region }: { region: string }) {
   if (!naverFoodEnabled()) return <Notice>{FOOD_MESSAGES.off}</Notice>;
   const result = await regionHot(region);
+  const save = await saveButtons(result.status === "ok" ? result.value : []);
   return (
     <div className="mt-4 space-y-3">
       <nav aria-label="지역" className="flex flex-wrap gap-1.5">
@@ -148,7 +166,7 @@ async function RegionTab({ region }: { region: string }) {
           <ol className="space-y-3" data-food-list="region">
             {result.value.map((p, i) => (
               <li key={p.id}>
-                <PlaceCard place={p} recent={p.recent} rank={i + 1} detailHref={detailHref(p.name, p)} />
+                <PlaceCard place={p} recent={p.recent} rank={i + 1} detailHref={detailHref(p.name, p)} actions={save(p)} />
                 {mapKey() && p.lat !== null && <FocusOnMapButton id={p.id} />}
               </li>
             ))}
@@ -162,6 +180,7 @@ async function RegionTab({ region }: { region: string }) {
 async function SearchTab({ q, placeId }: { q: string | null; placeId: string | null }) {
   const result = q ? await searchPlaces(q) : null;
   const picked = result?.status === "ok" && placeId ? (result.value.find((p) => p.id === placeId) ?? null) : null;
+  const save = await saveButtons(result?.status === "ok" ? result.value : []);
   return (
     <div className="mt-4 space-y-3">
       <form action="/food" className="flex gap-2" role="search">
@@ -181,7 +200,7 @@ async function SearchTab({ q, placeId }: { q: string | null; placeId: string | n
         </button>
       </form>
       {picked ? (
-        <PlaceDetailView place={picked} backHref={`/food?tab=search&q=${encodeURIComponent(q!)}`} />
+        <PlaceDetailView place={picked} backHref={`/food?tab=search&q=${encodeURIComponent(q!)}`} actions={save(picked)} />
       ) : (
         result &&
         (result.status !== "ok" ? (
@@ -192,7 +211,7 @@ async function SearchTab({ q, placeId }: { q: string | null; placeId: string | n
           <ul className="space-y-3" data-food-list="search">
             {result.value.map((p) => (
               <li key={p.id}>
-                <PlaceCard place={p} detailHref={detailHref(q!, p)} />
+                <PlaceCard place={p} detailHref={detailHref(q!, p)} actions={save(p)} />
               </li>
             ))}
           </ul>
@@ -202,14 +221,14 @@ async function SearchTab({ q, placeId }: { q: string | null; placeId: string | n
   );
 }
 
-async function PlaceDetailView({ place, backHref }: { place: FoodPlace; backHref: string }) {
+async function PlaceDetailView({ place, backHref, actions }: { place: FoodPlace; backHref: string; actions: React.ReactNode }) {
   const d = await placeDetail(place);
   return (
     <div className="space-y-4" data-food-detail={place.id}>
       <Link href={backHref} className="text-sm text-ink-soft hover:underline">
         ← 검색 결과로
       </Link>
-      <PlaceCard place={place} recent={d.reviews.status === "ok" ? d.recent : undefined} />
+      <PlaceCard place={place} recent={d.reviews.status === "ok" ? d.recent : undefined} actions={actions} />
       {mapKey() && place.lat !== null && <FoodMap jsKey={mapKey()!} places={[place]} />}
 
       {d.local.length > 0 && (
@@ -264,6 +283,25 @@ async function PlaceDetailView({ place, backHref }: { place: FoodPlace; backHref
       <Link href={reviewWriteHref(place)} className="btn btn-primary w-full justify-center">
         ✏ 이 식당 후기 쓰기
       </Link>
+    </div>
+  );
+}
+
+async function SavedTab() {
+  const member = await getSession();
+  if (!member) {
+    return (
+      <Notice>
+        <Link href={loginHref("/food?tab=saved")} className="font-semibold text-accent underline">
+          로그인
+        </Link>
+        하면 가고 싶은 곳을 모아 볼 수 있어요.
+      </Notice>
+    );
+  }
+  return (
+    <div className="mt-4">
+      <SavedList places={await listSavedPlaces(member.userId)} />
     </div>
   );
 }
