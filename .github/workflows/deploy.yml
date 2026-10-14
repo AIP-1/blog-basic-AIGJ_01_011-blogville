@@ -6,6 +6,7 @@
 #             ADMIN_USERNAME, ADMIN_PASSWORD (선택, 있으면 관리자 계정·공지 블로그를 만들거나 비밀번호 갱신)
 #             KAKAO_/NAVER_/GOOGLE_CLIENT_ID·_CLIENT_SECRET (선택, 둘 다 있는 서비스만 소셜 로그인 버튼이 켜짐)
 #             FEEDBACK_BOT_TOKEN (선택, 32자 이상이면 버그·문의 자동 처리 API /api/feedback가 켜짐)
+#             NAVER_SEARCH_CLIENT_ID·_SECRET (선택, 있으면 📰 뉴스 위젯이 켜짐 — 네이버 검색 API)
 name: deploy
 
 on:
@@ -123,12 +124,14 @@ jobs:
           NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          NAVER_SEARCH_CLIENT_ID: ${{ secrets.NAVER_SEARCH_CLIENT_ID }}
+          NAVER_SEARCH_CLIENT_SECRET: ${{ secrets.NAVER_SEARCH_CLIENT_SECRET }}
           FEEDBACK_BOT_TOKEN: ${{ secrets.FEEDBACK_BOT_TOKEN }}
         with:
           host: ${{ env.SSH_HOST }}
           port: ${{ env.SSH_PORT }}
           username: ${{ secrets.SSH_ID }}
           password: ${{ secrets.SSH_PASSWORD }}
-          envs: DATABASE_URL,APP_URL,IMAGE,ADMIN_USERNAME,ADMIN_PASSWORD,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,FEEDBACK_BOT_TOKEN
+          envs: DATABASE_URL,APP_URL,IMAGE,ADMIN_USERNAME,ADMIN_PASSWORD,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,NAVER_SEARCH_CLIENT_ID,NAVER_SEARCH_CLIENT_SECRET,FEEDBACK_BOT_TOKEN
           command_timeout: 10m
           script: bash ~/blogville/run.sh
