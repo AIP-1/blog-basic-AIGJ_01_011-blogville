@@ -26,6 +26,7 @@ Docker는 앱과 앱이 도는 데 필요한 것(OS 파일, Node, 라이브러�
 | | `ENV NODE_ENV=production PORT=8400 ...` | 운영 환경 변수 |
 | | `COPY --from=build /app ./` | 빌드 단계 결과를 가져옴. 마이그레이션(drizzle-kit)과 정리 작업(tsx)도 컨테이너에서 돌려서 `node_modules`째 가져옵니다 |
 | | `USER node` | root가 아닌 계정으로 실행(보안) |
+| | `HEALTHCHECK ... /api/health` | 30초마다 앱이 DB까지 닿는지 확인. `docker ps`에 `(healthy)`로 보임 |
 | | `EXPOSE 8400` / `CMD ...` | 시작할 때 `scripts/migrate.mjs`로 DB를 맞춘 뒤 `next start -p 8400` |
 
 - 이미지에 넣지 않을 파일은 [.dockerignore](../../.dockerignore)에 적습니다(`node_modules`, `.next`, `.env*` 등).
