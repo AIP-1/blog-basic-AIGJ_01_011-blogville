@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "./fixtures";
 
-// 🗺 맛집 지도: 카카오맵 JavaScript SDK는 시험에서 부르지 않는다 — 브라우저가 받는 SDK 주소를 작은 가짜 SDK로 바꿔
+// 🗺 맛집 지도: 카카오맵·네이버 지도 SDK는 시험에서 부르지 않는다 — 브라우저가 받는 SDK 주소를 작은 가짜 SDK로 바꿔
 // 핀·내 위치·말풍선·[지도에서 보기]·[이 지역에서 다시 찾기]가 화면과 이어지는지만 본다.
 // 시험 서버에 열쇠(KAKAO_REST_API_KEY·KAKAO_JS_KEY)가 없으면 지도도 없다 — 그때는 건너뛴다.
 const FAKE_SDK = `
@@ -15,8 +15,22 @@ window.kakao = { maps: {
   event: { addListener(map, name, fn) { (map.handlers ||= {})[name] = fn; } },
 } };`;
 
+// 네이버 지도 v3 가짜 (Marker의 icon.content를 지도 칸에 붙이고, Event.addListener로 누름을 잇는다)
+const FAKE_NAVER = `
+window.naver = { maps: {
+  LatLng: class { constructor(a, b) { this.a = a; this.b = b; } lat() { return this.a; } lng() { return this.b; } },
+  LatLngBounds: class { constructor() {} extend() {} },
+  Point: class { constructor(x, y) { this.x = x; this.y = y; } },
+  Position: { RIGHT_CENTER: 1 },
+  Map: class { constructor(el, o) { this.el = el; this.c = o.center; window.__map = this; } fitBounds() {} panTo(p) { this.c = p; } getCenter() { return this.c; } },
+  Marker: class { constructor(o) { this.el = o.icon.content; o.map.el.appendChild(this.el); } setMap(m) { if (!m) this.el.remove(); } },
+  InfoWindow: class { constructor() {} setContent(c) { this.c = c; } open(map) { if (this.el) this.el.remove(); this.el = this.c; map.el.appendChild(this.el); } close() { if (this.el) this.el.remove(); this.el = null; } },
+  Event: { addListener(t, name, fn) { (t.handlers ||= {})[name] = fn; if (t.el && name === "click" && !(t instanceof window.naver.maps.Map)) t.el.addEventListener("click", fn); } },
+} };`;
+
 async function fakeKakao(page: Page) {
   await page.route("https://dapi.kakao.com/v2/maps/sdk.js**", (route) => route.fulfill({ contentType: "text/javascript", body: FAKE_SDK }));
+  await page.route("https://oapi.map.naver.com/openapi/v3/maps.js**", (route) => route.fulfill({ contentType: "text/javascript", body: FAKE_NAVER }));
 }
 
 test("내 주변: 지도에 내 위치와 번호 핀, 핀·[지도에서 보기]로 말풍선, 지도를 옮기면 [이 지역에서 다시 찾기]", async ({ page }) => {
@@ -36,12 +50,15 @@ test("내 주변: 지도에 내 위치와 번호 핀, 핀·[지도에서 보기]
   const second = page.locator('[data-food-list="near"] > li').nth(2);
   await second.locator("[data-food-focus]").click();
   await expect(map.locator(".food-map-info")).toContainText("3.");
-  await expect(map.locator(".food-map-info a")).toHaveAttribute("target", "_blank");
+  // 말풍선에 네이버 지도·카카오맵 둘 다 (새 탭)
+  await expect(map.locator(".food-map-info a")).toHaveText(["네이버 지도 ›", "카카오맵 ›"]);
+  for (const a of await map.locator(".food-map-info a").all()) await expect(a).toHaveAttribute("target", "_blank");
 
   // 지도를 옮기면(드래그 끝) 다시 찾기 → 지도 가운데 좌표로
   await page.evaluate(() => {
     const m = (window as unknown as { __map: { c: unknown; handlers: Record<string, () => void> } }).__map;
-    m.c = new (window as unknown as { kakao: { maps: { LatLng: new (a: number, b: number) => unknown } } }).kakao.maps.LatLng(35.16, 126.85);
+    const w = window as unknown as { kakao?: { maps: { LatLng: new (a: number, b: number) => unknown } }; naver?: { maps: { LatLng: new (a: number, b: number) => unknown } } };
+    m.c = new (w.naver ?? w.kakao)!.maps.LatLng(35.16, 126.85);
     m.handlers.dragend();
   });
   await page.locator("[data-food-research]").click();

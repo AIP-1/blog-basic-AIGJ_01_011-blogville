@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { NearbyLocator } from "@/components/food/NearbyLocator";
-import { FocusOnMapButton, FoodMap } from "@/components/food/FoodMap";
+import { FocusOnMapButton, FoodMap, type MapProvider } from "@/components/food/FoodMap";
 import { PlaceCard } from "@/components/food/PlaceCard";
 import { ReviewCards } from "@/components/food/ReviewCards";
 import { SaveButton } from "@/components/food/SaveButton";
@@ -33,9 +33,11 @@ export const metadata: Metadata = {
 
 const DEFAULT_REGION = "서울";
 
-/** 🗺 지도용 카카오 JavaScript 키 (없으면 지도 없이 목록만) */
-function mapKey(): string | null {
-  return process.env.KAKAO_JS_KEY || null;
+/** 🗺 지도: 네이버 지도 Client ID가 있으면 네이버, 없으면 카카오 JavaScript 키 (둘 다 없으면 지도 없이 목록만) */
+function mapProvider(): MapProvider | null {
+  if (process.env.NAVER_MAP_CLIENT_ID) return { kind: "naver", key: process.env.NAVER_MAP_CLIENT_ID };
+  if (process.env.KAKAO_JS_KEY) return { kind: "kakao", key: process.env.KAKAO_JS_KEY };
+  return null;
 }
 
 function detailHref(q: string, p: FoodPlace) {
@@ -121,12 +123,12 @@ async function NearTab({ lat, lng, sort }: { lat?: string; lng?: string; sort: "
           <Notice>{FOOD_MESSAGES.nearEmpty}</Notice>
         ) : (
           <>
-            {mapKey() && <FoodMap jsKey={mapKey()!} places={result.value} me={at} researchSort={sort} />}
+            {mapProvider() && <FoodMap provider={mapProvider()!} places={result.value} me={at} researchSort={sort} />}
             <ol className="space-y-3" data-food-list="near">
               {result.value.map((p, i) => (
                 <li key={p.id}>
-                  <PlaceCard place={p} rank={mapKey() ? i + 1 : undefined} recent={naverFoodEnabled() ? p.recent : undefined} detailHref={detailHref(p.name, p)} actions={save(p)} />
-                  {mapKey() && p.lat !== null && <FocusOnMapButton id={p.id} />}
+                  <PlaceCard place={p} rank={mapProvider() ? i + 1 : undefined} recent={naverFoodEnabled() ? p.recent : undefined} detailHref={detailHref(p.name, p)} actions={save(p)} />
+                  {mapProvider() && p.lat !== null && <FocusOnMapButton id={p.id} />}
                 </li>
               ))}
             </ol>
@@ -163,12 +165,12 @@ async function RegionTab({ region }: { region: string }) {
         <Notice>{FOOD_MESSAGES.empty}</Notice>
       ) : (
         <>
-          {mapKey() && result.value.some((p) => p.lat !== null) && <FoodMap jsKey={mapKey()!} places={result.value} />}
+          {mapProvider() && result.value.some((p) => p.lat !== null) && <FoodMap provider={mapProvider()!} places={result.value} />}
           <ol className="space-y-3" data-food-list="region">
             {result.value.map((p, i) => (
               <li key={p.id}>
                 <PlaceCard place={p} recent={p.recent} rank={i + 1} detailHref={detailHref(p.name, p)} actions={save(p)} />
-                {mapKey() && p.lat !== null && <FocusOnMapButton id={p.id} />}
+                {mapProvider() && p.lat !== null && <FocusOnMapButton id={p.id} />}
               </li>
             ))}
           </ol>
@@ -230,7 +232,7 @@ async function PlaceDetailView({ place, backHref, actions }: { place: FoodPlace;
         ← 검색 결과로
       </Link>
       <PlaceCard place={place} recent={d.reviews.status === "ok" ? d.recent : undefined} actions={actions} />
-      {mapKey() && place.lat !== null && <FoodMap jsKey={mapKey()!} places={[place]} />}
+      {mapProvider() && place.lat !== null && <FoodMap provider={mapProvider()!} places={[place]} />}
 
       {d.local.length > 0 && (
         <section aria-labelledby="food-local" className="rounded-xl border border-line bg-surface p-4">

@@ -21,6 +21,7 @@
 #   {KAKAO,NAVER,GOOGLE}_CLIENT_ID, _CLIENT_SECRET (선택) 소셜 로그인 키. 둘 다 있는 서비스만 켜진다
 #   KAKAO_REST_API_KEY (선택) 🍽 맛집 내 주변·식당 찾기. 카카오맵 사용 설정을 켠 앱의 REST API 키
 #   KAKAO_JS_KEY (선택) 🗺 맛집 지도. 같은 앱의 JavaScript 키 (플랫폼 > Web 사이트 도메인에 사이트 주소 등록)
+#   NAVER_MAP_CLIENT_ID (선택) 🗺 맛집 지도를 네이버 지도로. 네이버 클라우드 Maps(Web Dynamic Map) Client ID
 #   FEEDBACK_BOT_TOKEN (선택) 버그·문의 자동 처리 API(/api/feedback)의 열쇠. 32자 이상이면 켜진다
 #
 # 서버에 남는 것 (DEPLOY_DIR 아래)
@@ -66,7 +67,7 @@ for k in KAKAO_CLIENT_ID KAKAO_CLIENT_SECRET NAVER_CLIENT_ID NAVER_CLIENT_SECRET
   if [ -n "$v" ]; then printf '%s=%s\n' "$k" "$v" >> "$DEPLOY_DIR/app.env"; fi
 done
 # 📰 뉴스 위젯·🔎 키워드 도우미·🍽 맛집 (NAVER API HUB, 카카오 로컬): 값이 있는 것만
-for k in NAVER_SEARCH_CLIENT_ID NAVER_SEARCH_CLIENT_SECRET NAVER_TREND_CLIENT_ID NAVER_TREND_CLIENT_SECRET KAKAO_REST_API_KEY KAKAO_JS_KEY; do
+for k in NAVER_SEARCH_CLIENT_ID NAVER_SEARCH_CLIENT_SECRET NAVER_TREND_CLIENT_ID NAVER_TREND_CLIENT_SECRET KAKAO_REST_API_KEY KAKAO_JS_KEY NAVER_MAP_CLIENT_ID; do
   v="${!k:-}"
   if [ -n "$v" ]; then printf '%s=%s\n' "$k" "$v" >> "$DEPLOY_DIR/app.env"; fi
 done
