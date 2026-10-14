@@ -47,3 +47,30 @@ describe("많이 올라온 순 세기 (countsAsBuzz)", () => {
     expect(countsAsBuzz({ title: "광주 쌍촌동 마피아 피자 맛집", summary: "먹었어요" }, mafia)).toBe(true);
   });
 });
+
+describe("다른 지점·동네 글 (otherRegionTitle)", () => {
+  it("광주 식당인데 신촌·세종 지점 글은 빼고, 서울 식당의 홍대 글은 둔다", async () => {
+    const { otherRegionTitle } = await import("@/lib/food-place-match");
+    const { areaWords } = await import("@/lib/food-relevance");
+    const sangmu = { address: "광주 서구 상무중앙로 1" };
+    const local = areaWords(sangmu.address);
+    expect(otherRegionTitle("신촌 초밥 맛집 상무초밥 신촌점", sangmu, local)).toBe(true);
+    expect(otherRegionTitle("세종 나성동 맛집 상무초밥", sangmu, local)).toBe(true);
+    expect(otherRegionTitle("상무지구 상무초밥 점심", sangmu, local)).toBe(false);
+    const seoul = { address: "서울 마포구 와우산로 1" };
+    expect(otherRegionTitle("홍대 맛집 다녀옴", seoul, areaWords(seoul.address))).toBe(false);
+    const merged = { address: "전남광주통합특별시 서구 상무오월로 1" };
+    expect(otherRegionTitle("광주 상무지구 맛집", merged, areaWords(shortCityOf(merged.address)))).toBe(false);
+  });
+});
+function shortCityOf(a: string) {
+  return a.replace(/^전남광주통합특별시/, "광주");
+}
+
+describe("식당 이름 속 지역 낱말", () => {
+  it("세종한정식은 세종 지역 글로 보지 않는다", async () => {
+    const { otherRegionTitle } = await import("@/lib/food-place-match");
+    const p = { name: "세종한정식", address: "광주 북구 우치로 1" };
+    expect(otherRegionTitle("세종한정식 점심 후기", p, ["북구", "우치로", "광주"])).toBe(false);
+  });
+});
