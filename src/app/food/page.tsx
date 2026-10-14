@@ -24,6 +24,8 @@ import {
   FOOD_REGION_TOP,
   FOOD_QUERY_MAX,
   FOOD_REGIONS,
+  FOOD_AREAS,
+  isFoodArea,
   FOOD_TABS,
   isFoodRegion,
   isFoodTab,
@@ -178,6 +180,7 @@ export default async function FoodPage({ searchParams }: PageProps<"/food">) {
           region={
             isFoodRegion(one(sp.region)) ? one(sp.region)! : DEFAULT_REGION
           }
+          area={one(sp.area)}
           kind={
             isFoodKind(one(sp.kind)) ? (one(sp.kind) as FoodKindFilter) : "all"
           }
@@ -342,13 +345,17 @@ async function NearTab({
 
 async function RegionTab({
   region,
+  area: rawArea,
   kind,
 }: {
   region: string;
+  area?: string;
   kind: FoodKindFilter;
 }) {
   if (!naverFoodEnabled()) return <Notice>{FOOD_MESSAGES.off}</Notice>;
-  const result = await regionHot(region);
+  const area = isFoodArea(region, rawArea) ? rawArea : null;
+  const place = area ?? region;
+  const result = await regionHot(place);
   const list =
     result.status === "ok"
       ? result.value
@@ -356,8 +363,8 @@ async function RegionTab({
           .slice(0, FOOD_REGION_TOP)
       : [];
   const save = await saveButtons(list);
-  const href = (r: string, k: FoodKindFilter) =>
-    `/food?tab=region&region=${encodeURIComponent(r)}${k === "all" ? "" : `&kind=${k}`}`;
+  const href = (r: string, k: FoodKindFilter, a: string | null = null) =>
+    `/food?tab=region&region=${encodeURIComponent(r)}${a ? `&area=${encodeURIComponent(a)}` : ""}${k === "all" ? "" : `&kind=${k}`}`;
   return (
     <div className="mt-4 space-y-3">
       <nav aria-label="지역" className="flex flex-wrap gap-1.5">
@@ -372,17 +379,28 @@ async function RegionTab({
           </Link>
         ))}
       </nav>
+      {isFoodRegion(region) && (
+        <Chips
+          label="동네"
+          items={[null, ...FOOD_AREAS[region]].map((a) => ({
+            href: href(region, kind, a),
+            text: a ? `📍 ${a}` : `${region} 전체`,
+            on: a === area,
+            data: `area-${a ?? "all"}`,
+          }))}
+        />
+      )}
       <Chips
         label="분류"
         items={FOOD_KINDS.map((k) => ({
-          href: href(region, k.key),
+          href: href(region, k.key, area),
           text: `${k.icon} ${k.label}`,
           on: k.key === kind,
           data: `kind-${k.key}`,
         }))}
       />
       <p className="text-sm text-ink-soft">
-        {region}에서 후기가 많은 식당·카페를 모아{" "}
+        {place}에서 후기가 많은 식당·카페를 모아{" "}
         <strong className="text-ink">
           최근 한 달 진짜 후기 수와 네이버 검색 관심도
         </strong>

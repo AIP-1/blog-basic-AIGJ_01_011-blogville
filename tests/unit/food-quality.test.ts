@@ -167,3 +167,14 @@ describe("검색 관심도", () => {
     ).toEqual(["b", "a"]);
   });
 });
+
+describe("지역 인기 동네", () => {
+  it("고른 도시의 동네만 받는다", async () => {
+    const { isFoodArea, FOOD_AREAS, FOOD_REGIONS } = await import("@/lib/food");
+    expect(isFoodArea("서울", "성수")).toBe(true);
+    expect(isFoodArea("부산", "성수")).toBe(false);
+    expect(isFoodArea("서울", "<script>")).toBe(false);
+    expect(isFoodArea("없는도시", "성수")).toBe(false);
+    for (const r of FOOD_REGIONS) expect(FOOD_AREAS[r].length).toBeGreaterThan(0);
+  });
+});
