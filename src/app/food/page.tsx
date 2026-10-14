@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { FoodMap } from "@/components/food/FoodMap";
 import { NearbyLocator } from "@/components/food/NearbyLocator";
 import { PlaceCard } from "@/components/food/PlaceCard";
+import { SaveButton } from "@/components/food/SaveButton";
+import { SavedList } from "@/components/food/SavedList";
 import {
   buzzLabel,
+  FOOD_HOT,
   FOOD_MESSAGES,
+  FOOD_RADIUS_M,
   FOOD_QUERY_MAX,
   FOOD_REGIONS,
   FOOD_TABS,
@@ -16,8 +21,11 @@ import {
   type FoodPlace,
   type FoodTab,
 } from "@/lib/food";
+import { loginHref } from "@/lib/safe-next";
 import { formatDate } from "@/lib/time";
-import { foodEnabled, kakaoEnabled, naverFoodEnabled, nearbyPlaces, placeDetail, regionHot, searchPlaces, type FoodResult } from "@/server/food";
+import { getSession } from "@/server/dal";
+import { listSavedPlaces, savedPlaceIds } from "@/server/food-saved";
+import { foodEnabled, kakaoEnabled, kakaoMapKey, naverFoodEnabled, nearbyPlaces, placeDetail, regionHot, searchPlaces, type FoodResult } from "@/server/food";
 
 export const metadata: Metadata = {
   title: "🍽 맛집 | Blogville",
@@ -28,6 +36,20 @@ const DEFAULT_REGION = "서울";
 
 function detailHref(q: string, p: FoodPlace) {
   return `/food?tab=search&q=${encodeURIComponent(q)}&place=${encodeURIComponent(p.id)}`;
+}
+
+/** 보이는 식당마다 [☆ 가고 싶어요] 버튼 (저장했는지 한 번에 묻는다) */
+async function saveButtons(places: FoodPlace[]): Promise<(p: FoodPlace) => React.ReactNode> {
+  const member = await getSession();
+  const saved = await savedPlaceIds(member?.userId ?? null, places.map((p) => p.id));
+  return function save(p) {
+    return <SaveButton place={p} saved={saved.has(p.id)} />;
+  };
+}
+
+/** 지도에 꽂을 핀 (좌표 없는 식당은 뺀다) */
+function pins(list: (FoodPlace & { recent?: number })[]) {
+  return list.flatMap((p) => (p.lat != null && p.lng != null ? [{ id: p.id, name: p.name, lat: p.lat, lng: p.lng, hot: (p.recent ?? 0) >= FOOD_HOT }] : []));
 }
 
 function Notice({ children }: { children: React.ReactNode }) {
@@ -57,7 +79,9 @@ export default async function FoodPage({ searchParams }: PageProps<"/food">) {
           </Link>
         ))}
       </nav>
-      {!foodEnabled() ? (
+      {tab === "saved" ? (
+        <SavedTab />
+      ) : !foodEnabled() ? (
         <Notice>{FOOD_MESSAGES.off}</Notice>
       ) : tab === "near" ? (
         <NearTab lat={one(sp.lat)} lng={one(sp.lng)} sort={one(sp.sort) === "buzz" ? "buzz" : "distance"} />
@@ -75,6 +99,7 @@ async function NearTab({ lat, lng, sort }: { lat?: string; lng?: string; sort: "
   const at = parseCoords(lat, lng);
   const result = at ? await nearbyPlaces(at, sort) : null;
   const base = at ? `/food?tab=near&lat=${at.lat}&lng=${at.lng}` : "";
+  const save = await saveButtons(result?.status === "ok" ? result.value : []);
   return (
     <div className="mt-4 space-y-3">
       <NearbyLocator sort={sort} located={!!at} />
@@ -90,6 +115,9 @@ async function NearTab({ lat, lng, sort }: { lat?: string; lng?: string; sort: "
           )}
         </nav>
       )}
+      {at && kakaoMapKey() && (
+        <FoodMap jsKey={kakaoMapKey()!} me={at} radius={FOOD_RADIUS_M} pins={result?.status === "ok" ? pins(result.value) : []} />
+      )}
       {result &&
         (result.status !== "ok" ? (
           <Notice>{failText(result)}</Notice>
@@ -99,7 +127,7 @@ async function NearTab({ lat, lng, sort }: { lat?: string; lng?: string; sort: "
           <ol className="space-y-3" data-food-list="near">
             {result.value.map((p) => (
               <li key={p.id}>
-                <PlaceCard place={p} recent={naverFoodEnabled() ? p.recent : undefined} detailHref={detailHref(p.name, p)} />
+                <PlaceCard place={p} recent={naverFoodEnabled() ? p.recent : undefined} detailHref={detailHref(p.name, p)} actions={save(p)} />
               </li>
             ))}
           </ol>
@@ -111,6 +139,7 @@ async function NearTab({ lat, lng, sort }: { lat?: string; lng?: string; sort: "
 async function RegionTab({ region }: { region: string }) {
   if (!naverFoodEnabled()) return <Notice>{FOOD_MESSAGES.off}</Notice>;
   const result = await regionHot(region);
+  const save = await saveButtons(result.status === "ok" ? result.value : []);
   return (
     <div className="mt-4 space-y-3">
       <nav aria-label="지역" className="flex flex-wrap gap-1.5">
@@ -133,13 +162,16 @@ async function RegionTab({ region }: { region: string }) {
       ) : result.value.length === 0 ? (
         <Notice>{FOOD_MESSAGES.empty}</Notice>
       ) : (
+        <>
+        {kakaoMapKey() && pins(result.value).length > 0 && <FoodMap jsKey={kakaoMapKey()!} pins={pins(result.value)} />}
         <ol className="space-y-3" data-food-list="region">
           {result.value.map((p, i) => (
             <li key={p.id}>
-              <PlaceCard place={p} recent={p.recent} rank={i + 1} detailHref={detailHref(p.name, p)} />
+              <PlaceCard place={p} recent={p.recent} rank={i + 1} detailHref={detailHref(p.name, p)} actions={save(p)} />
             </li>
           ))}
         </ol>
+        </>
       )}
     </div>
   );
@@ -148,6 +180,7 @@ async function RegionTab({ region }: { region: string }) {
 async function SearchTab({ q, placeId }: { q: string | null; placeId: string | null }) {
   const result = q ? await searchPlaces(q) : null;
   const picked = result?.status === "ok" && placeId ? (result.value.find((p) => p.id === placeId) ?? null) : null;
+  const save = await saveButtons(result?.status === "ok" ? result.value : []);
   return (
     <div className="mt-4 space-y-3">
       <form action="/food" className="flex gap-2" role="search">
@@ -167,7 +200,7 @@ async function SearchTab({ q, placeId }: { q: string | null; placeId: string | n
         </button>
       </form>
       {picked ? (
-        <PlaceDetailView place={picked} backHref={`/food?tab=search&q=${encodeURIComponent(q!)}`} />
+        <PlaceDetailView place={picked} backHref={`/food?tab=search&q=${encodeURIComponent(q!)}`} actions={save(picked)} />
       ) : (
         result &&
         (result.status !== "ok" ? (
@@ -178,7 +211,7 @@ async function SearchTab({ q, placeId }: { q: string | null; placeId: string | n
           <ul className="space-y-3" data-food-list="search">
             {result.value.map((p) => (
               <li key={p.id}>
-                <PlaceCard place={p} detailHref={detailHref(q!, p)} />
+                <PlaceCard place={p} detailHref={detailHref(q!, p)} actions={save(p)} />
               </li>
             ))}
           </ul>
@@ -188,14 +221,15 @@ async function SearchTab({ q, placeId }: { q: string | null; placeId: string | n
   );
 }
 
-async function PlaceDetailView({ place, backHref }: { place: FoodPlace; backHref: string }) {
+async function PlaceDetailView({ place, backHref, actions }: { place: FoodPlace; backHref: string; actions: React.ReactNode }) {
   const d = await placeDetail(place);
   return (
     <div className="space-y-4" data-food-detail={place.id}>
       <Link href={backHref} className="text-sm text-ink-soft hover:underline">
         ← 검색 결과로
       </Link>
-      <PlaceCard place={place} recent={d.reviews.status === "ok" ? d.recent : undefined} />
+      <PlaceCard place={place} recent={d.reviews.status === "ok" ? d.recent : undefined} actions={actions} />
+      {kakaoMapKey() && pins([place]).length > 0 && <FoodMap jsKey={kakaoMapKey()!} pins={pins([place])} />}
 
       {d.local.length > 0 && (
         <section aria-labelledby="food-local" className="rounded-xl border border-line bg-surface p-4">
@@ -249,6 +283,25 @@ async function PlaceDetailView({ place, backHref }: { place: FoodPlace; backHref
       <Link href={reviewWriteHref(place)} className="btn btn-primary w-full justify-center">
         ✏ 이 식당 후기 쓰기
       </Link>
+    </div>
+  );
+}
+
+async function SavedTab() {
+  const member = await getSession();
+  if (!member) {
+    return (
+      <Notice>
+        <Link href={loginHref("/food?tab=saved")} className="font-semibold text-accent underline">
+          로그인
+        </Link>
+        하면 가고 싶은 곳을 모아 볼 수 있어요.
+      </Notice>
+    );
+  }
+  return (
+    <div className="mt-4">
+      <SavedList places={await listSavedPlaces(member.userId)} />
     </div>
   );
 }
