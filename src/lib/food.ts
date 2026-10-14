@@ -178,18 +178,45 @@ export function shortCategory(raw: unknown): string {
   return parts.slice(-2).join(" > ");
 }
 
-/** 주소에서 "광주 서구"처럼 시·구 두 마디 (후기 검색을 좁힐 때 쓴다) */
+/** 주소에서 "광주 서구"처럼 시·구 두 마디 (같은 가게 묶기·지도 검색에 쓴다) */
 export function areaOf(address: string): string {
   return address.split(" ").slice(0, 2).join(" ");
 }
 
-/** 주소 시·도 이름을 짧게: "광주광역시" → "광주" */
+/**
+ * 블로그 후기 검색에 붙일 동네 이름. 블로거가 실제로 쓰는 말로:
+ * 큰 도시는 "광주 서구", 도 아래 시·군은 "목포"·"해남"처럼 시·군 이름만 ("전남 목포시"로 찾으면 거의 안 잡힌다)
+ */
+export function reviewArea(address: string): string {
+  const [first = "", second = ""] = address.split(" ");
+  if (PROVINCES.includes(first) && /^[가-힣]{1,6}(시|군)$/.test(second)) return second.replace(/(시|군)$/, "");
+  return areaOf(address);
+}
+
+const PROVINCES = ["경기", "강원", "충북", "충남", "전북", "전남", "경북", "경남", "제주"];
+const PROVINCE_NAMES: [RegExp, string][] = [
+  [/^경기도/, "경기"],
+  [/^강원(특별자치도|도)/, "강원"],
+  [/^충청북도/, "충북"],
+  [/^충청남도/, "충남"],
+  [/^(전라북도|전북특별자치도)/, "전북"],
+  [/^전라남도/, "전남"],
+  [/^경상북도/, "경북"],
+  [/^경상남도/, "경남"],
+  [/^제주특별자치도/, "제주"],
+];
+const GWANGJU_GU = /^(동구|서구|남구|북구|광산구)$/;
+
+/** 주소 시·도 이름을 짧게: "광주광역시" → "광주", "전라남도" → "전남", "전남광주통합특별시 서구" → "광주 서구", "전남광주통합특별시 목포시" → "전남 목포시" */
 export function shortCity(address: string): string {
-  return address
+  let a = address
     .replace(/^(서울|부산|대구|인천|광주|대전|울산)(특별시|광역시)/, "$1")
-    .replace(/^(세종)특별자치시/, "$1")
-    // 통합 시("전남광주통합특별시")는 블로그에 흔히 쓰는 도시 이름("광주")으로
-    .replace(/^(?:전남|전북|경남|경북|충남|충북|강원|경기)?(서울|부산|대구|인천|광주|대전|울산)?\S*통합특별시/, (m, city) => city ?? m);
+    .replace(/^(세종)특별자치시/, "$1");
+  for (const [re, short] of PROVINCE_NAMES) a = a.replace(re, short);
+  // 2026 통합 시: 광주의 구는 "광주", 옛 전남 시·군은 "전남"으로 (블로그에 흔히 쓰는 말)
+  const m = /^전남광주통합특별시\s+(\S+)/.exec(a);
+  if (m) return a.replace(/^전남광주통합특별시/, GWANGJU_GU.test(m[1]) ? "광주" : "전남");
+  return a.replace(/^(?:전남|전북|경남|경북|충남|충북|강원|경기)?(서울|부산|대구|인천|광주|대전|울산)?\S*통합특별시/, (whole, city) => city ?? whole);
 }
 
 function num(v: unknown): number | null {

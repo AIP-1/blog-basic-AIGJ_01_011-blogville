@@ -11,7 +11,7 @@ import { todayKST } from "@/lib/kst";
 import {
   FOOD_RADIUS_M,
   FOOD_RECENT_CAP,
-  areaOf,
+  reviewArea,
   dedupePlaces,
   parseKakaoPlaces,
   parseNaverPlaces,
@@ -129,7 +129,7 @@ async function mapLimit<T, R>(items: T[], n: number, fn: (x: T) => Promise<R>): 
 }
 
 function reviewQuery(p: Pick<FoodPlace, "name" | "address">): string {
-  return `${p.name} ${areaOf(p.address)}`.trim();
+  return `${p.name} ${reviewArea(p.address)}`.trim();
 }
 
 /**
