@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Pagination } from "@/components/blog/Pagination";
-import { formatDateTime } from "@/lib/comment-rules";
+import { formatDateTime } from "@/lib/time";
 import { formatNumber, LEDGER_PAGE_SIZE, REASON_LABEL } from "@/lib/game";
 import { parsePage } from "@/lib/ids";
 import { requireMember } from "@/server/dal";

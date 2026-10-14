@@ -43,18 +43,19 @@ describe("방명록 알림 (BLOG-10)", () => {
 describe("notificationTime", () => {
   const now = new Date("2026-10-12T03:00:00Z"); // 한국 12시
   const ago = (ms: number) => new Date(now.getTime() - ms);
-  it("방금 · N분 전 · N시간 전 · 하루가 지나면 한국 날짜", () => {
-    expect(notificationTime(ago(0), now)).toBe("방금");
-    expect(notificationTime(ago(59_999), now)).toBe("방금");
+  it("공통 상대 시각 (lib/time relativeTime)", () => {
+    expect(notificationTime(ago(0), now)).toBe("방금 전");
+    expect(notificationTime(ago(59_999), now)).toBe("방금 전");
     expect(notificationTime(ago(60_000), now)).toBe("1분 전");
     expect(notificationTime(ago(59 * 60_000), now)).toBe("59분 전");
     expect(notificationTime(ago(60 * 60_000), now)).toBe("1시간 전");
-    expect(notificationTime(ago(23 * 3_600_000 + 59 * 60_000), now)).toBe("23시간 전");
-    expect(notificationTime(ago(24 * 3_600_000), now)).toBe("2026.10.11");
+    expect(notificationTime(ago(11 * 3_600_000 + 59 * 60_000), now)).toBe("11시간 전");
+    expect(notificationTime(ago(12 * 3_600_000 + 60_000), now)).toBe("어제 23:59");
+    expect(notificationTime(ago(24 * 3_600_000), now)).toBe("어제 12:00");
     // UTC로는 10월 1일 16시지만 한국은 10월 2일 1시
-    expect(notificationTime(new Date("2026-10-01T16:00:00Z"), now)).toBe("2026.10.02");
+    expect(notificationTime(new Date("2026-10-01T16:00:00Z"), now)).toBe("2026.10.02 01:00");
   });
   it("시계가 어긋나 미래면 방금", () => {
-    expect(notificationTime(new Date(now.getTime() + 5_000), now)).toBe("방금");
+    expect(notificationTime(new Date(now.getTime() + 5_000), now)).toBe("방금 전");
   });
 });

@@ -58,19 +58,3 @@ export function checkComment(raw: string): { ok: true; content: string } | { ok:
   if (codePointLength(content) > COMMENT_MAX) return { ok: false, error: COMMENT_ERRORS.tooLong };
   return { ok: true, content };
 }
-
-const dateTimeFormat = new Intl.DateTimeFormat("ko-KR", {
-  timeZone: "Asia/Seoul",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  hourCycle: "h23",
-});
-
-/** `2026. 10. 02. 14:07` (한국 시간, 24시간) */
-export function formatDateTime(date: Date): string {
-  const p = Object.fromEntries(dateTimeFormat.formatToParts(date).map((x) => [x.type, x.value]));
-  return `${p.year}. ${p.month}. ${p.day}. ${p.hour}:${p.minute}`;
-}

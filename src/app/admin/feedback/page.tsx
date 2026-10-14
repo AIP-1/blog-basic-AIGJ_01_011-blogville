@@ -3,7 +3,7 @@ import Link from "next/link";
 import { FeedbackAdminForm } from "@/components/admin/FeedbackAdminForm";
 import { Pagination } from "@/components/blog/Pagination";
 import { FeedbackStatusBadge } from "@/components/support/FeedbackStatusBadge";
-import { formatDateTime } from "@/lib/comment-rules";
+import { formatDateTime } from "@/lib/time";
 import { parsePage } from "@/lib/ids";
 import { ADMIN_FEEDBACK_PAGE_SIZE, FEEDBACK_KIND_LABELS, FEEDBACK_STATUS_LABELS, FEEDBACK_STATUSES, isFeedbackStatus } from "@/lib/support-rules";
 import { requireAdmin } from "@/server/dal";

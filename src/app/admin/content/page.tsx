@@ -5,7 +5,7 @@ import { AdminActionForm } from "@/components/admin/AdminActionForm";
 import { BulkDeleteForm } from "@/components/admin/BulkDeleteForm";
 import { Pagination } from "@/components/blog/Pagination";
 import { ADMIN_PAGE_SIZE, CONTENT_TAB_LABELS, CONTENT_TABS, parseContentTab, REASON_MAX, snippet, type ContentTab } from "@/lib/admin-rules";
-import { formatDateTime } from "@/lib/comment-rules";
+import { formatDateTime } from "@/lib/time";
 import { parsePage } from "@/lib/ids";
 import { listCommentsForAdmin, listGuestbookForAdmin, listPostsForAdmin } from "@/server/admin-tools";
 import { requireAdmin } from "@/server/dal";

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatDate } from "@/lib/text";
+import { Time } from "@/components/common/Time";
 
 type Item = { id: number; title: string; createdAt: Date };
 
@@ -21,7 +21,7 @@ export function CategoryPosts({ slug, categoryName, href, items }: { slug: strin
           <li key={p.id}>
             <Link href={`/@${slug}/${p.id}`} className="flex min-h-11 items-center justify-between gap-3 px-1 py-2 hover:bg-ink/5">
               <span className="min-w-0 truncate">{p.title}</span>
-              <span className="shrink-0 text-sm text-ink-soft">{formatDate(p.createdAt)}</span>
+              <Time date={p.createdAt} className="shrink-0 text-sm text-ink-soft" />
             </Link>
           </li>
         ))}

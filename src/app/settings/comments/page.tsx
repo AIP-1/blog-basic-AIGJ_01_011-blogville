@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Pagination } from "@/components/blog/Pagination";
 import { CommentRowDelete } from "@/components/settings/CommentRowDelete";
-import { formatDateTime } from "@/lib/comment-rules";
+import { formatDateTime } from "@/lib/time";
 import { parsePage } from "@/lib/ids";
 import { excerpt } from "@/lib/text";
 import { listBlogComments, MANAGE_COMMENTS_PAGE_SIZE } from "@/server/comments";

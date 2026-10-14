@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Post } from "@/db/schema";
 import { firstImageUrl, thumbUrl } from "@/lib/attachments";
 import { scheduleLabel } from "@/lib/schedule";
-import { formatDate } from "@/lib/text";
+import { Time } from "@/components/common/Time";
 
 type Props = { slug: string; post: Post; commentCount?: number; likeCount?: number };
 
@@ -18,7 +18,7 @@ export function PostListRow({ slug, post, commentCount = 0, likeCount = 0 }: Pro
         <span className="shrink-0 text-sm text-ink-soft">
           <span aria-label={`공감 ${likeCount}`}>♥ {likeCount}</span>
           {commentCount > 0 && <span aria-label={`댓글 ${commentCount}개`}> · 💬 {commentCount}</span>}
-          <span className="max-sm:hidden"> · {formatDate(post.createdAt)}</span>
+          <span className="max-sm:hidden"> · <Time date={post.createdAt} /></span>
         </span>
       </Link>
     </li>
@@ -45,7 +45,7 @@ export function PostGalleryTile({ slug, post, likeCount = 0 }: Props) {
             {post.title}
           </span>
           <span className="mt-1 block text-sm text-ink-soft">
-            {formatDate(post.createdAt)} · <span aria-label={`공감 ${likeCount}`}>♥ {likeCount}</span>
+            <Time date={post.createdAt} /> · <span aria-label={`공감 ${likeCount}`}>♥ {likeCount}</span>
           </span>
         </span>
       </Link>

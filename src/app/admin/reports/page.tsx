@@ -4,7 +4,7 @@ import { adminReportBlind, adminReportDelete, adminReportDismiss } from "@/app/a
 import { AdminActionForm } from "@/components/admin/AdminActionForm";
 import { Pagination } from "@/components/blog/Pagination";
 import { ADMIN_PAGE_SIZE, REASON_MAX, snippet } from "@/lib/admin-rules";
-import { formatDateTime } from "@/lib/comment-rules";
+import { formatDateTime } from "@/lib/time";
 import { parsePage } from "@/lib/ids";
 import { REPORT_REASON_LABELS, REPORT_TARGET_LABELS, summarizeReasons, type ReportReason } from "@/lib/report-rules";
 import { requireAdmin } from "@/server/dal";

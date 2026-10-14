@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Pagination } from "@/components/blog/Pagination";
 import { parsePage } from "@/lib/ids";
 import { hasNewRelease, RELEASES_PAGE_SIZE, RELEASES_REPO, releaseSummary, releaseTitle } from "@/lib/releases";
-import { formatDate } from "@/lib/text";
+import { Time } from "@/components/common/Time";
 import { listReleases } from "@/server/releases";
 
 export const metadata: Metadata = { title: "업데이트 소식 | Blogville", description: "Blogville에 새로 생긴 것들 (릴리스 노트)" };
@@ -49,7 +49,7 @@ export default async function UpdatesPage({ searchParams }: PageProps<"/updates"
                     )}
                   </span>
                   <span className="block text-sm text-ink-soft">
-                    <time dateTime={r.publishedAt.toISOString()}>{formatDate(r.publishedAt)}</time>
+                    <Time date={r.publishedAt} />
                   </span>
                   {releaseSummary(r.html) && <span className="block text-sm">{releaseSummary(r.html)}</span>}
                 </Link>

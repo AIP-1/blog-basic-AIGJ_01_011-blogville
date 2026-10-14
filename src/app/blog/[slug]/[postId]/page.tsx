@@ -25,7 +25,7 @@ import { hasPostReward } from "@/server/points";
 import { showsPublishNotice } from "@/lib/post-rules";
 import { loginHref } from "@/lib/safe-next";
 import { scheduleLabel } from "@/lib/schedule";
-import { formatDate } from "@/lib/text";
+import { Time } from "@/components/common/Time";
 import { renderPostHtml } from "@/lib/post-render";
 import { readingMinutes, TOC_MIN_HEADINGS } from "@/lib/reader";
 import { getBlogBySlug } from "@/server/blog";
@@ -134,7 +134,7 @@ export default async function PostPage({ params, searchParams }: PageProps<"/blo
           {post.title}
         </h1>
         <p className="mt-2 text-sm text-ink-soft">
-          {nickname} · {formatDate(post.createdAt)}
+          {nickname} · <Time date={post.createdAt} absolute />
           {edited && " · 수정됨"}
           {` · 약 ${readingMinutes(post.contentText)}분 읽기`}
           {" · "}

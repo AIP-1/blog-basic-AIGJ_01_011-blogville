@@ -9,16 +9,3 @@ export function excerpt(text: string, max = 120): string {
   const chars = [...flat];
   return chars.length > max ? chars.slice(0, max).join("") + "…" : flat;
 }
-
-const dateFormat = new Intl.DateTimeFormat("ko-KR", {
-  timeZone: "Asia/Seoul",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
-
-/** `2026.10.11` (한국 시간) */
-export function formatDate(date: Date): string {
-  const parts = Object.fromEntries(dateFormat.formatToParts(date).map((p) => [p.type, p.value]));
-  return `${parts.year}.${parts.month}.${parts.day}`;
-}

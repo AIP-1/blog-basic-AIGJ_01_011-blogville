@@ -1,6 +1,7 @@
 // 관리자 회원·콘텐츠·사이트 관리 규칙 (ADM-01~07, specs/058-admin-tools). 서버와 단위 시험이 같이 쓰는 순수 함수만 둔다.
 import { z } from "zod";
 import { safeNext } from "./safe-next";
+import { formatDateTime } from "./time";
 
 export const ADMIN_PAGE_SIZE = 20;
 export const REASON_MAX = 200;
@@ -60,18 +61,8 @@ export function isPermanent(until: Date): boolean {
   return until.getTime() >= PERMANENT_UNTIL.getTime();
 }
 
-/** 한국 시간 `2026. 10. 20. 15:00` */
-export function formatKST(d: Date): string {
-  return d.toLocaleString("ko-KR", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  });
-}
+/** 한국 시간 `2026.10.20 15:00` */
+export const formatKST = formatDateTime;
 
 /** 로그인 화면·관리자 화면의 정지 문구: `이용이 정지된 계정이에요 (2026. 10. 20. 15:00까지, 사유: 도배)` */
 export function suspendedMessage(until: Date, reason: string | null): string {

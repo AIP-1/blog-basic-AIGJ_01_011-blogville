@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { addComment, addReply, deleteComment, deleteReply, updateComment, updateReply, type CommentResult } from "@/app/blog/actions";
-import { COMMENT_MAX, formatDateTime, SECRET_PLACEHOLDER } from "@/lib/comment-rules";
+import { COMMENT_MAX, SECRET_PLACEHOLDER } from "@/lib/comment-rules";
+import { formatDateTime } from "@/lib/time";
+import { Time } from "@/components/common/Time";
 import { confirmFirst } from "@/lib/confirm-action";
 import type { CommentLine, CommentThreadItem } from "@/server/comments";
 import { ReportButton } from "./ReportButton";
@@ -126,9 +128,7 @@ function Line({ line, kind, anchor, remove, edit, children }: LineProps) {
           ) : (
             <span className="font-bold text-ink-soft">{line.nickname ?? "알 수 없음"}</span>
           )}
-          <time dateTime={line.createdAt.toISOString()} className="text-ink-soft">
-            {formatDateTime(line.createdAt)}
-          </time>
+          <Time date={line.createdAt} className="text-ink-soft" />
           {line.editedAt && (
             <span className="text-ink-soft" title={`${formatDateTime(line.editedAt)}에 수정`}>
               (수정됨)
