@@ -7,8 +7,8 @@ import { countBuzz, dongFromRegion, parseDaumBlogs, interestGrowth, interestKeyw
 import { detectSponsor, pickOgImage, reviewFetchUrl, sponsorImageUrls } from "@/lib/food-sponsor";
 import { queueSponsorOcr, sponsorOcrState } from "@/server/food-ocr";
 import { placeKind, type FoodKind, type FoodKindFilter } from "@/lib/food-kind";
-import { areaWords, relevantReviews, reviewVerdict, REVIEW_DAYS, REVIEW_PAGE_SIZE } from "@/lib/food-relevance";
-import { bodyMatch, otherRegionTitle, type BodyMatch } from "@/lib/food-place-match";
+import { areaWords, reviewVerdict, REVIEW_DAYS, REVIEW_PAGE_SIZE } from "@/lib/food-relevance";
+import { bodyMatch, otherRegionTitle, type BodyMatch, type HiddenReason } from "@/lib/food-place-match";
 import { todayKST } from "@/lib/kst";
 import {
   FOOD_RADIUS_M,
@@ -468,7 +468,7 @@ export type PlaceDetail = {
   /** 이름만 같고 다른 이야기라 뺀 글 수 */
   reviewHidden: number;
   /** 뺀 글 몇 편과 그 까닭 (확인용, 많아야 10편) */
-  hiddenSample: { title: string; url: string; reason: "spam" | "no-name" | "off-topic" }[];
+  hiddenSample: { title: string; url: string; reason: HiddenReason }[];
   /** 거른 뒤 곳마다 후기 수 */
   sourceCounts: Record<ReviewSource, number>;
   recent: number;
@@ -580,12 +580,16 @@ export async function placeDetail(place: FoodPlace, page = 1, source: ReviewSour
           const { all } = await yearReviews(place);
           // 제목·요약으로 거르고, 본문을 이미 읽어 그 식당 이야기가 아니라고 본 글도 뺀다
           const local = areaWords(shortCity(place.address));
-          const kept = relevantReviews(all, place).filter((r) => knownBody(place, r.url) !== "mismatch" && !otherRegionTitle(r.title, place, local));
+          const hiddenWhy = (r: FoodReview): HiddenReason | null => {
+            const v = reviewVerdict(r, place);
+            if (!v.keep) return v.reason;
+            if (otherRegionTitle(r.title, place, local)) return "other-region";
+            return knownBody(place, r.url) === "mismatch" ? "body" : null;
+          };
+          const judged = all.map((r) => ({ r, why: hiddenWhy(r) }));
+          const kept = judged.flatMap(({ r, why }) => (why ? [] : [r]));
           reviewHidden = all.length - kept.length;
-          hiddenSample = all
-            .map((r) => ({ r, v: reviewVerdict(r, place) }))
-            .flatMap(({ r, v }) => (v.keep ? [] : [{ title: r.title, url: r.url, reason: v.reason }]))
-            .slice(0, 10);
+          hiddenSample = judged.flatMap(({ r, why }) => (why ? [{ title: r.title, url: r.url, reason: why }] : [])).slice(0, 10);
           sourceCounts = { naver: 0, daum: 0, cafe: 0 };
           for (const r of kept) sourceCounts[r.source ?? "naver"]++;
           const shown = source === "all" ? kept : kept.filter((r) => (r.source ?? "naver") === source);

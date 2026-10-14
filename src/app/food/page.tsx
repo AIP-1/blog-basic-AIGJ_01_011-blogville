@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { NearbyLocator } from "@/components/food/NearbyLocator";
 import { PendingHint } from "@/components/food/PendingHint";
-import { VERDICT_LABELS } from "@/lib/food-relevance";
+import { HIDDEN_LABELS } from "@/lib/food-place-match";
 import { REVIEW_SOURCES, type ReviewSource } from "@/lib/food";
 import {
   FOOD_KINDS,
@@ -801,7 +801,7 @@ async function PlaceDetailRest({ place, page, source, backHref }: DetailProps) {
         ) : d.reviews.value.length === 0 ? (
           <p className="mt-2 text-sm text-ink-soft" data-review-empty>
             {d.reviewHidden > 0
-              ? `최근 1년 글 ${d.reviewHidden}편을 찾았지만 이름만 같거나 광고로 보여서 뺐어요. 첫 후기를 남겨 보세요!`
+              ? `최근 1년 글 ${d.reviewHidden}편을 찾았지만 그 식당 이야기가 아니어서 뺐어요. 첫 후기를 남겨 보세요!`
               : "최근 1년 안에 네이버·티스토리·다음에 올라온 후기가 없어요. 첫 후기를 남겨 보세요!"}
           </p>
         ) : (
@@ -823,7 +823,7 @@ async function PlaceDetailRest({ place, page, source, backHref }: DetailProps) {
             <p className="mt-1 text-xs text-ink-soft" data-review-count>
               최근 1년 · 그 식당 이야기로 보이는 글 {d.reviewTotal}편
               {d.reviewHidden > 0 &&
-                ` · 이름만 같거나 광고로 보이는 글 ${d.reviewHidden}편은 뺐어요`}
+                ` · 그 식당 이야기가 아닌 글(이름만 같음·광고·다른 지역 등) ${d.reviewHidden}편은 뺐어요`}
             </p>
             <ReviewCards reviews={d.reviews.value} />
             {d.hiddenSample.length > 0 && (
@@ -839,7 +839,7 @@ async function PlaceDetailRest({ place, page, source, backHref }: DetailProps) {
                   {d.hiddenSample.map((h) => (
                     <li key={h.url} className="flex items-center gap-2">
                       <span className="shrink-0 rounded-full border border-line px-1.5 text-xs text-ink-soft">
-                        {VERDICT_LABELS[h.reason]}
+                        {HIDDEN_LABELS[h.reason]}
                       </span>
                       <a
                         href={h.url}
