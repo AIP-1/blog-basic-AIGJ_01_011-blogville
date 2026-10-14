@@ -21,6 +21,9 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write  # 이미지 저장소(GHCR)에 올리기
     steps:
       - uses: actions/checkout@v4
 
@@ -135,3 +138,22 @@ jobs:
           envs: DATABASE_URL,APP_URL,IMAGE,ADMIN_USERNAME,ADMIN_PASSWORD,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,NAVER_CLIENT_ID,NAVER_CLIENT_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,NAVER_SEARCH_CLIENT_ID,NAVER_SEARCH_CLIENT_SECRET,FEEDBACK_BOT_TOKEN
           command_timeout: 10m
           script: bash ~/blogville/run.sh
+
+      # 배포가 끝난 뒤, 같은 이미지를 GitHub 이미지 저장소(GHCR)에도 버전 꼬리표를 붙여 올린다.
+      # docker pull ghcr.io/handsomeguen/blogville:<버전>으로 운영과 같은 이미지를 받아 띄워 볼 수 있다.
+      # 실패해도 배포는 이미 끝났으므로 deploy를 빨갛게 만들지 않는다.
+      - name: 이미지 저장소(GHCR)에 올리기
+        if: github.repository == 'handsomeguen/blogville'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPO="ghcr.io/${GITHUB_REPOSITORY,,}"
+          VERSION=$(node -p "require('./package.json').version")
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          for tag in "${GITHUB_SHA::7}" "$VERSION" latest; do
+            docker tag "$IMAGE" "$REPO:$tag"
+            docker push -q "$REPO:$tag"
+          done
+          echo "### 이미지 저장소" >> "$GITHUB_STEP_SUMMARY"
+          echo "docker pull $REPO:$VERSION (꼬리표: ${GITHUB_SHA::7}, $VERSION, latest)" >> "$GITHUB_STEP_SUMMARY"

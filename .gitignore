@@ -47,3 +47,6 @@ next-env.d.ts
 
 # 첨부 파일 (002)
 /storage/
+
+# SonarQube 분석 임시 파일
+/.scannerwork/

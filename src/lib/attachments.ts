@@ -150,7 +150,7 @@ export function firstImageUrl(html: string): string | null {
 export function extractFileKeys(html: string): string[] {
   const keys = new Set<string>();
   for (const m of html.matchAll(/(?:src|href)\s*=\s*["']?\/files\/([0-9a-f]{32})["'\s>]/gi)) keys.add(m[1]);
-  return [...keys].sort();
+  return [...keys].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 }
 
 /**
