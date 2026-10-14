@@ -30,7 +30,13 @@ export async function getBlogSidebar(blogId: number, viewerIsOwner: boolean, vie
     : sql`((r.is_secret or c.is_secret) and not (${mine(sql`r.author_id`)} or ${mine(sql`c.author_id`)}))`;
 
   const [recent, popular, recentComments, blogTags, guestbookCount] = await Promise.all([
-    db.select(postLink).from(posts).where(visible).orderBy(desc(posts.createdAt), desc(posts.id)).limit(SIDEBAR_POSTS),
+    // 크게 보일 때 작은 사진: 본문의 첫 사진 키 (firstImageUrl과 같은 규칙)
+    db
+      .select({ ...postLink, createdAt: posts.createdAt, imageKey: sql<string | null>`substring(${posts.contentHtml} from '<img[^>]*src="/files/([0-9a-f]{32})"')` })
+      .from(posts)
+      .where(visible)
+      .orderBy(desc(posts.createdAt), desc(posts.id))
+      .limit(SIDEBAR_POSTS),
     db
       .select({ ...postLink, viewCount: posts.viewCount })
       .from(posts)

@@ -1,14 +1,14 @@
 import { expect, test } from "./fixtures";
 import { signUpOk } from "./helpers";
 
-// 📈 관심 종목: 블로그 설정에서 찾아 넣고 빼고, 블로그 홈 옆 칸에서 5초마다 시세가 바뀐다.
+// 📈 관심 종목: 블로그 설정에서 찾아 넣고 빼고, 블로그 홈 옆 칸에서 실시간 스트림(SSE)으로 시세가 바뀐다.
 // 네이버 증권은 시험에서 부르지 않는다 — 브라우저가 부르는 검색·시세 주소를 가짜 응답으로 바꾼다.
 test.describe.configure({ timeout: 60_000 });
 
 const SAMSUNG = { market: "KR", code: "005930", name: "삼성전자" };
 const APPLE = { market: "US", code: "AAPL.O", name: "애플" };
 
-test("종목을 찾아 넣으면 옆 칸에 보이고 5초마다 시세가 바뀌며, 빼면 사라진다", async ({ page, browser }) => {
+test("종목을 찾아 넣으면 옆 칸에 보이고 실시간 스트림으로 시세가 바뀌며, 빼면 사라진다", async ({ page, browser }) => {
   const me = await signUpOk(page);
 
   // 종목이 없으면 주인에게만 안내, 방문자에게는 위젯이 없다
@@ -34,24 +34,24 @@ test("종목을 찾아 넣으면 옆 칸에 보이고 5초마다 시세가 바�
   await expect(card.locator('[data-my-stock="AAPL.O"]')).toBeVisible();
   await expect(card.getByText("넣은 종목 2/10")).toBeVisible();
 
-  // 옆 칸: 넣은 순서, 5초 뒤 새 시세 (오르면 ▲, 내리면 ▼)
+  // 옆 칸: 넣은 순서, 스트림으로 새 시세 (오르면 ▲, 내리면 ▼)
   let calls = 0;
-  await visitor.route("**/api/stocks/quotes?**", (route) => {
+  const quotes = [
+    { ...SAMSUNG, price: 71000, change: 500, rate: 0.71, currency: "KRW", status: "OPEN" },
+    { ...APPLE, price: 227.5, change: -1.25, rate: -0.55, currency: "USD", status: "OPEN" },
+  ];
+  await visitor.route("**/api/stocks/stream?**", (route) => {
     calls++;
     return route.fulfill({
-      json: {
-        quotes: [
-          { ...SAMSUNG, price: 71000, change: 500, rate: 0.71, currency: "KRW", status: "OPEN" },
-          { ...APPLE, price: 227.5, change: -1.25, rate: -0.55, currency: "USD", status: "OPEN" },
-        ],
-      },
+      headers: { "content-type": "text/event-stream" },
+      body: `retry: 60000\n\ndata: ${JSON.stringify({ quotes, at: new Date().toISOString() })}\n\n`,
     });
   });
   await visitor.goto(`/@${me}`);
   const widget = visitor.locator("[data-stock-widget]");
   await expect(widget.locator("[data-stock]")).toHaveCount(2);
   await expect(widget.locator("[data-stock]").first()).toContainText("삼성전자");
-  await expect(widget.locator('[data-stock="005930"] [data-stock-price]')).toHaveText("71,000", { timeout: 12_000 });
+  await expect(widget.locator('[data-stock="005930"] [data-stock-price]')).toHaveText("71,000", { timeout: 10_000 });
   await expect(widget.locator('[data-stock="005930"] [data-stock-change]')).toHaveText("▲ 500 (+0.71%)");
   await expect(widget.locator('[data-stock="AAPL.O"] [data-stock-price]')).toHaveText("$227.50");
   await expect(widget.locator('[data-stock="AAPL.O"] [data-stock-change]')).toHaveText("▼ 1.25 (-0.55%)");

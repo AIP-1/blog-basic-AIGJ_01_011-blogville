@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  jsonb,
   check,
   date,
   foreignKey,
@@ -260,6 +261,8 @@ export const blogs = pgTable(
     listStyle: text("list_style"),
     // 블로그 홈 맨 위 커버 사진의 첨부 키 (블로그 꾸미기). NULL이면 없음
     coverKey: text("cover_key"),
+    // 옆 칸 위젯 순서·보이기·크기와 날씨 기본 도시 (src/lib/widgets.ts layoutOf로 읽는다). NULL이면 기본 배치
+    widgetLayout: jsonb("widget_layout"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

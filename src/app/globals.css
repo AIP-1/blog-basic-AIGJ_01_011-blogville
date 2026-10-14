@@ -150,6 +150,8 @@ body {
 /* 블로그 홈 옆 칸 (BLOG-09) */
 .widget { border: 1px solid var(--line); border-radius: 0.75rem; background: var(--surface); padding: 0.75rem; }
 .widget-title { padding: 0.25rem 0.5rem 0.5rem; font-weight: 700; }
+/* 위젯이 아무것도 그리지 않으면(종목 없는 방문자 등) 칸도 없앤다 */
+[data-widget-slot]:empty { display: none; }
 
 /* 첨부 (POST-07·09) */
 .prose-post img { display: block; max-width: 100%; height: auto; border-radius: 0.5rem; }

@@ -27,7 +27,8 @@ import { listFeed } from "@/server/feed";
 import { countFollowers, isFollowing } from "@/server/follows";
 import { countMyPosts, listBlogPosts, PAGE_SIZE } from "@/server/post";
 import { getBlogSidebar } from "@/server/sidebar";
-import { getBlogVisitStats } from "@/server/stats";
+import { getBlogVisitDays, getBlogVisitStats } from "@/server/stats";
+import { layoutOf } from "@/lib/widgets";
 
 export async function generateMetadata({ params }: PageProps<"/blog/[slug]">): Promise<Metadata> {
   const found = await getBlogBySlug((await params).slug);
@@ -73,7 +74,9 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
   const tag = search || searchParam === "empty" ? null : parseTagFilter(query.tag);
   const filtered = townMode || search !== null || tag !== null || searchParam === "empty";
 
-  const [{ items, total }, townFeed, townBlogs, { total: allTotal }, sidebar, visits, myPostCount, followers, following, avatar, ownerWallet, placed, owned] = await Promise.all([
+  const layout = layoutOf(blog.widgetLayout);
+  const visitWidget = layout.items.find((it) => it.key === "visits");
+  const [{ items, total }, townFeed, townBlogs, { total: allTotal }, sidebar, visits, myPostCount, followers, following, avatar, ownerWallet, placed, owned, visitDays] = await Promise.all([
     townMode || searchParam === "empty"
       ? { items: [], total: 0 }
       : listBlogPosts(blog.id, { viewerIsOwner: isOwner, categoryId, subcategoryId: subId, search, tag, page }),
@@ -93,6 +96,8 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
     getWallet(blog.ownerId),
     getPlacedFurniture(blog.ownerId),
     isOwner ? getOwnedFurniture(blog.ownerId) : null,
+    // 👣 방문자를 크게 보일 때만 최근 7일
+    visitWidget?.visible && visitWidget.size === "lg" ? getBlogVisitDays(blog.id) : null,
   ]);
   const house = houseInfo(ownerWallet.progress.level);
   const listStyle = listStyleOf(blog.listStyle);
@@ -209,7 +214,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
         roof={isOwner ? { current: currentRoof(blog.id, blog.roofColor), order: roofOrder(blog.id), unlocked: unlockedRoofCount(house.stage) } : null}
       />
 
-      <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_260px] lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_270px] lg:grid-cols-[minmax(0,1fr)_320px]">
         <section aria-labelledby="list-title" className="min-w-0">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 id="list-title" className="text-lg font-bold">
@@ -316,6 +321,8 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
           visits={visits}
           recordVisit={!isOwner}
           isOwner={isOwner}
+          layout={layout}
+          visitDays={visitDays}
           search={search ?? ""}
           townSearch={isOwner ? (town ?? "") : undefined}
           activeTag={tag}

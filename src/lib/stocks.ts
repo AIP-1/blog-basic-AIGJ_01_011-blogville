@@ -15,7 +15,12 @@ export type StockQuote = StockItem & {
 };
 
 export const STOCK_MAX = 10;
+/** 스트림이 끊겼을 때 대신 묻는 간격 */
 export const STOCK_REFRESH_MS = 5_000;
+/** 서버가 실시간 스트림으로 새 시세를 확인하는 간격 */
+export const STOCK_STREAM_MS = 1_500;
+/** 스트림 한 번의 길이: 끝나면 브라우저가 바로 다시 붙는다 (오래된 연결이 쌓이지 않게) */
+export const STOCK_STREAM_LIFETIME_MS = 5 * 60_000;
 export const STOCK_ERRORS = {
   invalid: "이 종목은 넣을 수 없어요. 검색 결과에서 골라 주세요.",
   full: `관심 종목은 ${STOCK_MAX}개까지 넣을 수 있어요.`,

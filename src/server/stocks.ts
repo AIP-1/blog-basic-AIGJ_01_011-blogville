@@ -10,7 +10,8 @@ import { parseNaverQuote, parseNaverSearchItem, STOCK_ERRORS, STOCK_MAX, type St
 // 시험은 STOCK_QUOTE_BASE·STOCK_SEARCH_BASE로 가짜 서버를 가리킨다.
 const QUOTE_BASE = () => process.env.STOCK_QUOTE_BASE ?? "https://polling.finance.naver.com";
 const SEARCH_BASE = () => process.env.STOCK_SEARCH_BASE ?? "https://ac.stock.naver.com";
-const QUOTE_TTL_MS = 4_000;
+// 실시간 스트림(1.5초마다)이 같은 종목을 여러 화면에 보내도 네이버에는 종목마다 1초에 한 번만 묻는다
+const QUOTE_TTL_MS = 1_000;
 const SEARCH_TTL_MS = 60_000;
 const TIMEOUT_MS = 3_000;
 const HEADERS = {
