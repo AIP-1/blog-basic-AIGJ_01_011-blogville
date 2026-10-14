@@ -97,3 +97,30 @@ describe("🍽 맛집 규칙", () => {
     );
   });
 });
+
+import { detectSponsor, pickOgImage, reviewFetchUrl } from "@/lib/food-sponsor";
+
+describe("🍽 후기 카드: 협찬·사진", () => {
+  it("협찬 문구·체험단 배너를 찾고, '협찬 아님'·내돈내산은 협찬이 아니다", () => {
+    expect(detectSponsor("<p>맛있어요</p><p>본 포스팅은 업체로부터 식사를 제공받아 작성했습니다</p>")).toBe("sponsored");
+    expect(detectSponsor("<p>소정의 원고료를 받았습니다</p>")).toBe("sponsored");
+    expect(detectSponsor('<img src="https://www.revu.net/banner.png">')).toBe("sponsored");
+    expect(detectSponsor("<p>#내돈내산 후기에요. 협찬 아님!</p>")).toBe("self");
+    expect(detectSponsor("<p>그냥 맛있었어요</p>")).toBeNull();
+  });
+
+  it("og:image는 https로만, 이상한 값은 버린다", () => {
+    expect(pickOgImage('<meta property="og:image" content="http://blogthumb.pstatic.net/a.jpg?type=w2&amp;x=1">')).toBe("https://blogthumb.pstatic.net/a.jpg?type=w2&x=1");
+    expect(pickOgImage('<meta content="https://x/y.png" property="og:image">')).toBe("https://x/y.png");
+    expect(pickOgImage('<meta property="og:image" content="javascript:alert(1)">')).toBeNull();
+    expect(pickOgImage("<p>없음</p>")).toBeNull();
+  });
+
+  it("서버가 열 주소: 네이버 블로그는 모바일로, 모르는 사이트는 안 연다", () => {
+    expect(reviewFetchUrl("https://blog.naver.com/abc_1/223456789")).toBe("https://m.blog.naver.com/abc_1/223456789");
+    expect(reviewFetchUrl("https://blog.naver.com/PostView.naver?blogId=abc&logNo=12")).toBe("https://m.blog.naver.com/abc/12");
+    expect(reviewFetchUrl("https://foo.tistory.com/12?x=1")).toBe("https://foo.tistory.com/12");
+    expect(reviewFetchUrl("http://169.254.169.254/latest")).toBeNull();
+    expect(reviewFetchUrl("https://evil.example.com/a")).toBeNull();
+  });
+});

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { NearbyLocator } from "@/components/food/NearbyLocator";
 import { FocusOnMapButton, FoodMap } from "@/components/food/FoodMap";
 import { PlaceCard } from "@/components/food/PlaceCard";
+import { ReviewCards } from "@/components/food/ReviewCards";
 import { SaveButton } from "@/components/food/SaveButton";
 import { SavedList } from "@/components/food/SavedList";
 import {
@@ -263,20 +264,7 @@ async function PlaceDetailView({ place, backHref, actions }: { place: FoodPlace;
         ) : d.reviews.value.length === 0 ? (
           <p className="mt-2 text-sm text-ink-soft">아직 블로그 후기가 없어요. 첫 후기를 남겨 보세요!</p>
         ) : (
-          <ol className="mt-2 divide-y divide-line" data-food-reviews>
-            {d.reviews.value.map((r) => (
-              <li key={r.url} className="py-2.5">
-                <a href={r.url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline">
-                  {r.title}
-                </a>
-                {r.summary && <p className="mt-0.5 line-clamp-2 text-sm text-ink-soft">{r.summary}</p>}
-                <p className="mt-0.5 text-xs text-ink-soft">
-                  {r.blogger}
-                  {r.date && ` · ${r.date}`}
-                </p>
-              </li>
-            ))}
-          </ol>
+          <ReviewCards reviews={d.reviews.value} />
         )}
       </section>
 
