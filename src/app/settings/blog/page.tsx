@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { BlogCoverForm } from "@/components/settings/BlogCoverForm";
+import { StockManager } from "@/components/settings/StockManager";
+import { listBlogStocks } from "@/server/stocks";
 import { CategoryManager } from "@/components/settings/CategoryManager";
 import { VisitChart } from "@/components/settings/VisitChart";
 import { AccentForm, BlogInfoForm, ListStyleForm, SlugForm } from "@/components/settings/SettingsForms";
@@ -26,12 +28,13 @@ export default async function BlogSettingsPage({ searchParams }: PageProps<"/set
   // 내보내기를 10분 안에 다시 누르면 라우트 핸들러가 ?export=wait&min=N으로 돌려보낸다
   const waitMin = query.export === "wait" ? Math.min(10, Math.max(1, Number(query.min) || 10)) : null;
   const blog = await getMyBlog(member.userId);
-  const [tree, stats, days, referrers, popular] = await Promise.all([
+  const [tree, stats, days, referrers, popular, stocks] = await Promise.all([
     getCategoryTree(blog.id, true),
     getBlogVisitStats(blog.id),
     getBlogVisitDays(blog.id),
     getReferrerStats(blog.id),
     getPopularPosts(blog.id),
+    listBlogStocks(blog.id),
   ]);
   return (
     <div className="mx-auto max-w-2xl space-y-4">
@@ -66,6 +69,9 @@ export default async function BlogSettingsPage({ searchParams }: PageProps<"/set
       </Card>
       <Card id="cover" title="🖼️ 커버 사진">
         <BlogCoverForm coverKey={blog.coverKey} />
+      </Card>
+      <Card id="stocks" title="📈 관심 종목">
+        <StockManager stocks={stocks} />
       </Card>
       <Card id="accent" title="🎨 강조색">
         <AccentForm accent={blog.accentColor ?? "green"} />
