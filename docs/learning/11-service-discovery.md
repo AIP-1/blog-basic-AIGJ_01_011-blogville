@@ -18,7 +18,7 @@
 - 앱은 `http://market:8500`, 게이트웨이는 `http://app-msa:8400`처럼 **이름**으로만 부릅니다. IP는 어디에도 적혀 있지 않습니다.
 - `--scale market=2`로 띄우면 `market`이라는 이름에 컨테이너 두 개의 IP가 붙습니다.
 - 게이트웨이(nginx)는 `resolver 127.0.0.11 valid=5s`로 이 이름을 5초마다 다시 묻습니다. 그래서 늘리거나 줄여도 게이트웨이를 다시 띄울 필요가 없습니다.
-- `market` 이미지에는 `HEALTHCHECK`(`/health`)가 있고, 앱은 `depends_on: condition: service_healthy`로 market이 건강해진 뒤에 뜹니다.
+- 헬스 체크: `market` 이미지는 `/health`, 블로그 앱 이미지는 `/api/health`(DB에 `select 1`까지 해 보고 200 UP / 503 DOWN)를 `HEALTHCHECK`로 부릅니다. 앱은 market이, 게이트웨이는 앱과 market이 `healthy`가 된 뒤에 뜹니다(`depends_on: condition: service_healthy`).
 
 ## 직접 해 보기
 
@@ -32,4 +32,4 @@ docker compose --profile msa up -d --scale market=3           # 늘리기
 sleep 6; docker compose exec gateway nslookup market 127.0.0.11   # IP 세 개, 게이트웨이는 그대로
 ```
 
-해 볼 것: `docker compose ps`로 `(healthy)` 표시를 보고, 한 컨테이너를 `docker stop`한 뒤 몇 초 안에 요청이 남은 쪽으로만 가는지 확인합니다. Eureka·Consul 같은 등록소 방식은 무엇이 더 필요할지(등록·해제, 하트비트) 비교해 봅니다.
+해 볼 것: `curl localhost:8080/api/health`로 앱 상태(버전·DB)를 보고, `docker compose stop db` 뒤 다시 불러 503 DOWN이 되는지 봅니다(`docker compose start db`로 되돌림). `docker compose ps`로 `(healthy)` 표시를 보고, 한 컨테이너를 `docker stop`한 뒤 몇 초 안에 요청이 남은 쪽으로만 가는지 확인합니다. Eureka·Consul 같은 등록소 방식은 무엇이 더 필요할지(등록·해제, 하트비트) 비교해 봅니다.

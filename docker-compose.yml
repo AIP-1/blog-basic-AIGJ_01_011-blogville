@@ -73,7 +73,11 @@ services:
   gateway:
     profiles: [msa]
     image: nginx:1.27-alpine
-    depends_on: [app-msa, market]
+    depends_on:
+      app-msa:
+        condition: service_healthy  # 이미지의 HEALTHCHECK(/api/health)
+      market:
+        condition: service_healthy
     ports:
       - "8080:8080"
     volumes:
