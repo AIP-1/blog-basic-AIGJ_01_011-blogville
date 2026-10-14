@@ -5,6 +5,16 @@ import type { FoodPlace } from "./food";
 
 export type BodyMatch = "match" | "weak" | "mismatch" | "unknown";
 
+/** 후기에서 뺀 까닭: 제목·요약으로 본 것(food-relevance)과 다른 지역 여행 글, 본문에 그 식당 이야기가 없는 글 */
+export type HiddenReason = "spam" | "no-name" | "off-topic" | "other-region" | "body";
+export const HIDDEN_LABELS: Record<HiddenReason, string> = {
+  spam: "광고·스팸",
+  "no-name": "식당 이름 없음",
+  "off-topic": "다른 이야기",
+  "other-region": "다른 지역 글",
+  body: "본문에 이 식당 없음",
+};
+
 const squash = (s: string) => s.toLowerCase().replace(/[\s·.,!?'"()[\]{}<>~\-_/|]+/g, "");
 
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", "#39": "'" };
