@@ -148,3 +148,15 @@ describe("후기 거르기 v4 (두 글자 이하 흔한 낱말 이름)", () => {
     expect(isRelevantReview({ title: "광주 화정동 술집 [봄] 요리주점 후기", summary: "" }, spring)).toBe(true);
   });
 });
+
+describe("후기 거르기 v5 (체인 다른 지점·시공 글)", () => {
+  it("상무초밥 광주 가게에 신촌점·간판 시공 글은 빼고 광주 글은 남긴다", async () => {
+    const { isRelevantReview } = await import("@/lib/food-relevance");
+    const p = { name: "상무초밥 광주본점", address: "광주 서구 상무중앙로 1", category: "일식 > 초밥,롤" };
+    expect(isRelevantReview({ title: "신촌 저녁 맛집 '상무초밥 신촌점' 스시 사시미정식 혼밥 후기", summary: "" }, p)).toBe(false);
+    expect(isRelevantReview({ title: "광주 상무초밥 전자메뉴판 설치｜LG DID 3대 천장형 디스플레이 시공", summary: "" }, p)).toBe(false);
+    expect(isRelevantReview({ title: "광주 상무지구 초밥 맛집 상무초밥 점심 특선", summary: "" }, p)).toBe(true);
+    const branch = { name: "상무초밥 상무점", address: "광주 서구 상무중앙로 1", category: "일식 > 초밥,롤" };
+    expect(isRelevantReview({ title: "광주 상무초밥 상무점 런치 후기", summary: "" }, branch)).toBe(true);
+  });
+});

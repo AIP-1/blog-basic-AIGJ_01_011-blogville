@@ -37,7 +37,7 @@ const NAME_AS_OTHER_AFTER = "\\s*(?:게임|겜|연극|영화|드라마|웹툰|�
 const NAME_AS_OTHER_BEFORE = "(?:영화|연극|게임|드라마|웹툰|소설|뮤지컬|노래)\\s*[<《「『\"'“]?\\s*";
 
 // 식당이 아닌 업종 (제목이 이런 이야기면 식당 후기가 아니다)
-const OTHER_BIZ = /네일|헤어|미용실|미용|피부과|피부관리|병원|의원|치과|한의원|학원|숙소|호텔|펜션|모텔|리조트|부동산|인테리어|웨딩|스튜디오|헬스|필라테스|요가|여행\s*기록|일상|브이로그|vlog/i;
+const OTHER_BIZ = /네일|헤어|미용실|미용|피부과|피부관리|병원|의원|치과|한의원|학원|숙소|호텔|펜션|모텔|리조트|부동산|인테리어|웨딩|스튜디오|헬스|필라테스|요가|여행\s*기록|일상|브이로그|vlog|시공|설치|간판|디스플레이|키오스크|POS|창업\s*컨설팅|가맹\s*문의/i;
 
 export type ReviewVerdict = { keep: true } | { keep: false; reason: "spam" | "no-name" | "off-topic" };
 
@@ -72,9 +72,14 @@ export function reviewVerdict(
   const digits = (place.phone ?? "").replace(/\D/g, "");
   const exact = (roadWord.length >= 3 && flat.includes(squash(roadWord))) || (digits.length >= 8 && text.replace(/\D/g, "").includes(digits));
   if (!exact && (new RegExp(nr + NAME_AS_OTHER_AFTER).test(text) || new RegExp(NAME_AS_OTHER_BEFORE + nr).test(text))) return { keep: false, reason: "off-topic" };
-  // 제목이 다른 업종(네일·미용·숙소·병원…) 이야기이고 제목에 식당 이름이 없으면, 본문에 지나가듯 나온 것
+  // 제목이 다른 업종(네일·미용·숙소·병원·간판 시공…) 이야기면 식당 후기가 아니다 (제목에 이름이 없거나, 이름이 있어도 시공·설치 글)
   const inTitle = squash(r.title).includes(name);
-  if (!exact && !inTitle && OTHER_BIZ.test(r.title)) return { keep: false, reason: "off-topic" };
+  if (!exact && OTHER_BIZ.test(r.title) && (!inTitle || /시공|설치|간판|디스플레이|키오스크|POS|창업|가맹/i.test(r.title))) return { keep: false, reason: "off-topic" };
+  // 체인 다른 지점: "상무초밥 신촌점"처럼 이름 뒤 지점 이름이 이 가게 동네가 아니면 다른 가게
+  const branchName = /([가-힣A-Za-z]{1,8})점$/.exec(place.name.trim())?.[1] ?? null;
+  const myArea = [...areaWords(place.address), ...(branchName ? [branchName] : [])].map(squash);
+  const branchHits = [...text.matchAll(new RegExp(nr + "\\s*([가-힣]{1,8})점", "g"))].map((m) => squash(m[1]));
+  if (!exact && branchHits.length > 0 && branchHits.every((b) => !myArea.some((a) => a.includes(b) || b.includes(a)))) return { keep: false, reason: "off-topic" };
   const catWord = place.category ? place.category.split(">").pop()!.trim().split(",")[0] : "";
   // 두 글자 이하 이름("정원"·"봄")은 흔한 낱말이라, 곁에 가게 분류어(한정식·호프…)나 "○○ 식당"·따옴표 이름이 있어야 그 가게
   const tiny = [...name].length <= 2;
