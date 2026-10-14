@@ -21,8 +21,11 @@ import { SavedList } from "@/components/food/SavedList";
 import {
   buzzLabel,
   FOOD_MESSAGES,
+  FOOD_REGION_TOP,
   FOOD_QUERY_MAX,
   FOOD_REGIONS,
+  FOOD_AREAS,
+  isFoodArea,
   FOOD_TABS,
   isFoodRegion,
   isFoodTab,
@@ -176,6 +179,10 @@ export default async function FoodPage({ searchParams }: PageProps<"/food">) {
         <RegionTab
           region={
             isFoodRegion(one(sp.region)) ? one(sp.region)! : DEFAULT_REGION
+          }
+          area={one(sp.area)}
+          kind={
+            isFoodKind(one(sp.kind)) ? (one(sp.kind) as FoodKindFilter) : "all"
           }
         />
       ) : (
@@ -336,17 +343,35 @@ async function NearTab({
   );
 }
 
-async function RegionTab({ region }: { region: string }) {
+async function RegionTab({
+  region,
+  area: rawArea,
+  kind,
+}: {
+  region: string;
+  area?: string;
+  kind: FoodKindFilter;
+}) {
   if (!naverFoodEnabled()) return <Notice>{FOOD_MESSAGES.off}</Notice>;
-  const result = await regionHot(region);
-  const save = await saveButtons(result.status === "ok" ? result.value : []);
+  const area = isFoodArea(region, rawArea) ? rawArea : null;
+  const place = area ?? region;
+  const result = await regionHot(place);
+  const list =
+    result.status === "ok"
+      ? result.value
+          .filter((p) => kind === "all" || p.kind === kind)
+          .slice(0, FOOD_REGION_TOP)
+      : [];
+  const save = await saveButtons(list);
+  const href = (r: string, k: FoodKindFilter, a: string | null = null) =>
+    `/food?tab=region&region=${encodeURIComponent(r)}${a ? `&area=${encodeURIComponent(a)}` : ""}${k === "all" ? "" : `&kind=${k}`}`;
   return (
     <div className="mt-4 space-y-3">
       <nav aria-label="지역" className="flex flex-wrap gap-1.5">
         {FOOD_REGIONS.map((r) => (
           <Link
             key={r}
-            href={`/food?tab=region&region=${encodeURIComponent(r)}`}
+            href={href(r, kind)}
             aria-current={r === region ? "page" : undefined}
             className={`rounded-full border px-3 py-1 text-sm ${r === region ? "border-ink bg-ink font-bold text-surface" : "border-line hover:border-accent"}`}
           >
@@ -354,29 +379,64 @@ async function RegionTab({ region }: { region: string }) {
           </Link>
         ))}
       </nav>
+      {isFoodRegion(region) && (
+        <Chips
+          label="동네"
+          items={[null, ...FOOD_AREAS[region]].map((a) => ({
+            href: href(region, kind, a),
+            text: a ? `📍 ${a}` : `${region} 전체`,
+            on: a === area,
+            data: `area-${a ?? "all"}`,
+          }))}
+        />
+      )}
+      <Chips
+        label="분류"
+        items={FOOD_KINDS.map((k) => ({
+          href: href(region, k.key, area),
+          text: `${k.icon} ${k.label}`,
+          on: k.key === kind,
+          data: `kind-${k.key}`,
+        }))}
+      />
       <p className="text-sm text-ink-soft">
-        {region}에서 블로그·카페 후기가 많은 식당을 모아,{" "}
-        <strong className="text-ink">최근 한 달 블로그에 많이 올라온 순</strong>
-        으로 보여 줘요.
+        {place}에서 후기가 많은 식당·카페를 모아{" "}
+        <strong className="text-ink">
+          최근 한 달 진짜 후기 수와 네이버 검색 관심도
+        </strong>
+        를 반씩 섞은 순으로 보여 줘요. 백화점·쇼핑몰·큰 체인점은 빼고,
+        체험단·협찬 글과 가게 이야기가 아닌 글은 세지 않아요.
       </p>
       {result.status !== "ok" ? (
         <Notice>{failText(result)}</Notice>
-      ) : result.value.length === 0 ? (
+      ) : list.length === 0 ? (
         <Notice>{FOOD_MESSAGES.empty}</Notice>
       ) : (
         <>
-          {mapProviders() && result.value.some((p) => p.lat !== null) && (
-            <FoodMap providers={mapProviders()!} places={result.value} />
+          {mapProviders() && list.some((p) => p.lat !== null) && (
+            <FoodMap providers={mapProviders()!} places={list} />
           )}
           <ol className="space-y-3" data-food-list="region">
-            {result.value.map((p, i) => (
+            {list.map((p, i) => (
               <li key={p.id}>
                 <PlaceCard
                   place={p}
                   recent={p.recent}
                   rank={i + 1}
                   detailHref={detailHref(p.name, p)}
-                  actions={save(p)}
+                  actions={
+                    <>
+                      {p.rising && (
+                        <span
+                          className="self-center rounded-full border border-accent/40 px-2 py-0.5 text-xs font-bold text-ink"
+                          data-food-rising
+                        >
+                          🔎 검색 관심 ↑
+                        </span>
+                      )}
+                      {save(p)}
+                    </>
+                  }
                 />
                 {mapProviders() && p.lat !== null && (
                   <FocusOnMapButton id={p.id} />

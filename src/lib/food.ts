@@ -38,6 +38,33 @@ export const FOOD_REGIONS = [
   "수원", "성남", "고양", "용인", "청주", "전주", "천안", "창원", "포항", "제주",
 ] as const;
 
+/** 지역 인기를 동네로 좁혀 보기: 도시마다 맛집이 몰린 동네 (검색어 그대로 쓴다) */
+export const FOOD_AREAS: Record<(typeof FOOD_REGIONS)[number], readonly string[]> = {
+  서울: ["강남역", "성수", "홍대", "연남동", "망원", "이태원", "한남동", "용산", "익선동", "을지로", "여의도", "잠실", "송리단길", "건대", "신촌", "서촌", "문래", "압구정", "가로수길"],
+  부산: ["서면", "해운대", "광안리", "남포동", "전포", "기장"],
+  대구: ["동성로", "수성못", "대봉동", "앞산"],
+  인천: ["송도", "구월동", "부평", "차이나타운"],
+  광주: ["동명동", "충장로", "상무지구", "양림동", "첨단"],
+  대전: ["둔산동", "은행동", "봉명동", "유성"],
+  울산: ["삼산동", "성남동", "울산대"],
+  세종: ["나성동", "도담동", "보람동"],
+  수원: ["행궁동", "인계동", "광교"],
+  성남: ["판교", "정자동", "서현"],
+  고양: ["일산", "라페스타", "삼송"],
+  용인: ["수지", "기흥", "동백"],
+  청주: ["성안길", "율량동", "복대동"],
+  전주: ["한옥마을", "객사", "서신동"],
+  천안: ["신부동", "불당동"],
+  창원: ["상남동", "창원 가로수길", "마산"],
+  포항: ["영일대", "죽도시장", "양덕동"],
+  제주: ["제주시", "애월", "서귀포", "성산", "협재"],
+};
+
+/** 고른 도시의 동네인가 */
+export function isFoodArea(region: string, v: unknown): v is string {
+  return isFoodRegion(region) && typeof v === "string" && FOOD_AREAS[region].includes(v);
+}
+
 /** 글쓰기에 식당 카드를 미리 채우는 주소. /write가 place_* 값을 읽는다 */
 export function reviewWriteHref(p: Pick<FoodPlace, "name" | "address" | "mapUrl" | "category">): string {
   const q = new URLSearchParams({ place_name: p.name, place_address: p.address, place_url: p.mapUrl, place_category: p.category });
