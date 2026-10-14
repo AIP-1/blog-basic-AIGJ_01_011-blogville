@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { PASSWORD, signIn, signUp, signUpOk, sql, uid } from "./helpers";
+import { PASSWORD, signIn, signUp, signUpOk, sql, uid, openMyMenu } from "./helpers";
 
 test.describe("US1 가입·로그인·로그아웃", () => {
   test("가입하면 블로그·프로필·카테고리 '일상'이 함께 생기고 내 블로그로 간다", async ({ page }) => {
@@ -77,7 +77,7 @@ test.describe("US1 가입·로그인·로그아웃", () => {
 
   test("로그아웃하면 첫 화면, 로그인하면 마을. 아이디는 대소문자·공백 무시", async ({ page }) => {
     const username = await signUpOk(page);
-    await page.getByRole("button", { name: "로그아웃" }).click();
+    await (await openMyMenu(page)).getByRole("button", { name: "로그아웃" }).click();
     await expect(page).toHaveURL("/");
     await page.goto("/write");
     await expect(page).toHaveURL("/");
@@ -88,7 +88,7 @@ test.describe("US1 가입·로그인·로그아웃", () => {
 
   test("로그인 실패 문구는 하나, 5번 틀리면 6번째는 맞는 비밀번호도 잠금", async ({ page }) => {
     const username = await signUpOk(page);
-    await page.getByRole("button", { name: "로그아웃" }).click();
+    await (await openMyMenu(page)).getByRole("button", { name: "로그아웃" }).click();
     await expect(page).toHaveURL("/");
 
     await signIn(page, "", "");

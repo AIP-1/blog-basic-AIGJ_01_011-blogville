@@ -20,7 +20,7 @@ test.describe("AUTH-09 로그인 유지 연장", () => {
       if (new URL(r.url()).pathname === "/api/auth/get-session") keeps.push(r.url());
     });
     await page.goto(`/@${username}`);
-    await expect(page.getByRole("link", { name: "내 정보" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "내 메뉴" })).toBeVisible();
     await page.waitForTimeout(500);
     expect(keeps).toHaveLength(0);
 
