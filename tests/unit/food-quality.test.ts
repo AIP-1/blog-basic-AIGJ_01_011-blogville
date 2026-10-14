@@ -178,3 +178,18 @@ describe("지역 인기 동네", () => {
     for (const r of FOOD_REGIONS) expect(FOOD_AREAS[r].length).toBeGreaterThan(0);
   });
 });
+
+describe("내 동네 이름", async () => {
+  const { dongFromRegion } = await import("@/lib/food-quality");
+  const doc = (three: string, two = "성동구", one = "서울특별시") => ({ documents: [{ region_type: "H", region_1depth_name: one, region_2depth_name: two, region_3depth_name: "성수1가1동" }, { region_type: "B", region_1depth_name: one, region_2depth_name: two, region_3depth_name: three }] });
+  it("법정동에서 번지·가를 뗀다", () => {
+    expect(dongFromRegion(doc("성수동1가"))).toEqual({ dong: "성수동", city: "서울" });
+    expect(dongFromRegion(doc("역삼동", "강남구"))).toEqual({ dong: "역삼동", city: "서울" });
+    expect(dongFromRegion(doc("동명동", "동구", "광주광역시"))).toEqual({ dong: "동명동", city: "광주" });
+  });
+  it("동이 없으면 시군구, 이상한 값은 null", () => {
+    expect(dongFromRegion(doc("", "용인시 수지구", "경기도"))?.dong).toBe("수지구");
+    expect(dongFromRegion({ documents: [] })).toBeNull();
+    expect(dongFromRegion(null)).toBeNull();
+  });
+});
