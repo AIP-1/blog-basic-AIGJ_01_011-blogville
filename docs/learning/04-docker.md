@@ -30,13 +30,14 @@ Docker는 앱과 앱이 도는 데 필요한 것(OS 파일, Node, 라이브러�
 | | `EXPOSE 8400` / `CMD ...` | 시작할 때 `scripts/migrate.mjs`로 DB를 맞춘 뒤 `next start -p 8400` |
 
 - 이미지에 넣지 않을 파일은 [.dockerignore](../../.dockerignore)에 적습니다(`node_modules`, `.next`, `.env*` 등).
-- 저장소 맨 위 [docker-compose.yml](../../docker-compose.yml)에는 서비스 셋이 있습니다. 평소엔 `db`만 뜨고, 나머지는 **프로필**을 줄 때만 뜹니다.
+- 저장소 맨 위 [docker-compose.yml](../../docker-compose.yml)에는 서비스 여섯이 있습니다. 평소엔 `db`만 뜨고, 나머지는 **프로필**을 줄 때만 뜹니다.
 
   | 서비스 | 프로필 | 하는 일 |
   |---|---|---|
   | `db` | (없음) | 개발용 PostgreSQL 16, `localhost:5432`. `npm run dev`와 같이 씀 |
   | `app` | `app` | 운영과 같은 Dockerfile로 만든 앱, `localhost:8400`. DB는 서비스 이름 `db`로 찾아감(`postgres://blog:blog@db:5432/blogville`) |
   | `sonarqube` | `sonar` | 품질 검사 서버, `localhost:9000` ([03-sonar.md](03-sonar.md)) |
+  | `app-msa`·`market`·`gateway` | `msa` | MSA 실습. 게이트웨이 `localhost:8080` 하나로만 들어감 ([09-msa.md](09-msa.md)) |
 
 - `app`은 `db`의 healthcheck(`pg_isready`)가 통과한 뒤에 뜨고(`depends_on: condition: service_healthy`), 뜰 때 마이그레이션을 먼저 합니다.
 - 운영 서버의 구성(nginx + 앱 두 벌)은 [deploy/compose.yml](../../deploy/compose.yml)로 따로 있습니다. [08-zero-downtime.md](08-zero-downtime.md)에서 다룹니다.

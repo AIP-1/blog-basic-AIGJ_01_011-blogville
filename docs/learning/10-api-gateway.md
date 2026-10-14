@@ -19,7 +19,7 @@
 
 | 경로 | 보내는 곳 | 비고 |
 |---|---|---|
-| `/gateway/health` | 게이트웨이 자신 | `{"status":"UP"}` |
+| `/gateway/health` | 게이트웨이 자신 | `{"status":"UP","service":"gateway"}` |
 | `/market/health` | `market:8500/health` | 시세·날씨 서비스는 상태 확인만 바깥에 엶 |
 | `/` (나머지 전부) | `app-msa:8400` | 증시 실시간(SSE)이 끊기지 않게 `proxy_buffering off` |
 

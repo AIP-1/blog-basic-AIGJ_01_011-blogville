@@ -22,7 +22,7 @@ Git Flow는 브랜치마다 역할을 정해 두는 방식입니다. 운영에 �
 - merge는 merge commit으로 합니다(squash·rebase 하지 않음). `main`·`develop`에는 force push 금지입니다.
 - 배포는 `develop`에서 `release/<버전>`을 만들어 `main`으로 PR을 엽니다. 이 브랜치에서 `package.json` 버전, `docs/releases/v<버전>.md` 릴리스 노트, `CHANGELOG.md`를 고칩니다.
 - `main`에 merge되면 `.github/workflows/deploy.yml`이 운영 서버에 무중단 배포하고, `release.yml`이 GitHub 릴리스와 `v<버전>` 태그를 만듭니다.
-- `main`·`develop`은 브랜치 보호 규칙으로 "PR 필수 + `check` 통과 필수 + force push 금지"가 걸려 있습니다.
+- `main`·`develop`은 브랜치 보호 규칙으로 "PR 필수 + 필수 검사 통과 + force push 금지"가 걸려 있습니다. 필수 검사는 `develop`이 `check`, `main`이 `check`와 `e2e`입니다.
 
 DB 마이그레이션이 든 기능 브랜치는 merge 직전에 최신 `develop`을 받아 `drizzle/meta/_journal.json`에서 내 마이그레이션이 맨 뒤에 오게 맞춥니다. 두 브랜치가 동시에 마이그레이션을 만들면 순서가 꼬이기 때문입니다.
 
