@@ -260,6 +260,8 @@ export const blogs = pgTable(
     listStyle: text("list_style"),
     // 블로그 홈 맨 위 커버 사진의 첨부 키 (블로그 꾸미기). NULL이면 없음
     coverKey: text("cover_key"),
+    // ☀️ 날씨 위젯의 도시 (src/lib/weather.ts WEATHER_CITIES의 key). NULL이면 서울
+    weatherCity: text("weather_city"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
