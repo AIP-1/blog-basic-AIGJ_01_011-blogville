@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { htmlToText, sanitizePostHtml, type KnownAttachments } from "@/lib/sanitize";
-import { postTextLength } from "@/lib/text-length";
+import { postTextLength, trimLineEnds } from "@/lib/text-length";
 
 const known: KnownAttachments = new Map([
   ["a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6.png", { kind: "image", name: "사진.png", size: 1000 }],
@@ -46,5 +46,21 @@ describe("postTextLength는 서버 content_text 길이와 같다", () => {
     expect(postTextLength(SAMPLES.이모지)).toBe(8); // 😀 2 + 👍 2 + 🏽 2 + 띄어쓰기 + 가
     expect(postTextLength(SAMPLES.사진)).toBe("앞\n뒤".length);
     expect(postTextLength(SAMPLES["빈 문단"])).toBe(0);
+  });
+});
+
+describe("trimLineEnds", () => {
+  it("줄 끝 빈칸·탭만 지우고 줄 앞·가운데는 둔다 (/[ \\t]+\\n/g와 같다)", () => {
+    for (const s of ["a  \nb\t\n  c", " x \t \n\n y", "끝  ", "", "\n \n", "가 나\t다 \n"]) {
+      expect(trimLineEnds(s).trim()).toBe(s.replace(/[ \t]+\n/g, "\n").trim());
+    }
+  });
+
+  it("줄바꿈 없는 아주 긴 빈칸도 금방 끝난다", () => {
+    const started = Date.now();
+    const html = `<p>a${" ".repeat(200_000)}x</p>`;
+    expect(postTextLength(html)).toBe(200_002);
+    expect(htmlToText(html)).toHaveLength(200_002);
+    expect(Date.now() - started).toBeLessThan(500);
   });
 });

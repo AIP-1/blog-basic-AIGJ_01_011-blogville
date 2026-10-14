@@ -1,6 +1,7 @@
 import "server-only";
 import sanitizeHtml from "sanitize-html";
 import { extensionOf, formatBytes, keyFromUrl } from "./attachments";
+import { trimLineEnds } from "./text-length";
 import { youtubeEmbedSrc, youtubeId } from "./youtube";
 
 const LINK_REL = "noopener noreferrer nofollow";
@@ -125,13 +126,13 @@ export function htmlToText(html: string): string {
   // 표 칸 안은 문단이라 칸마다 줄이 나뉜다
   const spaced = html.replace(/<\/(p|h2|h3|li|blockquote|pre)>|<br\s*\/?>/gi, "$&\n");
   const text = sanitizeHtml(spaced, { allowedTags: [], allowedAttributes: {} });
-  return text
-    .replace(/&nbsp;/g, " ")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, "&")
-    .replace(/[ \t]+\n/g, "\n")
-    .trim();
+  return trimLineEnds(
+    text
+      .replace(/&nbsp;/g, " ")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, "&"),
+  ).trim();
 }

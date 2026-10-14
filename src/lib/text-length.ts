@@ -16,8 +16,23 @@ function decode(text: string): string {
   });
 }
 
+/**
+ * 줄 끝의 빈칸·탭을 지운다 (`/[ \t]+\n/g`와 같은 결과). 정규식은 줄바꿈 없는 긴 빈칸에서 시간이
+ * 제곱으로 늘어(빈칸 4만 자에 2초) 글 저장·글자 수 세기가 멈출 수 있어서 한 번 훑는 방식으로 한다.
+ */
+export function trimLineEnds(text: string): string {
+  return text
+    .split("\n")
+    .map((line) => {
+      let end = line.length;
+      while (end > 0 && (line.charCodeAt(end - 1) === 32 || line.charCodeAt(end - 1) === 9)) end--;
+      return end === line.length ? line : line.slice(0, end);
+    })
+    .join("\n");
+}
+
 /** 에디터 HTML의 글자 수 (JS `length`, 이모지는 2자). 사진·파일 카드는 글자가 없어 0자 */
 export function postTextLength(html: string): number {
   const text = decode(html.replace(LINE_END, "$&\n").replace(TAG, ""));
-  return text.replace(/[ \t]+\n/g, "\n").trim().length;
+  return trimLineEnds(text).trim().length;
 }
