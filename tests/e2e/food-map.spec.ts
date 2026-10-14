@@ -92,3 +92,21 @@ test("네이버 지도가 인증 실패 그림만 깔고 아무 소식이 없어
   await expect(map).toHaveAttribute("data-food-map", "ready");
   await expect(map.locator("[data-food-pin]")).toHaveCount(await page.locator('[data-food-list="near"] > li').count());
 });
+
+test("지도 고르기: 열쇠가 둘 다 있으면 [네이버 | 카카오]로 바꾸고, 고른 지도를 다음에도 연다", async ({ page }) => {
+  await fakeKakao(page);
+  await page.goto("/food?tab=near&lat=35.147&lng=126.915");
+  const picks = page.locator("[data-food-map-pick]");
+  test.skip((await picks.count()) < 2, "지도 열쇠가 둘 다 있는 시험 서버에서만");
+  const map = page.locator("[data-food-map]");
+  await expect(map).toHaveAttribute("data-food-map", "ready");
+  await expect(page.locator('[data-food-map-pick="naver"]')).toHaveAttribute("aria-pressed", "true");
+
+  await page.locator('[data-food-map-pick="kakao"]').click();
+  await expect(page.locator('[data-food-map-pick="kakao"]')).toHaveAttribute("aria-pressed", "true");
+  await expect(map).toHaveAttribute("data-food-map", "ready");
+  await expect(map.locator("[data-food-pin]").first()).toHaveText("1");
+
+  await page.reload();
+  await expect(page.locator('[data-food-map-pick="kakao"]')).toHaveAttribute("aria-pressed", "true");
+});

@@ -142,6 +142,9 @@ async function naverAdapter(key: string, box: HTMLElement, start: LL, onAuthFail
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
+const MAP_LABEL = { naver: "네이버", kakao: "카카오" } as const;
+const PICK_KEY = "food-map";
+
 type Props = {
   /** 쓸 지도 순서 (앞의 것이 열쇠·주소 문제로 실패하면 다음 것으로 바꾼다) */
   providers: MapProvider[];
@@ -160,6 +163,27 @@ export function FoodMap({ providers, places, me = null, researchSort, className 
   const [moved, setMoved] = useState(false);
   const [which, setWhich] = useState(0);
   const provider = providers[Math.min(which, providers.length - 1)];
+  // 지도가 둘이면 [네이버 | 카카오]로 고르고, 고른 것은 이 브라우저에 기억한다
+  useEffect(() => {
+    try {
+      const i = providers.findIndex((p) => p.kind === localStorage.getItem(PICK_KEY));
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 브라우저 저장소는 화면이 준비된 뒤에만 읽을 수 있다
+      if (i > 0) setWhich(i);
+    } catch {
+      // 저장소를 못 쓰면 기본 지도
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  function pick(i: number) {
+    if (i === which) return;
+    setState("loading");
+    setMoved(false);
+    setWhich(i);
+    try {
+      localStorage.setItem(PICK_KEY, providers[i].kind);
+    } catch {
+      // 기억만 못 할 뿐
+    }
+  }
   const router = useRouter();
   // 번호는 목록 순서 그대로 (좌표가 없는 곳은 핀만 빠진다)
   const pins = places.map((p, i) => ({ ...p, n: i + 1 })).filter((p) => p.lat !== null && p.lng !== null) as (FoodPlace & { n: number; lat: number; lng: number })[];
@@ -253,6 +277,22 @@ export function FoodMap({ providers, places, me = null, researchSort, className 
         <p className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-ink-soft">
           지도를 불러오지 못했어요 ({provider.kind === "naver" ? "네이버 클라우드 Maps의 Client ID·Web 서비스 URL" : "카카오 JavaScript 키·사이트 도메인"} 설정을 확인해 주세요). 아래 목록은 그대로 볼 수 있어요.
         </p>
+      )}
+      {providers.length > 1 && (
+        <div className="absolute left-3 top-3 z-10 flex overflow-hidden rounded-full border border-line bg-surface text-xs shadow" role="group" aria-label="지도 고르기">
+          {providers.map((p, i) => (
+            <button
+              key={p.kind}
+              type="button"
+              onClick={() => pick(i)}
+              aria-pressed={p.kind === provider.kind}
+              className={`px-3 py-1.5 font-medium ${p.kind === provider.kind ? "bg-ink text-surface" : "text-ink-soft hover:bg-bg"}`}
+              data-food-map-pick={p.kind}
+            >
+              {MAP_LABEL[p.kind]}
+            </button>
+          ))}
+        </div>
       )}
       {state === "ready" && researchSort && moved && (
         <button type="button" onClick={researchHere} className="btn btn-primary absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-full px-4 text-sm shadow-lg" data-food-research>
