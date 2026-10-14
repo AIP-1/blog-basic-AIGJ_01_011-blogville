@@ -6,13 +6,13 @@ test.describe("US5 블로그 설정·닉네임", () => {
     const username = await signUpOk(page);
     await page.goto("/settings/blog");
     await page.getByLabel("블로그 이름").fill("   ");
-    await page.getByRole("button", { name: "저장" }).click();
+    await page.getByRole("button", { name: "저장", exact: true }).click();
     await expect(page.locator("p[role=alert]")).toHaveText("블로그 이름을 적어 주세요");
     await expect(page.getByLabel("블로그 이름")).toHaveValue("   ");
 
     await page.getByLabel("블로그 이름").fill("나의 작은 정원");
     await page.getByLabel("소개").fill("a".repeat(160));
-    await page.getByRole("button", { name: "저장" }).click();
+    await page.getByRole("button", { name: "저장", exact: true }).click();
     await expect(page.getByRole("status")).toHaveText("저장했어요 ✓");
     await page.goto(`/@${username}`);
     await expect(page.getByRole("heading", { name: "나의 작은 정원" })).toBeVisible();
