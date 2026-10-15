@@ -2,7 +2,7 @@
 
 import { useId, useRef, useState, useTransition } from "react";
 import { reportContent } from "@/app/blog/report-actions";
-import { REPORT_DETAIL_MAX, REPORT_REASON_LABELS, REPORT_REASONS, REPORT_TARGET_LABELS, type ReportResult, type ReportTarget } from "@/lib/report-rules";
+import { REPORT_DETAIL_MAX, REPORT_REASON_LABELS, REPORT_REASONS, REPORT_TARGET_LABELS, type ReportResult, type ReportTarget } from "@/lib/report-labels";
 
 type Props = { targetType: ReportTarget; targetId: number; className?: string };
 
