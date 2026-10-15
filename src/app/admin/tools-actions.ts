@@ -4,7 +4,10 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
   ADMIN_ERRORS,
+  GRANT_COIN_MAX,
+  GRANT_EXP_MAX,
   parseBannedWords,
+  parseGrantAmount,
   parseContentRefs,
   parseContentTab,
   parseNotice,
@@ -17,6 +20,7 @@ import {
   blindPost,
   deleteContent,
   forceDeleteMember,
+  grantPoints,
   saveBannedWords,
   setMemberRole,
   setNotice,
@@ -74,6 +78,17 @@ export async function adminForceDelete(formData: FormData): Promise<AdminResult>
   const userId = userIdOf(formData);
   if (!userId) return { ok: false, error: ADMIN_ERRORS.notFound };
   return done(await forceDeleteMember(admin.userId, userId));
+}
+
+/** 코인·경험치 지급 (운영자 선물) */
+export async function adminGrantPoints(formData: FormData): Promise<AdminResult> {
+  const admin = await requireAdmin();
+  const userId = userIdOf(formData);
+  if (!userId) return { ok: false, error: ADMIN_ERRORS.notFound };
+  const coin = parseGrantAmount(formData.get("coin"), GRANT_COIN_MAX);
+  const exp = parseGrantAmount(formData.get("exp"), GRANT_EXP_MAX);
+  if (coin === null || exp === null || coin + exp === 0) return { ok: false, error: ADMIN_ERRORS.grant };
+  return done(await grantPoints(admin.userId, userId, coin, exp));
 }
 
 export async function adminBlindPost(formData: FormData): Promise<AdminResult> {

@@ -17,6 +17,7 @@ import { resolveCategory } from "./category";
 import { removeEmptySeries, resolveSeries } from "./series";
 import { syncPostTags } from "./tags";
 import { checkBannedWords } from "./banned-words";
+import { cached } from "./ttl-cache";
 
 export const PAGE_SIZE = 8;
 
@@ -288,7 +289,14 @@ export async function listFeedPosts(blogId: number, limit = 20) {
 }
 
 /** sitemap.xml: 모든 블로그 홈과 공개 글 (최신 5만 개까지, sitemap 한 파일의 한도) */
-export async function listSitemapEntries() {
+// 검색엔진만 읽고 글 5만 개를 훑으므로 10분 동안 기억한다 (봇이 자주 와도 DB를 매번 훑지 않게)
+const SITEMAP_CACHE_MS = 10 * 60_000;
+
+export function listSitemapEntries() {
+  return cached("sitemap", SITEMAP_CACHE_MS, loadSitemapEntries);
+}
+
+async function loadSitemapEntries() {
   const [blogRows, postRows] = await Promise.all([
     db.select({ slug: blogs.slug, updatedAt: blogs.updatedAt }).from(blogs),
     db
