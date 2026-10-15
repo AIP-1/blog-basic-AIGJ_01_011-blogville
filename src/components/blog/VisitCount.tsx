@@ -1,7 +1,7 @@
 "use client";
 
-import { startTransition, useEffect, useState } from "react";
-import { recordBlogVisit } from "@/app/blog/actions";
+import { useEffect, useState } from "react";
+import { postVisit } from "./record-visit";
 import type { VisitStats } from "@/server/stats";
 
 const n = (value: number) => value.toLocaleString("ko-KR");
@@ -11,10 +11,13 @@ export function VisitCount({ blogId, initial, record }: { blogId: number; initia
   const [stats, setStats] = useState(initial);
   useEffect(() => {
     if (!record) return;
-    startTransition(async () => {
-      const next = await recordBlogVisit(String(blogId)).catch(() => null);
-      if (next) setStats(next);
+    let live = true;
+    postVisit<{ stats: VisitStats | null }>({ blogId }).then((res) => {
+      if (live && res?.stats) setStats(res.stats);
     });
+    return () => {
+      live = false;
+    };
   }, [blogId, record]);
   return (
     <dl className="grid grid-cols-3 gap-2 text-center">
