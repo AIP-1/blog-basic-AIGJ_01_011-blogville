@@ -61,10 +61,8 @@ export function isReleaseTag(tag: string): boolean {
   return /^v\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(tag);
 }
 
-/** 목록에 보일 한 줄 요약: 노트의 첫 문단(제목·표·그림 앞)을 글자만 남겨 max자에서 자른다 */
-export function releaseSummary(html: string, max = 90): string {
-  const first = html.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i)?.[1] ?? "";
-  const text = first
+const plain = (html: string) =>
+  html
     .replace(/<[^>]+>/g, "")
     .replace(/&nbsp;/g, " ")
     .replace(/&lt;/g, "<")
@@ -74,6 +72,26 @@ export function releaseSummary(html: string, max = 90): string {
     .replace(/&amp;/g, "&")
     .replace(/\s+/g, " ")
     .trim();
+
+/**
+ * 목록에 보일 한 줄 요약: 노트의 첫 문단(제목·표·그림 앞)을 글자만 남겨 max자에서 자른다.
+ * 첫 문단 없이 "## 바뀐 것" 목록으로 바로 시작하는 노트는 항목의 굵은 제목을 " · "로 잇고, 굵은 제목이 없으면 첫 항목을 쓴다
+ */
+export function releaseSummary(html: string, max = 90): string {
+  const firstLi = html.search(/<li\b/i);
+  const paras = [...html.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].filter((m) => firstLi < 0 || m.index! < firstLi);
+  let text = paras.map((m) => plain(m[1])).find(Boolean) ?? "";
+  if (!text && firstLi >= 0) {
+    // 바깥 목록 항목만 (안쪽 목록 항목은 빼고): <li> 앞까지 열린 목록 수가 1인 것
+    const items: string[] = [];
+    let depth = 0;
+    for (const m of html.matchAll(/<(\/?)(ul|ol)\b[^>]*>|<li\b[^>]*>([\s\S]*?)(?=<\/?(?:li|ul|ol)\b|$)/gi)) {
+      if (m[2]) depth += m[1] ? -1 : 1;
+      else if (depth === 1) items.push(m[3]);
+    }
+    const titles = items.map((li) => li.match(/<strong>([\s\S]*?)<\/strong>/i)?.[1]).filter((t): t is string => !!t).map(plain);
+    text = titles.length ? titles.join(" · ") : plain(items[0] ?? "");
+  }
   return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
 }
 

@@ -36,6 +36,12 @@ describe("업데이트 소식 목록", () => {
     expect(releaseSummary(`<p>${"가".repeat(100)}</p>`, 10)).toBe(`${"가".repeat(9)}…`);
     expect(releaseSummary("<table><tr><td>표만</td></tr></table>")).toBe("");
   });
+  it("첫 문단 없이 목록으로 시작하면 굵은 제목을 잇고, 없으면 첫 항목", () => {
+    const bold = "<h2>바뀐 것</h2><ul><li>🕘 <strong>지난 위치로 보기</strong>: 6시간 기억</li><li>⏳ <strong>누르면 빙글이</strong>: 돌아요</li></ul><p><img src=a.png></p><p>뒤 문단</p>";
+    expect(releaseSummary(bold)).toBe("지난 위치로 보기 · 누르면 빙글이");
+    const plainList = "<h2>고친 것</h2><ul><li>🍽 엉뚱한 글을 더 막았어요.<ul><li>안쪽 <strong>예시</strong></li></ul></li><li>둘째</li></ul>";
+    expect(releaseSummary(plainList)).toBe("🍽 엉뚱한 글을 더 막았어요.");
+  });
   it("버전 주소는 v숫자.숫자.숫자만", () => {
     expect(isReleaseTag("v1.6.0")).toBe(true);
     expect(isReleaseTag("v10.0.12")).toBe(true);
