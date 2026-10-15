@@ -50,3 +50,18 @@ describe("릴리스 노트 → 공지 글", () => {
     expect(htmlToText("<h2>제목</h2><p>A &amp; B</p>")).toBe("제목 A & B");
   });
 });
+
+describe("릴리스 노트 한 줄 요약", () => {
+  it("모든 노트는 제목 다음 줄에 한 줄 요약 문단이 있다 (업데이트 소식 목록에 보이는 글)", async () => {
+    const { readdirSync, readFileSync } = await import("node:fs");
+    const dir = "docs/releases";
+    const missing = readdirSync(dir)
+      .filter((f) => /^v\d+\.\d+\.\d+\.md$/.test(f))
+      .filter((f) => {
+        const lines = readFileSync(`${dir}/${f}`, "utf8").split("\n");
+        const lead = lines.slice(1).find((l) => l.trim()) ?? "";
+        return /^(#|\||!\[|-\s|\d+\.\s)/.test(lead.trim()) || !lead.trim();
+      });
+    expect(missing).toEqual([]);
+  });
+});
