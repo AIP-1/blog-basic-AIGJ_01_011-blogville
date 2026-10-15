@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { adminForceDelete, adminSetRole, adminSuspend, adminUnsuspend } from "@/app/admin/tools-actions";
+import { adminForceDelete, adminGrantPoints, adminSetRole, adminSuspend, adminUnsuspend } from "@/app/admin/tools-actions";
 import { AdminActionForm } from "@/components/admin/AdminActionForm";
 import { ResetPasswordButton } from "@/components/admin/ResetPasswordButton";
 import { Pagination } from "@/components/blog/Pagination";
-import { ADMIN_PAGE_SIZE, isSuspended, parseQuery, REASON_MAX, SUSPEND_DAYS, suspendLabel, suspendedMessage } from "@/lib/admin-rules";
+import { ADMIN_PAGE_SIZE, GRANT_COIN_MAX, GRANT_EXP_MAX, isSuspended, parseQuery, REASON_MAX, SUSPEND_DAYS, suspendLabel, suspendedMessage } from "@/lib/admin-rules";
 import { formatDateTime } from "@/lib/time";
 import { parsePage } from "@/lib/ids";
 import { listMembers, type MemberFilter } from "@/server/admin-tools";
@@ -18,7 +18,7 @@ const FILTERS: { value: MemberFilter; label: string }[] = [
   { value: "admin", label: "관리자" },
 ];
 
-// 관리자 회원 관리 (ADM-01, specs/058-admin-tools): 아이디·닉네임으로 찾기, 정지·해제, 관리자 지정·해제, 비밀번호 초기화, 강제 탈퇴.
+// 관리자 회원 관리 (ADM-01, specs/058-admin-tools): 아이디·닉네임으로 찾기, 코인·경험치 주기, 정지·해제, 관리자 지정·해제, 비밀번호 초기화, 강제 탈퇴.
 // 내 계정에는 관리 칸이 없고, 서버도 다시 막는다 (나 자신·다른 관리자·마지막 관리자)
 export default async function AdminMembersPage({ searchParams }: PageProps<"/admin/members">) {
   const me = await requireAdmin();
@@ -92,6 +92,25 @@ export default async function AdminMembersPage({ searchParams }: PageProps<"/adm
                   <details className="rounded-xl bg-bg p-3">
                     <summary className="flex min-h-11 cursor-pointer items-center font-semibold">관리</summary>
                     <div className="mt-2 space-y-3">
+                      <AdminActionForm
+                        action={adminGrantPoints}
+                        label="코인·경험치 지급"
+                        confirm={`${m.username} 님에게 코인·경험치를 줄까요? 내역에 '운영자 선물'로 남아요.`}
+                        className="flex flex-wrap items-center gap-2"
+                      >
+                        <input type="hidden" name="userId" value={m.userId} />
+                        <label className="flex items-center gap-1">
+                          🪙 코인
+                          <input name="coin" type="number" min={0} max={GRANT_COIN_MAX} step={1} defaultValue={0} inputMode="numeric" className="field field-auto w-32" />
+                        </label>
+                        <label className="flex items-center gap-1">
+                          ⭐ 경험치
+                          <input name="exp" type="number" min={0} max={GRANT_EXP_MAX} step={1} defaultValue={0} inputMode="numeric" className="field field-auto w-32" />
+                        </label>
+                        <button type="submit" className="btn">
+                          🎁 주기
+                        </button>
+                      </AdminActionForm>
                       {m.role !== "admin" &&
                         (suspended ? (
                           <AdminActionForm action={adminUnsuspend} label="정지 풀기" confirm={`${m.username} 님의 정지를 풀까요?`} className="flex flex-wrap items-center gap-2">
