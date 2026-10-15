@@ -58,6 +58,7 @@ jobs:
           BETTER_AUTH_SECRET=$(openssl rand -hex 32)
           BETTER_AUTH_URL=http://localhost:3000
           UPLOAD_DIR=storage/uploads
+          SHARED_CACHE=off
           ENV
 
       - name: DB 준비

@@ -5,6 +5,7 @@ import { blogs, categories, comments, postLikes, posts, postViews, profiles, sub
 import { comparePopular, POPULAR_LIMIT, POPULAR_WEIGHTS, popularWindow, type PopularRange } from "@/lib/popular";
 import { commentCountSql } from "./comments";
 import { likeCountSql } from "./likes";
+import { cached } from "./ttl-cache";
 
 /** 보이는 글만: 공개, 블라인드 아님, 예약 시각이 지난 글 (블라인드·예약 글은 비공개로만 있지만 한 번 더 막는다) */
 const visible = sql`p.is_public and p.blinded_at is null and (p.publish_at is null or p.publish_at <= now())`;
@@ -14,14 +15,16 @@ const visible = sql`p.is_public and p.blinded_at is null and (p.publish_at is nu
  * 점수 = 그 기간의 조회 기록(post_views, 방문자마다 하루 1행) + 공감 × 3 + 지우지 않은 댓글 × 2.
  * 같으면 새 글이 먼저.
  *
- * 캐시 없이 화면을 열 때마다 센다: 기간 안의 행만 묶어 세고(30일 조회 기록·공감·댓글) 30개만 다시 읽어
- * 가볍고, 글을 비공개로 돌리거나 블라인드하면 바로 빠져야 해서다. 기록이 아주 많아지면
- * post_views(date) 색인이나 순위만 `unstable_cache`(5분)로 두는 것을 생각한다.
+ * 순위(글 번호와 점수)만 5분 기억한다: 기간 안의 조회 기록·공감·댓글을 모두 묶어 세는 일이 기록이 쌓이면
+ * 가장 무거워서다(글 20만·조회 100만에서 약 1초). 카드 내용은 매번 다시 읽고 보이는 글인지도 다시 보므로,
+ * 글을 비공개로 돌리거나 블라인드하면 기억과 상관없이 바로 빠진다.
  */
+const POPULAR_CACHE_MS = 5 * 60_000;
+
 export async function listPopular(range: PopularRange, now = new Date()) {
   const { startDay, startAt } = popularWindow(range, now);
   const since = startAt.toISOString();
-  const ranked = await db.execute<{ id: number; score: number }>(sql`
+  const ranked = await cached(`popular:${range}:${startDay}`, POPULAR_CACHE_MS, () => db.execute<{ id: number; score: number }>(sql`
     with v as (
       select post_id, count(*)::int as n from ${postViews} where date >= ${startDay}::date group by post_id
     ), l as (
@@ -41,7 +44,7 @@ export async function listPopular(range: PopularRange, now = new Date()) {
     where ${visible}
     order by score desc, p.created_at desc, p.id desc
     limit ${POPULAR_LIMIT}
-  `);
+  `));
   if (ranked.length === 0) return [];
   const scores = new Map(ranked.map((r) => [Number(r.id), Number(r.score)]));
   // 마을 소식과 같은 카드 내용. 순위를 센 뒤 바뀌었을 수 있어 보이는 글인지 한 번 더 본다

@@ -26,8 +26,9 @@ import { siteUrl } from "@/lib/feed";
 import { noticeDismissKey } from "@/lib/admin-rules";
 import { getActiveNotice } from "@/server/admin-tools";
 import { foodEnabled } from "@/server/food";
-// 한글 글꼴 Pretendard를 이 사이트에서 직접 내려준다. 글자 범위별로 쪼갠 파일이라 화면에 쓰인 글자 몫만 받는다
-import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
+// 한글 글꼴 Pretendard는 이 사이트에서 직접 내려준다. 글자 범위별로 쪼갠 파일이라 화면에 쓰인 글자 몫만 받고,
+// 첫 화면을 막지 않게 LateFonts가 그린 뒤에 불러온다
+import { LateFonts } from "@/components/layout/LateFonts";
 import "./globals.css";
 import "./post-extras.css";
 import "./theme-dark.css";
@@ -174,6 +175,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
       <body className="flex min-h-dvh flex-col">
+        <LateFonts />
         {/* 공지 띠·헤더(세션·출석·코인·알림 읽기)를 본문과 따로 그려서, 본문이 헤더 쿼리를 기다리지 않는다 */}
         <Suspense fallback={null}>
           <NoticeBar />
