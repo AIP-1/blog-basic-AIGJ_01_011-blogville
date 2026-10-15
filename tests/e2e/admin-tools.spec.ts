@@ -215,6 +215,33 @@ test.describe("ADM-01 회원 관리", () => {
   });
 });
 
+test.describe("ADM-01 코인·경험치 주기", () => {
+  test("관리자가 준 코인·경험치가 원장·내역·관리 기록에 남고 레벨이 오른다", async ({ browser }) => {
+    const target = await member(browser);
+    const a = await admin(browser);
+    const card = await openMember(a.page, target.username);
+    const form = card.getByRole("form", { name: "코인·경험치 지급" });
+    await form.getByLabel("🪙 코인").fill("100000");
+    await form.getByLabel("⭐ 경험치").fill("10000");
+    a.page.once("dialog", (d) => d.accept());
+    await form.getByRole("button", { name: "🎁 주기" }).click();
+    await expect(form.locator("[data-admin-result]")).toContainText("Lv.32");
+    const [row] = await sql`select coin_delta, exp_delta from point_ledger where user_id = ${target.userId} and reason = 'admin_grant'`;
+    expect(row).toMatchObject({ coin_delta: 100000, exp_delta: 10000 });
+    const [log] = await audits("grant_points", target.userId);
+    expect(log.detail).toContain("코인 +100,000");
+    await target.page.goto("/wallet");
+    await expect(target.page.getByText("🎁 운영자 선물")).toBeVisible();
+
+    // 둘 다 0이면 거절
+    await form.getByLabel("🪙 코인").fill("0");
+    await form.getByLabel("⭐ 경험치").fill("0");
+    a.page.once("dialog", (d) => d.accept());
+    await form.getByRole("button", { name: "🎁 주기" }).click();
+    await expect(form.locator("[data-admin-result]")).toHaveAttribute("role", "alert");
+  });
+});
+
 test.describe("ADM-02 콘텐츠 관리", () => {
   test("글·댓글·답글·방명록을 최신순으로 보고(비밀 내용 포함) 골라 지운다", async ({ browser }) => {
     const owner = await member(browser);

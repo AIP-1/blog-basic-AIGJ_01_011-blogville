@@ -18,6 +18,7 @@ export const ADMIN_ERRORS = {
   postNotFound: "글을 찾지 못했어요",
   noneSelected: "지울 항목을 골라 주세요",
   invalid: "요청이 올바르지 않아요",
+  grant: "코인·경험치를 0 이상 숫자로 적어 주세요 (둘 중 하나는 1 이상)",
 } as const;
 
 // ── 회원 정지 (ADM-01) ─────────────────────────────────────
@@ -291,9 +292,27 @@ export const AUDIT_ACTIONS = {
   feedback: "문의 답변",
   dismiss_reports: "신고 기각",
   resolve_error: "오류 해결",
+  grant_points: "코인·경험치 지급",
 } as const;
 export type AuditAction = keyof typeof AUDIT_ACTIONS;
 
 export function parseAuditAction(value: unknown): AuditAction | null {
   return typeof value === "string" && Object.hasOwn(AUDIT_ACTIONS, value) ? (value as AuditAction) : null;
+}
+
+// ── 코인·경험치 지급 (ADM-01) ──────────────────────────────
+
+/** 한 번에 줄 수 있는 최대 코인·경험치. 경험치 100,000이면 Lv.99를 넘는다 */
+export const GRANT_COIN_MAX = 1_000_000;
+export const GRANT_EXP_MAX = 100_000;
+
+/** 지급 칸 값 → 0 이상 정수. 비우면 0, 쉼표는 지운다. 범위를 넘거나 숫자가 아니면 null */
+export function parseGrantAmount(value: unknown, max: number): number | null {
+  if (value == null) return 0;
+  if (typeof value !== "string") return null;
+  const text = value.replaceAll(",", "").trim();
+  if (text === "") return 0;
+  if (!/^\d+$/.test(text)) return null;
+  const n = Number(text);
+  return n <= max ? n : null;
 }

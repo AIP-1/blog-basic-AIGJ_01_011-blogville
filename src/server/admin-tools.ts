@@ -27,6 +27,7 @@ import { BANNED_KEY, clearBannedWordsCache, readBannedWords } from "./banned-wor
 import { removeComment, removeReply } from "./comments";
 import type { Member } from "./dal";
 import { removeEntry } from "./guestbook";
+import { addLedgerEntry, getWallet, lockUser } from "./points";
 
 // 관리자 보강 (ADM-01~07, specs/058-admin-tools). 부르는 쪽(Server Action·화면)이 먼저 requireAdmin()으로 관리자인지 본다.
 
@@ -221,6 +222,23 @@ export async function forceDeleteMember(adminId: string, userId: string): Promis
   await deleteMember(userId, target.username);
   await writeAudit(db, adminId, "delete_member", { type: "member", id: userId, label: target.username });
   return { ok: true, message: `${target.username} 님을 탈퇴시켰어요` };
+}
+
+/** 코인·경험치 지급: 원장에 '운영자 선물' 한 줄을 넣고(레벨이 오르면 알림도), 관리 기록에 지급 전후 레벨을 남긴다 */
+export async function grantPoints(adminId: string, userId: string, coin: number, exp: number): Promise<AdminResult> {
+  if (coin < 0 || exp < 0 || coin + exp === 0) return { ok: false, error: ADMIN_ERRORS.grant };
+  return db.transaction(async (tx) => {
+    const target = await lockTarget(tx, userId);
+    if (!target) return { ok: false, error: ADMIN_ERRORS.notFound };
+    await lockUser(tx, userId);
+    const before = await getWallet(userId, tx);
+    await addLedgerEntry(tx, { userId, reason: "admin_grant", expDelta: exp, coinDelta: coin, refId: null });
+    const after = await getWallet(userId, tx);
+    const summary = `코인 +${coin.toLocaleString("ko-KR")} · 경험치 +${exp.toLocaleString("ko-KR")}`;
+    const levels = `Lv.${before.progress.level} → Lv.${after.progress.level}`;
+    await writeAudit(tx, adminId, "grant_points", { type: "member", id: userId, label: target.username }, `${summary} (${levels})`);
+    return { ok: true, message: `${target.username} 님에게 ${summary}을 줬어요. ${levels}, 코인 ${after.coin.toLocaleString("ko-KR")}` };
+  });
 }
 
 // ── 콘텐츠 (ADM-02) ────────────────────────────────────────

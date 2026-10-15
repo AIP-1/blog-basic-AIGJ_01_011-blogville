@@ -13,6 +13,7 @@ import {
   NOTICE_ERRORS,
   noticeDismissKey,
   parseAuditAction,
+  parseGrantAmount,
   parseBannedWords,
   parseContentRefs,
   parseContentTab,
@@ -187,5 +188,20 @@ describe("ADM-03·06 통계·기록 값", () => {
   });
   it("LIKE 특수 문자는 글자 그대로", () => {
     expect(likePattern("a%_\\")).toBe("%a\\%\\_\\\\%");
+  });
+});
+
+describe("코인·경험치 지급 칸 (ADM-01)", () => {
+  it("비우면 0, 쉼표는 빼고 0 이상 정수만", () => {
+    expect(parseGrantAmount(null, 100)).toBe(0);
+    expect(parseGrantAmount("  ", 100)).toBe(0);
+    expect(parseGrantAmount("1,000", 5000)).toBe(1000);
+    expect(parseGrantAmount("-5", 100)).toBeNull();
+    expect(parseGrantAmount("1.5", 100)).toBeNull();
+    expect(parseGrantAmount("abc", 100)).toBeNull();
+  });
+  it("최대를 넘으면 거절", () => {
+    expect(parseGrantAmount("100", 100)).toBe(100);
+    expect(parseGrantAmount("101", 100)).toBeNull();
   });
 });

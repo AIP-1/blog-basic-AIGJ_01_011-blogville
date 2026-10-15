@@ -784,7 +784,7 @@ export const pointLedger = pgTable(
     uniqueIndex("point_ledger_fishing_uq").on(t.userId, t.refId).where(sql`${t.reason} = 'fishing'`),
     check(
       "point_ledger_reason_check",
-      sql`${t.reason} in ('signup', 'attendance', 'post', 'comment', 'like_received', 'purchase', 'farm_care', 'farm_grown', 'egg_purchase', 'growth_purchase', 'fishing')`,
+      sql`${t.reason} in ('signup', 'attendance', 'post', 'comment', 'like_received', 'purchase', 'farm_care', 'farm_grown', 'egg_purchase', 'growth_purchase', 'fishing', 'admin_grant')`,
     ),
     // 구매(상점·알)만 코인이 줄고, 구매는 경험치가 없다 (SHOP-03, TOWN-09)
     check(
