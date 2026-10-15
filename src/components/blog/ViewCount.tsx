@@ -1,7 +1,7 @@
 "use client";
 
-import { startTransition, useEffect, useState } from "react";
-import { recordPostView } from "@/app/blog/actions";
+import { useEffect, useState } from "react";
+import { postVisit } from "./record-visit";
 
 /**
  * 이 화면에 오기 직전 주소. 사이트 안에서 링크로 옮겨 왔으면(처음 연 문서 주소와 지금 주소가 다르면)
@@ -21,11 +21,14 @@ export function ViewCount({ postId, initial, record }: { postId: number; initial
   const [count, setCount] = useState(initial);
   useEffect(() => {
     if (!record) return;
-    startTransition(async () => {
-      // 어디서 왔는지(유입 경로)는 서버가 사이트 이름만 남긴다
-      const next = await recordPostView(String(postId), currentReferrer()).catch(() => null);
-      if (next !== null) setCount(next);
+    let live = true;
+    // 어디서 왔는지(유입 경로)는 서버가 사이트 이름만 남긴다
+    postVisit<{ count: number | null }>({ postId, referrer: currentReferrer() }).then((res) => {
+      if (live && typeof res?.count === "number") setCount(res.count);
     });
+    return () => {
+      live = false;
+    };
   }, [postId, record]);
   return <span aria-label={`조회 ${count}`}>👀 {count}</span>;
 }
