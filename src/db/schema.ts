@@ -376,8 +376,13 @@ export const posts = pgTable(
     index("posts_series_idx").on(t.seriesId, t.createdAt, t.id).where(sql`${t.seriesId} is not null`),
     index("posts_publish_at_idx").on(t.publishAt).where(sql`${t.publishAt} is not null`),
     check("posts_scheduled_private", sql`${t.publishAt} is null or not ${t.isPublic}`),
-    index("posts_blog_list_idx").on(t.blogId, t.createdAt.desc(), t.id.desc()),
-    index("posts_blog_popular_idx").on(t.blogId, t.viewCount.desc()),
+    index("posts_blog_list_idx").on(t.blogId, t.createdAt, t.id),
+    // 마을 소식·인기 글 기간 후보처럼 모든 블로그의 글을 최신순으로 몇 개만 읽을 때 (성능 개선 0051).
+    // is_public은 질의에서 $1로 넘어가 준비된 질의의 일반 계획이 부분 색인을 못 쓰므로 조건 없이 둔다.
+    // 색인은 모두 오름차순으로 둔다: 드리즐 .desc() 색인은 NULLS LAST라 "order by … desc"(NULLS FIRST)에 안 맞아 못 쓴다.
+    // 오름차순 색인은 거꾸로 읽어 desc 정렬에 그대로 쓰인다 (0051)
+    index("posts_recent_idx").on(t.createdAt, t.id),
+    index("posts_blog_popular_idx").on(t.blogId, t.viewCount),
     check("posts_view_count_check", sql`${t.viewCount} >= 0`),
     index("posts_category_idx").on(t.categoryId),
     index("posts_subcategory_idx").on(t.subcategoryId),
@@ -467,6 +472,8 @@ export const comments = pgTable(
   },
   (t) => [
     index("comments_post_created_idx").on(t.postId, t.createdAt),
+    // 인기 글: 기간 안에 달린 댓글만 세려고 (0051)
+    index("comments_created_idx").on(t.createdAt).where(sql`${t.deletedAt} is null`),
     liveContentCheck("comments_content_check", t.content, t.deletedAt),
   ],
 );
@@ -520,7 +527,7 @@ export const guestbookEntries = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    index("guestbook_entries_blog_created_idx").on(t.blogId, t.createdAt.desc(), t.id.desc()),
+    index("guestbook_entries_blog_created_idx").on(t.blogId, t.createdAt, t.id),
     index("guestbook_entries_author_idx").on(t.authorId),
     check("guestbook_entries_content_check", sql`char_length(${t.content}) between 1 and 1000`),
     check(
@@ -555,7 +562,7 @@ export const feedback = pgTable(
   },
   (t) => [
     index("feedback_status_created_idx").on(t.status, t.createdAt),
-    index("feedback_user_created_idx").on(t.userId, t.createdAt.desc()),
+    index("feedback_user_created_idx").on(t.userId, t.createdAt),
     check("feedback_kind_check", sql`${t.kind} in ('bug', 'question')`),
     check("feedback_status_check", sql`${t.status} in ('new', 'in_progress', 'answered', 'fixed')`),
     check("feedback_title_check", sql`char_length(${t.title}) between 1 and 100`),
@@ -627,7 +634,7 @@ export const postLikes = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     createdAt: createdAt(),
   },
-  (t) => [primaryKey({ columns: [t.postId, t.userId] }), index("post_likes_user_idx").on(t.userId)],
+  (t) => [primaryKey({ columns: [t.postId, t.userId] }), index("post_likes_user_idx").on(t.userId), index("post_likes_created_idx").on(t.createdAt)],
 );
 
 // 이웃 (SOC-04). 기본 키가 "같은 이웃은 한 번만"을, CHECK가 "나는 내 이웃이 아님"을 지킨다.
@@ -709,7 +716,7 @@ export const notifications = pgTable(
     readAt: timestamp("read_at", { withTimezone: true }),
   },
   (t) => [
-    index("notifications_user_created_idx").on(t.userId, t.createdAt.desc(), t.id.desc()),
+    index("notifications_user_created_idx").on(t.userId, t.createdAt, t.id),
     index("notifications_unread_idx").on(t.userId).where(sql`${t.readAt} is null`),
     index("notifications_post_idx").on(t.postId),
     index("notifications_actor_idx").on(t.actorId),
@@ -762,7 +769,7 @@ export const pointLedger = pgTable(
   },
   (t) => [
     index("point_ledger_user_reason_created_idx").on(t.userId, t.reason, t.createdAt),
-    index("point_ledger_user_created_idx").on(t.userId, t.createdAt.desc(), t.id.desc()),
+    index("point_ledger_user_created_idx").on(t.userId, t.createdAt, t.id),
     // 같은 사람·같은 글 공감 보상은 한 번만 (껐다 켜도, 동시에 눌러도)
     uniqueIndex("point_ledger_like_received_uq").on(t.userId, t.refId).where(sql`${t.reason} = 'like_received'`),
     // 가입 축하는 한 번만
@@ -904,8 +911,8 @@ export const adminAudit = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    index("admin_audit_created_idx").on(t.createdAt.desc(), t.id.desc()),
-    index("admin_audit_action_created_idx").on(t.action, t.createdAt.desc()),
+    index("admin_audit_created_idx").on(t.createdAt, t.id),
+    index("admin_audit_action_created_idx").on(t.action, t.createdAt),
     check("admin_audit_action_check", sql`char_length(${t.action}) between 1 and 40`),
     check("admin_audit_target_type_check", sql`${t.targetType} in ('member', 'post', 'comment', 'reply', 'guestbook', 'feedback', 'site')`),
     check("admin_audit_target_id_check", sql`${t.targetId} is null or char_length(${t.targetId}) between 1 and 64`),
@@ -978,7 +985,7 @@ export const bookmarks = pgTable(
       .references(() => posts.id, { onDelete: "cascade" }),
     createdAt: createdAt(),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.postId] }), index("bookmarks_user_created_idx").on(t.userId, t.createdAt.desc()), index("bookmarks_post_idx").on(t.postId)],
+  (t) => [primaryKey({ columns: [t.userId, t.postId] }), index("bookmarks_user_created_idx").on(t.userId, t.createdAt), index("bookmarks_post_idx").on(t.postId)],
 );
 
 // 서버 오류 기록 (instrumentation.ts의 onRequestError, server/error-log.ts).
@@ -1002,7 +1009,7 @@ export const errorLogs = pgTable(
     count: integer("count").notNull().default(1),
   },
   (t) => [
-    index("error_logs_last_seen_idx").on(t.lastSeenAt.desc()),
+    index("error_logs_last_seen_idx").on(t.lastSeenAt),
     index("error_logs_group_idx").on(t.routePath, t.digest, t.lastSeenAt),
     check("error_logs_message_check", sql`char_length(${t.message}) <= 1000`),
     check("error_logs_stack_check", sql`${t.stack} is null or char_length(${t.stack}) <= 4000`),
@@ -1032,7 +1039,7 @@ export const foodSaved = pgTable(
   },
   (t) => [
     unique("food_saved_user_place_unique").on(t.userId, t.placeId),
-    index("food_saved_user_created_idx").on(t.userId, t.createdAt.desc()),
+    index("food_saved_user_created_idx").on(t.userId, t.createdAt),
     check("food_saved_place_id_check", sql`char_length(${t.placeId}) between 1 and 200`),
     check("food_saved_name_check", sql`char_length(${t.name}) between 1 and 100`),
   ],

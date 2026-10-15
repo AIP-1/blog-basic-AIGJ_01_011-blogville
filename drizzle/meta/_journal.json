@@ -316,6 +316,13 @@
       "when": 1791972245044,
       "tag": "0050_food_saved",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1792024791609,
+      "tag": "0051_perf_indexes",
+      "breakpoints": true
     }
   ]
 }

@@ -7,6 +7,7 @@ import { blogs, categories, follows, posts, profiles, subcategories } from "@/db
 import { commentCountSql } from "./comments";
 import { likeCountSql } from "./likes";
 import { PAGE_SIZE } from "./post";
+import { cached } from "./ttl-cache";
 
 /**
  * 마을 소식(SOC-05)·이웃 새 글(SOC-04): 모든 블로그(또는 내 이웃 블로그)의 공개 글, 최신순 8개씩.
@@ -51,7 +52,10 @@ export async function listFeed({ page, followerId, search }: { page: number; fol
       .orderBy(...(followerId ? [desc(pinned)] : []), desc(posts.createdAt), desc(posts.id))
       .limit(PAGE_SIZE)
       .offset((page - 1) * PAGE_SIZE),
-    db.select({ total: count() }).from(posts).innerJoin(blogs, eq(blogs.id, posts.blogId)).where(where),
+    // 모든 블로그의 공개 글 수는 마을 소식을 열 때마다 같은 값을 세므로 1분 기억한다 (이웃 새 글·검색은 사람마다 달라 매번)
+    followerId || search
+      ? db.select({ total: count() }).from(posts).innerJoin(blogs, eq(blogs.id, posts.blogId)).where(where)
+      : cached("feed-total", 60_000, () => db.select({ total: count() }).from(posts).where(where)),
   ]);
   return { items, total };
 }
@@ -60,9 +64,13 @@ export const BROWSE_BLOGS = 12;
 
 /**
  * 마을 소식 1페이지의 `블로그 둘러보기` (SOC-05 열린 질문의 제안): 공개 글이 있는 블로그를 최근 공개 글 순으로.
- * 글 수도 공개 글만 센다.
+ * 글 수도 공개 글만 센다. 모든 글을 블로그마다 묶어 세므로 1분 기억한다.
  */
-export async function listActiveBlogs(limit = BROWSE_BLOGS) {
+export function listActiveBlogs(limit = BROWSE_BLOGS) {
+  return cached(`active-blogs:${limit}`, 60_000, () => loadActiveBlogs(limit));
+}
+
+function loadActiveBlogs(limit: number) {
   const active = db
     .select({ blogId: posts.blogId, lastAt: max(posts.createdAt).as("last_at"), postCount: count().as("post_count") })
     .from(posts)

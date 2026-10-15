@@ -5,6 +5,7 @@ import { blogs, categories, posts, postTags, subcategories, tags } from "@/db/sc
 import { commentCountSql } from "./comments";
 import { likeCountSql } from "./likes";
 import { PAGE_SIZE } from "./post";
+import { cached } from "./ttl-cache";
 
 /** 이 글의 태그를 새 목록에 맞춘다. 글 저장과 같은 트랜잭션에서 부른다 (POST-04). */
 export async function syncPostTags(tx: Tx, postId: number, names: string[]) {
@@ -70,8 +71,12 @@ export async function listTagPosts(name: string, page: number) {
 
 export const POPULAR_TAGS_MAX = 30;
 
-/** 인기 태그: 공개 글에 달린 횟수 많은 순 → 이름순, 30개 */
-export async function getPopularTags() {
+/** 인기 태그: 공개 글에 달린 횟수 많은 순 → 이름순, 30개. 모든 글의 태그를 세서 5분 기억한다 */
+export function getPopularTags() {
+  return cached("popular-tags", 5 * 60_000, loadPopularTags);
+}
+
+function loadPopularTags() {
   const uses = count(postTags.postId);
   return db
     .select({ name: tags.name, count: uses })
