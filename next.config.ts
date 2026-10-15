@@ -18,6 +18,12 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // 글자 인식(협찬 배너 그림)은 worker 파일과 한국어 데이터를 node_modules에서 그대로 읽는다
   serverExternalPackages: ["tesseract.js"],
+  experimental: {
+    // 화면은 모두 로그인한 사람마다 달라 서버가 no-store로 보낸다(맞는 동작). 그래서 브라우저 안 이동은
+    // 방금 본 화면으로 돌아가도 매번 서버에 다시 묻는다. 30초 동안은 받아 둔 화면을 바로 다시 보여 준다.
+    // 글·댓글·공감 같은 서버 액션은 revalidatePath로 이 기억을 비우므로 내가 바꾼 것은 바로 보인다.
+    staleTimes: { dynamic: 30 },
+  },
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
