@@ -73,3 +73,33 @@ describe("parseIndexChart (지수 하루 흐름)", () => {
     expect(parseIndexChart({ error: 1 })).toEqual([]);
   });
 });
+
+describe("정규장 밖 거래 (애프터마켓)", () => {
+  it("15:30 뒤 넥스트레이드 애프터마켓이 거래 중이면 그 가격과 전날 종가 대비 등락을 쓴다", () => {
+    const row = {
+      itemCode: "005930",
+      closePrice: "215,500",
+      compareToPreviousClosePrice: "5,500",
+      compareToPreviousPrice: { code: "2", name: "RISING" },
+      fluctuationsRatio: "2.62",
+      marketStatus: "OPEN",
+      overMarketPriceInfo: { tradingSessionType: "AFTER_MARKET", overMarketStatus: "OPEN", overPrice: "216,000", compareToPreviousClosePrice: "6,000", fluctuationsRatio: "2.86" },
+    };
+    expect(parseNaverQuote(row)).toMatchObject({ price: 216000, change: 6000, rate: 2.86, session: "after" });
+    // 애프터마켓이 끝났으면 정규장 종가
+    expect(parseNaverQuote({ ...row, overMarketPriceInfo: { ...row.overMarketPriceInfo, overMarketStatus: "CLOSE" } })).toMatchObject({ price: 215500, change: 5500, session: null });
+  });
+
+  it("미국 애프터마켓은 등락을 오늘 종가 대비가 아니라 전날 종가 대비로 다시 센다", () => {
+    const q = parseNaverQuote({
+      reutersCode: "AAPL.O",
+      closePrice: "342.00",
+      compareToPreviousClosePrice: "2.00",
+      compareToPreviousPrice: { code: "2", name: "RISING" },
+      fluctuationsRatio: "0.59",
+      overMarketPriceInfo: { tradingSessionType: "PRE_MARKET", overMarketStatus: "OPEN", overPrice: "340.67", compareToPreviousClosePrice: "-1.33" },
+    });
+    expect(q).toMatchObject({ price: 340.67, change: 0.67, session: "pre" });
+    expect(q!.rate).toBeCloseTo(0.2, 2);
+  });
+});
