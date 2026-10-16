@@ -118,17 +118,17 @@ export function parseNaverQuote(row: unknown): { key: string; price: number | nu
     name: str(r.stockName),
     session: null as StockSession | null,
   };
-  // 정규장 밖 거래 (15:30 뒤 넥스트레이드 애프터마켓 등): 거래 중이면 그 가격을 보여 준다.
-  // 등락은 정규장과 같은 기준(전날 종가 대비)으로 다시 센다 — 미국은 over 쪽 등락이 오늘 종가 대비라서
+  // 정규장 밖 거래 (국내 넥스트레이드 프리·애프터, 미국 프리·애프터마켓): 거래 중이면 그 가격과 네이버 증권이 보여 주는 등락을 그대로 쓴다.
+  // 국내는 전날 종가 대비, 미국 프리마켓은 전날 종가 대비, 미국 애프터마켓은 그날 종가 대비 (네이버 증권 화면과 같다)
   const over = rec(r.overMarketPriceInfo);
   const overPrice = toNumber(over?.overPrice);
-  const type = str(over?.tradingSessionType);
-  const session: StockSession | null = type === "AFTER_MARKET" ? "after" : type === "PRE_MARKET" ? "pre" : null;
-  if (!over || str(over.overMarketStatus) !== "OPEN" || overPrice === null || !session || price === null || change === null) return base;
-  const prevClose = price - change;
-  const round = (n: number) => Math.round(n * 100) / 100;
-  const overChange = round(overPrice - prevClose);
-  return { ...base, price: overPrice, change: overChange, rate: prevClose > 0 ? round((overChange / prevClose) * 100) : null, session };
+  const type = (str(over?.tradingSessionType) ?? "").toUpperCase();
+  const session: StockSession | null = /AFTER/.test(type) ? "after" : /PRE|BEFORE/.test(type) ? "pre" : null;
+  if (!over || str(over.overMarketStatus)?.toUpperCase() !== "OPEN" || overPrice === null || !session) return base;
+  const overDirection = str(rec(over.compareToPreviousPrice)?.name) ?? str(rec(over.compareToPreviousPrice)?.code);
+  const overFalling = overDirection === "FALLING" || overDirection === "LOWER_LIMIT" || overDirection === "5" || overDirection === "4";
+  const overSign = (n: number | null) => (n === null ? null : overFalling ? -Math.abs(n) : overDirection === "EVEN" || overDirection === "3" ? 0 : overDirection ? Math.abs(n) : n);
+  return { ...base, price: overPrice, change: overSign(toNumber(over.compareToPreviousClosePrice)), rate: overSign(toNumber(over.fluctuationsRatio)), session };
 }
 
 /** 네이버 증권 검색 자동 완성(ac.stock.naver.com/ac) 한 줄 → 넣을 수 있는 종목. 국내·미국 주식만 */
