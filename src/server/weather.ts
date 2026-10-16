@@ -2,7 +2,8 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { blogs } from "@/db/schema";
-import { isCityKey, parseForecast, type Weather } from "@/lib/weather";
+import { shortCity } from "@/lib/food";
+import { dongOfRegion, isCityKey, parseForecast, type Weather } from "@/lib/weather";
 
 // ☀️ 날씨 위젯 자료: Open-Meteo(열쇠 없음)를 서버가 받아 자리마다 30분 기억한다.
 // 브라우저는 Open-Meteo를 직접 부르지 않는다 (사이트 CSP는 그대로). 시험은 WEATHER_BASE·AIR_BASE로 가짜 서버를 가리킨다.
@@ -15,6 +16,32 @@ const TIMEOUT_MS = 4_000;
 // 미세먼지 서버는 예보보다 느려서 더 기다린다. 미세먼지만 못 받았으면 5분 뒤 다시 묻는다
 const AIR_TIMEOUT_MS = 8_000;
 const NO_AIR_TTL_MS = 5 * 60_000;
+
+const KAKAO_BASE = () => process.env.KAKAO_API_BASE ?? "https://dapi.kakao.com";
+const DONG_TTL_MS = 24 * 3_600_000;
+const dongCache = new Map<string, { at: number; value: Promise<{ dong: string; full: string } | null> }>();
+
+/** 그 자리의 동 이름 (카카오 좌표→행정구역, 하루 기억). 카카오 열쇠가 없거나 못 받으면 null */
+export function getDong(lat: number, lon: number): Promise<{ dong: string; full: string } | null> {
+  const keyId = process.env.KAKAO_REST_API_KEY;
+  if (!keyId) return Promise.resolve(null);
+  const key = `${lat},${lon}`;
+  const hit = dongCache.get(key);
+  if (hit && Date.now() - hit.at < DONG_TTL_MS) return hit.value;
+  const value = fetch(`${KAKAO_BASE()}/v2/local/geo/coord2regioncode.json?x=${lon}&y=${lat}`, {
+    headers: { Authorization: `KakaoAK ${keyId}` },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+    cache: "no-store",
+  })
+    .then((res) => (res.ok ? res.json() : null))
+    .then(dongOfRegion)
+    // "전남광주통합특별시 서구 상무1동" → "광주 서구 상무1동" (맛집과 같은 짧은 이름)
+    .then((d) => (d ? { ...d, full: shortCity(d.full) } : null))
+    .catch(() => null);
+  dongCache.set(key, { at: Date.now(), value });
+  if (dongCache.size > 5_000) for (const [k, v] of dongCache) if (Date.now() - v.at >= DONG_TTL_MS) dongCache.delete(k);
+  return value;
+}
 
 const cache = new Map<string, { at: number; ttl: number; value: Promise<Weather | null> }>();
 
