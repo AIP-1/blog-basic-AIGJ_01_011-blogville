@@ -83,23 +83,29 @@ describe("정규장 밖 거래 (애프터마켓)", () => {
       compareToPreviousPrice: { code: "2", name: "RISING" },
       fluctuationsRatio: "2.62",
       marketStatus: "OPEN",
-      overMarketPriceInfo: { tradingSessionType: "AFTER_MARKET", overMarketStatus: "OPEN", overPrice: "216,000", compareToPreviousClosePrice: "6,000", fluctuationsRatio: "2.86" },
+      overMarketPriceInfo: { tradingSessionType: "AFTER_MARKET", overMarketStatus: "OPEN", overPrice: "216,000", compareToPreviousPrice: { code: "2", name: "RISING" }, compareToPreviousClosePrice: "6,000", fluctuationsRatio: "2.86" },
     };
     expect(parseNaverQuote(row)).toMatchObject({ price: 216000, change: 6000, rate: 2.86, session: "after" });
     // 애프터마켓이 끝났으면 정규장 종가
     expect(parseNaverQuote({ ...row, overMarketPriceInfo: { ...row.overMarketPriceInfo, overMarketStatus: "CLOSE" } })).toMatchObject({ price: 215500, change: 5500, session: null });
   });
 
-  it("미국 애프터마켓은 등락을 오늘 종가 대비가 아니라 전날 종가 대비로 다시 센다", () => {
-    const q = parseNaverQuote({
+  it("미국 프리·애프터마켓은 네이버 증권과 같은 등락(그 시간대 기준)을 그대로 쓴다", () => {
+    const row = {
       reutersCode: "AAPL.O",
       closePrice: "342.00",
       compareToPreviousClosePrice: "2.00",
       compareToPreviousPrice: { code: "2", name: "RISING" },
       fluctuationsRatio: "0.59",
-      overMarketPriceInfo: { tradingSessionType: "PRE_MARKET", overMarketStatus: "OPEN", overPrice: "340.67", compareToPreviousClosePrice: "-1.33" },
-    });
-    expect(q).toMatchObject({ price: 340.67, change: 0.67, session: "pre" });
-    expect(q!.rate).toBeCloseTo(0.2, 2);
+      marketStatus: "CLOSE",
+      overMarketPriceInfo: { tradingSessionType: "PRE_MARKET", overMarketStatus: "OPEN", overPrice: "340.67", compareToPreviousPrice: { code: "5", name: "FALLING" }, compareToPreviousClosePrice: "-1.33", fluctuationsRatio: "-0.39" },
+    };
+    expect(parseNaverQuote(row)).toMatchObject({ price: 340.67, change: -1.33, rate: -0.39, session: "pre" });
+    // 방향 표시가 없어도 부호를 그대로 믿는다
+    const noDir = { ...row, overMarketPriceInfo: { ...row.overMarketPriceInfo, compareToPreviousPrice: undefined, tradingSessionType: "AFTER_MARKET" } };
+    expect(parseNaverQuote(noDir)).toMatchObject({ price: 340.67, change: -1.33, rate: -0.39, session: "after" });
+    // 상승은 부호 없이 와도 양수
+    const up = { ...row, overMarketPriceInfo: { ...row.overMarketPriceInfo, compareToPreviousPrice: { code: "2", name: "RISING" }, compareToPreviousClosePrice: "1.20", fluctuationsRatio: "0.35" } };
+    expect(parseNaverQuote(up)).toMatchObject({ change: 1.2, rate: 0.35 });
   });
 });
