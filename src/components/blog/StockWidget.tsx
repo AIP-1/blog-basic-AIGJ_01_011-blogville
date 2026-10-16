@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { formatChange, formatPrice, STOCK_INDEXES, STOCK_REFRESH_MS, type StockIndex, type StockIndexCode, type StockQuote } from "@/lib/stocks";
+import { formatChange, formatPrice, STOCK_INDEXES, STOCK_REFRESH_MS, STOCK_SESSION_LABELS, type StockIndex, type StockIndexCode, type StockQuote } from "@/lib/stocks";
 import type { WidgetSize } from "@/lib/widgets";
 
 const UP = "text-[#d32f2f] dark:text-[#ff6b6b]";
@@ -202,6 +202,11 @@ export function StockWidget({
                       <span className="shrink-0 text-xs text-ink-soft">시세를 못 받았어요</span>
                     ) : (
                       <span className={`flex shrink-0 items-baseline gap-2 rounded-md px-1 tabular-nums transition-colors duration-700 ${flashOf(k)}`}>
+                        {q.session && (
+                          <span className="rounded border border-line px-1 text-[10px] font-semibold text-ink-soft" data-stock-session={q.session} title={`${STOCK_SESSION_LABELS[q.session]}마켓 가격 (정규장 밖 거래)`}>
+                            {STOCK_SESSION_LABELS[q.session]}
+                          </span>
+                        )}
                         <span className={`text-xs font-semibold ${toneOf(q.change)}`} data-stock-rate>
                           {rateText(q.rate)}
                         </span>

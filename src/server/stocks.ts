@@ -115,6 +115,7 @@ export async function getQuotes(items: StockItem[]): Promise<StockQuote[]> {
       rate: q?.rate ?? null,
       currency: q?.currency ?? (item.market === "KR" ? "KRW" : "USD"),
       status: q?.status ?? null,
+      session: q?.session ?? null,
     };
   });
 }
