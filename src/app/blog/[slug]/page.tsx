@@ -17,6 +17,7 @@ import { parseSearchQuery, parseTagFilter, SEARCH_EMPTY, TOWN_SEARCH_EMPTY, TOWN
 import { parseId, parsePage } from "@/lib/ids";
 import { NOTICE_SLUG } from "@/lib/names";
 import { getBlogBySlug, searchBlogs } from "@/server/blog";
+import { weatherPlaceEnabled } from "@/server/weather-place";
 import { accentProps } from "@/lib/blog-accent";
 import { getOwnedFurniture, getPlacedFurniture } from "@/server/house";
 import { getAvatar } from "@/server/items";
@@ -322,7 +323,8 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
           recordVisit={!isOwner}
           isOwner={isOwner}
           layout={layout}
-          weatherCity={blog.weatherCity}
+          weather={{ weatherCity: blog.weatherCity, weatherPlace: blog.weatherPlace, weatherLat: blog.weatherLat, weatherLon: blog.weatherLon }}
+          weatherPlaceSearch={isOwner && weatherPlaceEnabled()}
           visitDays={visitDays}
           search={search ?? ""}
           townSearch={isOwner ? (town ?? "") : undefined}

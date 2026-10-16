@@ -330,6 +330,13 @@
       "when": 1792050350243,
       "tag": "0052_admin_grant",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1792134318957,
+      "tag": "0053_weather_place",
+      "breakpoints": true
     }
   ]
 }

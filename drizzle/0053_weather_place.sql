@@ -1,0 +1,4 @@
+ALTER TABLE "blogs" ADD COLUMN "weather_place" text;--> statement-breakpoint
+ALTER TABLE "blogs" ADD COLUMN "weather_lat" double precision;--> statement-breakpoint
+ALTER TABLE "blogs" ADD COLUMN "weather_lon" double precision;--> statement-breakpoint
+ALTER TABLE "blogs" ADD CONSTRAINT "blogs_weather_place_check" CHECK (("blogs"."weather_place" is null) = ("blogs"."weather_lat" is null) and ("blogs"."weather_place" is null) = ("blogs"."weather_lon" is null) and ("blogs"."weather_place" is null or (char_length("blogs"."weather_place") between 1 and 60 and "blogs"."weather_lat" between 33 and 39 and "blogs"."weather_lon" between 124 and 132)));
