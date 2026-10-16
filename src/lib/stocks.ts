@@ -12,7 +12,12 @@ export type StockQuote = StockItem & {
   currency: string;
   /** 장 상태 (OPEN·CLOSE 등), 모르면 null */
   status: string | null;
+  /** 정규장 밖 거래 중이면 그 시간대 (국내 넥스트레이드 프리·애프터마켓, 미국 프리·애프터마켓). price는 그 시간대 가격 */
+  session?: StockSession | null;
 };
+
+export type StockSession = "pre" | "after";
+export const STOCK_SESSION_LABELS: Record<StockSession, string> = { pre: "프리", after: "애프터" };
 
 /** 증시 지수 (코스피·코스닥): 지금 값과 오늘 분 단위 흐름. 받지 못하면 price가 null */
 export type StockIndex = {
@@ -92,7 +97,7 @@ const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? 
  * 네이버 증권 실시간 시세(polling.finance.naver.com/api/realtime/…)의 `datas` 한 줄.
  * 하락이면 compareToPreviousClosePrice·fluctuationsRatio가 이미 음수인 때와 양수인 때가 섞여 있어 compareToPreviousPrice.name으로 부호를 맞춘다.
  */
-export function parseNaverQuote(row: unknown): { key: string; price: number | null; change: number | null; rate: number | null; currency: string | null; status: string | null; name: string | null } | null {
+export function parseNaverQuote(row: unknown): { key: string; price: number | null; change: number | null; rate: number | null; currency: string | null; status: string | null; name: string | null; session: StockSession | null } | null {
   const r = rec(row);
   if (!r) return null;
   const key = str(r.reutersCode) ?? str(r.itemCode) ?? str(r.symbolCode);
@@ -101,15 +106,29 @@ export function parseNaverQuote(row: unknown): { key: string; price: number | nu
   const falling = direction === "FALLING" || direction === "LOWER_LIMIT" || direction === "5" || direction === "4";
   const sign = (n: number | null) => (n === null ? null : falling ? -Math.abs(n) : direction === "EVEN" || direction === "3" ? 0 : Math.abs(n));
   const currency = str(rec(r.currencyType)?.code) ?? str(r.currencyType);
-  return {
+  const price = toNumber(r.closePrice);
+  const change = sign(toNumber(r.compareToPreviousClosePrice));
+  const base = {
     key,
-    price: toNumber(r.closePrice),
-    change: sign(toNumber(r.compareToPreviousClosePrice)),
+    price,
+    change,
     rate: sign(toNumber(r.fluctuationsRatio)),
     currency,
     status: str(r.marketStatus),
     name: str(r.stockName),
+    session: null as StockSession | null,
   };
+  // 정규장 밖 거래 (15:30 뒤 넥스트레이드 애프터마켓 등): 거래 중이면 그 가격을 보여 준다.
+  // 등락은 정규장과 같은 기준(전날 종가 대비)으로 다시 센다 — 미국은 over 쪽 등락이 오늘 종가 대비라서
+  const over = rec(r.overMarketPriceInfo);
+  const overPrice = toNumber(over?.overPrice);
+  const type = str(over?.tradingSessionType);
+  const session: StockSession | null = type === "AFTER_MARKET" ? "after" : type === "PRE_MARKET" ? "pre" : null;
+  if (!over || str(over.overMarketStatus) !== "OPEN" || overPrice === null || !session || price === null || change === null) return base;
+  const prevClose = price - change;
+  const round = (n: number) => Math.round(n * 100) / 100;
+  const overChange = round(overPrice - prevClose);
+  return { ...base, price: overPrice, change: overChange, rate: prevClose > 0 ? round((overChange / prevClose) * 100) : null, session };
 }
 
 /** 네이버 증권 검색 자동 완성(ac.stock.naver.com/ac) 한 줄 → 넣을 수 있는 종목. 국내·미국 주식만 */
