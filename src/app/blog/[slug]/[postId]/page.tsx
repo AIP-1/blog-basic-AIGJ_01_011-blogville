@@ -128,7 +128,7 @@ export default async function PostPage({ params, searchParams }: PageProps<"/blo
       <article className="post-page mx-auto max-w-3xl rounded-2xl border border-line bg-surface p-5 md:px-12 md:py-10">
         {isOwner && post.blindedAt && <BlindNotice reason={post.blindReason} />}
         {/* 블로그 이름은 블로그 홈처럼 원고지 칸에 (작게) */}
-        <Link href={`/@${blog.slug}`} className="sheet-wrap mb-4 flex min-h-11 w-full items-center" data-blog-link>
+        <Link href={`/@${blog.slug}`} className="sheet-wrap sheet-link mb-4 flex min-h-11 w-full items-center" aria-label={`📖 ${blog.title}`} data-blog-link>
           <span className="sr-only">📖 </span>
           <SheetLine text={blog.title} />
         </Link>

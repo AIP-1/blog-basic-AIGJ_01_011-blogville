@@ -54,12 +54,12 @@ export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle,
           </div>
           <h2 className="post-title-serif mt-2 text-[1.1875rem] group-hover:text-accent">{post.title}</h2>
           <p className="mt-1.5 line-clamp-2 leading-relaxed text-ink-soft">{excerpt(post.contentText)}</p>
-          <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-soft">
-            {blogTitle && <span className="font-semibold text-ink">{blogTitle}</span>}
+          <p className="mt-3 text-sm text-ink-soft">
+            {blogTitle && `${blogTitle} · `}
             <Time date={post.createdAt} />
-            <span aria-label={`공감 ${likeCount}`}>♥ {likeCount}</span>
-            {commentCount > 0 && <span aria-label={`댓글 ${commentCount}개`}>💬 {commentCount}</span>}
-            <span aria-label={`조회 ${post.viewCount}`}>👀 {post.viewCount}</span>
+            <span aria-label={`공감 ${likeCount}`}> · ♥ {likeCount}</span>
+            {commentCount > 0 && <span aria-label={`댓글 ${commentCount}개`}> · 💬 {commentCount}</span>}
+            <span aria-label={`조회 ${post.viewCount}`}> · 👀 {post.viewCount}</span>
           </p>
         </div>
         {cover && (

@@ -48,7 +48,7 @@
   height: var(--cell);
   font-size: calc(var(--cell) * 0.56);
 }
-.sheet:hover .sheet-cell { color: var(--accent); }
+.sheet-link:hover .sheet-cell { color: var(--accent); }
 /* 글 화면 위의 작은 블로그 이름 */
 .sheet[data-sheet-size="sm"] { --cell-max: 2rem; --cell-min: 1.5rem; }
 

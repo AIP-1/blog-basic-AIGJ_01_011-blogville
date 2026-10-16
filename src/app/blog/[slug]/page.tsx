@@ -143,14 +143,14 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
         <div className="grid gap-5 p-5 sm:grid-cols-[minmax(0,1fr)_14rem] sm:p-7 lg:grid-cols-[minmax(0,1fr)_16rem]">
           <div className="min-w-0">
             {/* 블로그 이름은 원고지 칸에 한 글자씩 (블로그 꾸미기 강조색 칸 선) */}
-            <h1 className="sheet-wrap min-w-0">
+            <h1 className="min-w-0">
               <SheetTitle text={blog.title} href={`/@${blog.slug}`} />
             </h1>
             {blog.intro && <p className="mt-4 max-w-[60ch] text-[1.0625rem] leading-relaxed text-ink-soft">{blog.intro}</p>}
             <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3">
               <div className="flex min-w-0 items-center gap-3" aria-label="블로그 정보">
                 {/* 주인 프로필 사진 (BLOG-04, 없으면 캐릭터) */}
-                <ProfileAvatar photoKey={photoKey} nickname={nickname} character={avatar.layers} size={44} />
+                <ProfileAvatar photoKey={photoKey} nickname={nickname} character={avatar.layers} />
                 <span className="min-w-0 leading-tight">
                   <span className="block font-bold">{nickname}</span>
                   <span className="block text-sm text-ink-soft">@{blog.slug}</span>
