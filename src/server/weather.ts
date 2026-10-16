@@ -87,9 +87,9 @@ export function getWeather(lat: number, lon: number): Promise<Weather | null> {
   return entry.value;
 }
 
-/** 내 블로그의 날씨 도시 바꾸기. 모르는 도시면 false */
+/** 내 블로그의 날씨 도시 바꾸기 (고른 동네는 지운다). 모르는 도시면 false */
 export async function setBlogWeatherCity(ownerId: string, key: string): Promise<boolean> {
   if (!isCityKey(key)) return false;
-  await db.update(blogs).set({ weatherCity: key }).where(eq(blogs.ownerId, ownerId));
+  await db.update(blogs).set({ weatherCity: key, weatherPlace: null, weatherLat: null, weatherLon: null }).where(eq(blogs.ownerId, ownerId));
   return true;
 }

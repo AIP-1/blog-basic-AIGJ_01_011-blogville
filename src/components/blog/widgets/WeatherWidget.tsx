@@ -3,13 +3,20 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { geoErrorText, locate } from "@/lib/geolocate";
 import { cityOf, dustGrade, formatTemp, WEATHER_CITIES, weatherLook, weekdayOf, type DustGrade, type Weather } from "@/lib/weather";
+import { placeShort, type WeatherPlace } from "@/lib/weather-place";
 import { saveWeatherCity } from "./actions";
+import { WeatherPlacePicker } from "./WeatherPlacePicker";
 
-// ☀️ 이번 주 날씨 (위젯 보드). 처음엔 블로그 주인이 고른 도시(기본 서울), 보는 사람이 "내 위치"를 허락하면 그 자리.
+// ☀️ 이번 주 날씨 (위젯 보드). 처음엔 블로그 주인이 고른 동네나 도시(기본 서울), 보는 사람이 "내 위치"를 허락하면 그 자리.
 // 자료는 /api/weather (서버가 Open-Meteo를 30분 기억). 한 번 허락한 사람은 다음에 오면 바로 내 위치로 보여 준다.
 const HERE_KEY = "bv-weather-here";
 
-type Props = { blog: { weatherCity?: string | null }; isOwner?: boolean };
+type Props = {
+  blog: { weatherCity?: string | null; weatherPlace?: string | null; weatherLat?: number | null; weatherLon?: number | null };
+  isOwner?: boolean;
+  /** 주인이 동네를 찾아 고를 수 있는지 (카카오 열쇠가 있을 때). 없으면 도시 목록 */
+  placeSearch?: boolean;
+};
 type Data = { place: { name: string | null; city: string | null; full?: string | null }; weather: Weather };
 
 const UP = "text-[#d32f2f] dark:text-[#ff6b6b]";
@@ -57,8 +64,13 @@ async function fetchAir(lat: number, lon: number): Promise<{ pm10: number | null
   }
 }
 
-export function WeatherWidget({ blog, isOwner = false }: Props) {
+export function WeatherWidget({ blog, isOwner = false, placeSearch = false }: Props) {
   const [city, setCity] = useState(cityOf(blog.weatherCity).key);
+  // 주인이 고른 동네 ("광주 서구 상무1동"). 있으면 도시 대신 이 자리
+  const [place, setPlace] = useState<WeatherPlace | null>(
+    blog.weatherPlace && blog.weatherLat != null && blog.weatherLon != null ? { name: blog.weatherPlace, lat: blog.weatherLat, lon: blog.weatherLon } : null,
+  );
+  const [picking, setPicking] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [data, setData] = useState<Data | null>(null);
   const [state, setState] = useState<"loading" | "ok" | "error">("loading");
@@ -70,7 +82,8 @@ export function WeatherWidget({ blog, isOwner = false }: Props) {
 
   useEffect(() => {
     let stopped = false;
-    const q = coords ? `lat=${coords.lat}&lon=${coords.lon}` : `city=${city}`;
+    const at = coords ?? place;
+    const q = at ? `lat=${at.lat}&lon=${at.lon}` : `city=${city}`;
     fetch(`/api/weather?${q}`, tick > 0 ? { cache: "reload" } : undefined)
       .then(async (res) => {
         if (!res.ok) throw new Error(String(res.status));
@@ -80,8 +93,8 @@ export function WeatherWidget({ blog, isOwner = false }: Props) {
         setState("ok");
         // 서버가 미세먼지를 못 받아 왔으면(운영 서버에서 대기질 서버가 막힐 때가 있다) 브라우저가 직접 받아 채운다
         if (json.weather.pm10 === null && json.weather.pm25 === null) {
-          const at = coords ?? cityOf(city);
-          const air = await fetchAir(at.lat, at.lon);
+          const spot = at ?? cityOf(city);
+          const air = await fetchAir(spot.lat, spot.lon);
           if (!stopped && air) setData((d) => (d ? { ...d, weather: { ...d.weather, ...air } } : d));
         }
       })
@@ -89,7 +102,7 @@ export function WeatherWidget({ blog, isOwner = false }: Props) {
     return () => {
       stopped = true;
     };
-  }, [city, coords, tick]);
+  }, [city, coords, place, tick]);
 
   const askHere = useCallback((quiet: boolean) => {
     if (!quiet) setNote("위치를 확인하는 중…");
@@ -103,7 +116,7 @@ export function WeatherWidget({ blog, isOwner = false }: Props) {
       })
       .catch((e: unknown) => {
         if (!quiet) writeHere(null);
-        if (!quiet) setNote(`${geoErrorText(e)} 지금은 블로그 도시 날씨를 보여 드려요.`);
+        if (!quiet) setNote(`${geoErrorText(e)} 지금은 블로그 날씨를 보여 드려요.`);
       });
   }, []);
 
@@ -126,17 +139,28 @@ export function WeatherWidget({ blog, isOwner = false }: Props) {
 
   function changeCity(key: string) {
     setCity(key);
+    setPlace(null);
     setCoords(null);
+    setPicking(false);
     startSaving(async () => {
       const { ok } = await saveWeatherCity(key);
       setNote(ok ? `블로그 날씨 도시를 바꿨어요: ${cityOf(key).name}` : "도시를 바꾸지 못했어요");
     });
   }
 
+  function changePlace(p: WeatherPlace) {
+    setPlace(p);
+    setCoords(null);
+    setPicking(false);
+    setNote(`블로그 날씨 동네를 바꿨어요: ${p.name}`);
+  }
+
   const w = data?.weather;
   // 내 위치면 동 이름 ("📍 상무1동"), 동을 모르면 "📍 내 위치"
-  const placeName = coords ? `📍 ${(data?.place.city === null && data.place.name) || "내 위치"}` : (data?.place.name ?? cityOf(city).name);
-  const placeTitle = coords && data?.place.full ? `${data.place.full} 날씨` : undefined;
+  // 블로그가 정한 자리 (주인이 고른 동네, 없으면 도시)
+  const home = place ? placeShort(place.name) : cityOf(city).name;
+  const placeName = coords ? `📍 ${(data?.place.city === null && data.place.name) || "내 위치"}` : place ? home : (data?.place.name ?? cityOf(city).name);
+  const placeTitle = coords ? (data?.place.full ? `${data.place.full} 날씨` : undefined) : place ? `${place.name} 날씨` : undefined;
 
   return (
     <section className="widget @container" aria-labelledby="w-weather" data-weather-widget aria-busy={state === "loading"}>
@@ -220,14 +244,26 @@ export function WeatherWidget({ blog, isOwner = false }: Props) {
       <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-line px-2 pt-2 text-sm">
         {coords ? (
           <button type="button" onClick={backToCity} className="text-ink-soft hover:underline">
-            {cityOf(city).name} 날씨 보기
+            {home} 날씨 보기
           </button>
         ) : (
           <button type="button" onClick={() => askHere(false)} className="text-ink-soft hover:underline">
             📍 내 위치 날씨
           </button>
         )}
-        {isOwner && (
+        {isOwner && placeSearch && (
+          <button
+            type="button"
+            onClick={() => setPicking((v) => !v)}
+            aria-expanded={picking}
+            className="ml-auto max-w-[60%] truncate rounded-md px-1 text-ink-soft hover:bg-line/40"
+            title={place ? place.name : undefined}
+          >
+            블로그 동네 <b className="text-ink">{home}</b> ✎
+          </button>
+        )}
+        {isOwner && placeSearch && picking && <WeatherPlacePicker city={city} onPlace={changePlace} onCity={changeCity} onClose={() => setPicking(false)} />}
+        {isOwner && !placeSearch && (
           <label className="ml-auto flex items-center gap-1 text-ink-soft">
             블로그 도시
             <select value={city} onChange={(e) => changeCity(e.target.value)} disabled={saving} className="rounded-md border border-line bg-surface px-1 py-0.5 text-ink">
