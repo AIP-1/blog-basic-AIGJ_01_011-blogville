@@ -33,10 +33,22 @@ export function isCityKey(key: unknown): key is string {
   return typeof key === "string" && WEATHER_CITIES.some((c) => c.key === key);
 }
 
-/** 보는 사람 위치는 0.1도(약 10km)로 줄여 쓴다: 서버 기억 칸을 나눠 쓰고, 정확한 자리를 남기지 않는다 */
+/** 보는 사람 위치는 0.01도(약 1km)로 줄여 쓴다: 그 동네 칸 예보를 받되, 정확한 자리는 남기지 않는다 (서버는 저장하지 않는다) */
 export function roundCoord(lat: number, lon: number): { lat: number; lon: number } | null {
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
-  return { lat: Math.round(lat * 10) / 10, lon: Math.round(lon * 10) / 10 };
+  return { lat: Math.round(lat * 100) / 100, lon: Math.round(lon * 100) / 100 };
+}
+
+/** 카카오 좌표→행정구역 응답에서 동 이름. 행정동(H, "상무1동")을 먼저, 없으면 법정동. 모르면 null */
+export function dongOfRegion(json: unknown): { dong: string; full: string } | null {
+  const docs = (json as { documents?: { region_type?: string; region_1depth_name?: string; region_2depth_name?: string; region_3depth_name?: string }[] } | null)?.documents;
+  if (!Array.isArray(docs)) return null;
+  const d = docs.find((x) => x.region_type === "H") ?? docs.find((x) => x.region_type === "B");
+  const dong = d?.region_3depth_name?.trim() || d?.region_2depth_name?.trim();
+  if (!d || !dong) return null;
+  const top = (d.region_1depth_name ?? "").trim();
+  const full = [top, d.region_2depth_name?.trim(), d.region_3depth_name?.trim()].filter(Boolean).join(" ");
+  return { dong: dong.slice(0, 20), full: full.slice(0, 60) };
 }
 
 /** WMO 날씨 코드 → 글자·그림 (Open-Meteo weather_code) */

@@ -10,7 +10,7 @@ import { saveWeatherCity } from "./actions";
 const HERE_KEY = "bv-weather-here";
 
 type Props = { blog: { weatherCity?: string | null }; isOwner?: boolean };
-type Data = { place: { name: string | null; city: string | null }; weather: Weather };
+type Data = { place: { name: string | null; city: string | null; full?: string | null }; weather: Weather };
 
 const UP = "text-[#d32f2f] dark:text-[#ff6b6b]";
 const DOWN = "text-[#1565c0] dark:text-[#64a8ff]";
@@ -95,8 +95,8 @@ export function WeatherWidget({ blog, isOwner = false }: Props) {
     if (!quiet) setNote("위치를 확인하는 중…");
     locate(30 * 60_000)
       .then((p) => {
-        // 0.1도(약 10km)로 줄여서만 보낸다
-        const here = { lat: Math.round(p.lat * 10) / 10, lon: Math.round(p.lng * 10) / 10 };
+        // 0.01도(약 1km)로 줄여서만 보낸다 (그 동네 칸 예보)
+        const here = { lat: Math.round(p.lat * 100) / 100, lon: Math.round(p.lng * 100) / 100 };
         setCoords(here);
         writeHere(here);
         setNote("");
@@ -134,7 +134,9 @@ export function WeatherWidget({ blog, isOwner = false }: Props) {
   }
 
   const w = data?.weather;
-  const placeName = coords ? "📍 내 위치" : (data?.place.name ?? cityOf(city).name);
+  // 내 위치면 동 이름 ("📍 상무1동"), 동을 모르면 "📍 내 위치"
+  const placeName = coords ? `📍 ${(data?.place.city === null && data.place.name) || "내 위치"}` : (data?.place.name ?? cityOf(city).name);
+  const placeTitle = coords && data?.place.full ? `${data.place.full} 날씨` : undefined;
 
   return (
     <section className="widget @container" aria-labelledby="w-weather" data-weather-widget aria-busy={state === "loading"}>
@@ -142,7 +144,7 @@ export function WeatherWidget({ blog, isOwner = false }: Props) {
         <h2 id="w-weather" className="font-bold">
           날씨
         </h2>
-        <span className="ml-auto truncate text-sm text-ink-soft" data-weather-place>
+        <span className="ml-auto truncate text-sm text-ink-soft" data-weather-place title={placeTitle}>
           {placeName}
         </span>
         <button type="button" onClick={() => setTick((t) => t + 1)} className="grid size-8 shrink-0 place-items-center rounded-full text-ink-soft hover:bg-line/40" aria-label="날씨 새로 받기" title="새로 받기">
