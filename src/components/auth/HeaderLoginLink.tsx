@@ -8,7 +8,8 @@ import { loginHref } from "@/lib/safe-next";
 export function HeaderLoginLink() {
   const pathname = usePathname();
   return (
-    <Link href={loginHref(pathname)} className="btn btn-primary rounded-full px-4">
+    // 미리 받지 않는다: 주소마다 ?next=가 달라 첫 화면(/)을 화면마다 따로 두 번씩 미리 받고 있었다
+    <Link href={loginHref(pathname)} prefetch={false} className="btn btn-primary rounded-full px-4">
       로그인
     </Link>
   );
