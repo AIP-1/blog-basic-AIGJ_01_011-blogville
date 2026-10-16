@@ -225,7 +225,7 @@ export function BlogSidebar({ blogId, slug, sidebar, visits, recordVisit, search
     }
   };
   return (
-    <aside aria-label="옆 칸" className="min-w-0 space-y-4" data-sidebar>
+    <aside aria-label="옆 칸" className="blog-aside min-w-0" data-sidebar>
       {layout.items
         .filter((it) => it.visible)
         .map((it) => {

@@ -40,7 +40,7 @@ export function PostGalleryTile({ slug, post, likeCount = 0 }: Props) {
           </span>
         )}
         <span className="block p-3">
-          <span className="line-clamp-2 font-bold">
+          <span className="post-title-serif line-clamp-2">
             {!post.isPublic && <span className="mr-1 text-sm text-ink-soft">{post.publishAt ? "⏰" : "🔒"}</span>}
             {post.title}
           </span>

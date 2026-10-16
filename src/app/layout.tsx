@@ -32,6 +32,7 @@ import { LateFonts } from "@/components/layout/LateFonts";
 import "./globals.css";
 import "./post-extras.css";
 import "./theme-dark.css";
+import "./blog-design.css";
 
 // metadataBase는 실행할 때의 사이트 주소로 정한다 (공유 미리보기의 사진·주소를 절대 주소로)
 export async function generateMetadata(): Promise<Metadata> {

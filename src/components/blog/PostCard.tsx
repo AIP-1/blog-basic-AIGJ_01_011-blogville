@@ -37,7 +37,7 @@ export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle,
           <span className="min-w-0 truncate text-ink-soft">· {author.blogTitle}</span>
         </Link>
       )}
-      <Link href={`/@${slug}/${post.id}`} className="flex gap-4 rounded-xl border border-line bg-surface p-4 hover:border-accent">
+      <Link href={`/@${slug}/${post.id}`} className="group flex gap-4 rounded-2xl border border-line bg-surface p-4 hover:border-accent sm:gap-5 sm:p-5">
         {rank !== undefined && (
           <span className={`min-w-9 shrink-0 whitespace-nowrap text-center text-2xl font-extrabold tabular-nums ${rank <= 3 ? "text-accent" : "text-ink-soft"}`} data-popular-rank={rank}>
             {rank}
@@ -52,19 +52,19 @@ export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle,
               <span className="text-sm font-semibold text-ink-soft">{post.publishAt ? `⏰ ${scheduleLabel(post.publishAt)} 공개 예약` : "🔒 비공개"}</span>
             )}
           </div>
-          <h2 className="mt-2 text-lg font-bold">{post.title}</h2>
-          <p className="mt-1 line-clamp-2 text-ink-soft">{excerpt(post.contentText)}</p>
-          <p className="mt-2 text-sm text-ink-soft">
-            {blogTitle && `${blogTitle} · `}
+          <h2 className="post-title-serif mt-2 text-[1.1875rem] group-hover:text-accent">{post.title}</h2>
+          <p className="mt-1.5 line-clamp-2 leading-relaxed text-ink-soft">{excerpt(post.contentText)}</p>
+          <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-soft">
+            {blogTitle && <span className="font-semibold text-ink">{blogTitle}</span>}
             <Time date={post.createdAt} />
-            <span aria-label={`공감 ${likeCount}`}> · ♥ {likeCount}</span>
-            {commentCount > 0 && <span aria-label={`댓글 ${commentCount}개`}> · 💬 {commentCount}</span>}
-            <span aria-label={`조회 ${post.viewCount}`}> · 👀 {post.viewCount}</span>
+            <span aria-label={`공감 ${likeCount}`}>♥ {likeCount}</span>
+            {commentCount > 0 && <span aria-label={`댓글 ${commentCount}개`}>💬 {commentCount}</span>}
+            <span aria-label={`조회 ${post.viewCount}`}>👀 {post.viewCount}</span>
           </p>
         </div>
         {cover && (
           // eslint-disable-next-line @next/next/no-img-element -- 우리 저장소(/files) 사진, 크기를 모른다
-          <img src={thumbUrl(cover, 320)} alt="" loading="lazy" className="size-20 shrink-0 self-center rounded-lg border border-line object-cover sm:size-24" data-post-cover />
+          <img src={thumbUrl(cover, 320)} alt="" loading="lazy" className="aspect-square w-20 shrink-0 self-center rounded-xl object-cover sm:aspect-[4/3] sm:w-36" data-post-cover />
         )}
       </Link>
     </article>
