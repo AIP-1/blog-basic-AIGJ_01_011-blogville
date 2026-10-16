@@ -61,7 +61,7 @@ test("날씨·캘린더 위젯", async ({ page, browser }) => {
 
 });
 
-test("📍 내 위치 날씨: 허락하면 그 자리, 다음에 와도 기억한 자리로 그린다(Safari처럼 다시 묻는 브라우저), 끄면 블로그 도시", async ({ page, browser }) => {
+test("📍 내 위치 날씨: 사이트에 위치가 허락돼 있으면 누르지 않아도 그 자리, 다음에 와도 기억한 자리(Safari처럼 다시 묻는 브라우저), 도시를 고르면 그대로", async ({ page, browser }) => {
   const me = await signUpOk(page);
   const context = await browser.newContext({ geolocation: { latitude: 35.16, longitude: 129.06 }, permissions: ["geolocation"] });
   const visitor = await context.newPage();
@@ -72,8 +72,7 @@ test("📍 내 위치 날씨: 허락하면 그 자리, 다음에 와도 기억�
   });
   await visitor.goto(`/@${me}`);
   const weather = visitor.locator("[data-weather-widget]");
-  await expect(weather.locator("[data-weather-temp]")).toHaveText("15.9°");
-  await weather.getByRole("button", { name: "📍 내 위치 날씨" }).click();
+  // 맛집 등에서 이미 허락한 사이트: 저절로 내 위치 (0.01도로 줄여 보낸다)
   await expect(weather.locator("[data-weather-place]")).toHaveText("📍 내 위치");
   await expect.poll(() => asked.at(-1)).toBe("?lat=35.16&lon=129.06");
 
@@ -83,10 +82,16 @@ test("📍 내 위치 날씨: 허락하면 그 자리, 다음에 와도 기억�
   await expect(weather.locator("[data-weather-place]")).toHaveText("📍 내 위치");
   await expect.poll(() => asked.at(-1)).toBe("?lat=35.16&lon=129.06");
 
-  // 블로그 도시로 돌아가면 잊는다
+  // 블로그 도시로 돌아가면, 위치가 다시 허락돼 있어도 도시 그대로
   await weather.getByRole("button", { name: "서울 날씨 보기" }).click();
+  await context.grantPermissions(["geolocation"]);
   await visitor.reload();
   await expect(weather.locator("[data-weather-place]")).toHaveText("서울");
+  await expect(weather.getByRole("button", { name: "📍 내 위치 날씨" })).toBeVisible();
+
+  // 다시 누르면 내 위치
+  await weather.getByRole("button", { name: "📍 내 위치 날씨" }).click();
+  await expect(weather.locator("[data-weather-place]")).toHaveText("📍 내 위치");
   await context.close();
 });
 
