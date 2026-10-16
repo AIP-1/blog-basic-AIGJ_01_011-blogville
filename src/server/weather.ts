@@ -12,11 +12,14 @@ const TTL_MS = 30 * 60_000;
 // 못 받았을 때는 잠깐만 기억해 1분 뒤 다시 묻는다
 const FAIL_TTL_MS = 60_000;
 const TIMEOUT_MS = 4_000;
+// 미세먼지 서버는 예보보다 느려서 더 기다린다. 미세먼지만 못 받았으면 5분 뒤 다시 묻는다
+const AIR_TIMEOUT_MS = 8_000;
+const NO_AIR_TTL_MS = 5 * 60_000;
 
-const cache = new Map<string, { at: number; ok: boolean; value: Promise<Weather | null> }>();
+const cache = new Map<string, { at: number; ttl: number; value: Promise<Weather | null> }>();
 
-async function getJson(url: string): Promise<unknown> {
-  const res = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(TIMEOUT_MS), cache: "no-store" });
+async function getJson(url: string, timeoutMs = TIMEOUT_MS): Promise<unknown> {
+  const res = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(timeoutMs), cache: "no-store" });
   if (!res.ok) throw new Error(`open-meteo ${res.status}`);
   return res.json();
 }
@@ -30,7 +33,10 @@ async function load(lat: number, lon: number): Promise<Weather | null> {
       "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
   );
   // 미세먼지는 없어도 날씨는 보여 준다
-  const air = getJson(`${AIR_BASE()}/v1/air-quality?${at}&current=pm10,pm2_5`).catch(() => null);
+  const air = getJson(`${AIR_BASE()}/v1/air-quality?${at}&current=pm10,pm2_5`, AIR_TIMEOUT_MS).catch((e: unknown) => {
+    console.warn("[weather] 미세먼지 못 받음", e instanceof Error ? e.message : e);
+    return null;
+  });
   return parseForecast(await forecast, await air);
 }
 
@@ -38,12 +44,15 @@ async function load(lat: number, lon: number): Promise<Weather | null> {
 export function getWeather(lat: number, lon: number): Promise<Weather | null> {
   const key = `${lat},${lon}`;
   const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < (hit.ok ? TTL_MS : FAIL_TTL_MS)) return hit.value;
-  const entry = { at: Date.now(), ok: true, value: Promise.resolve<Weather | null>(null) };
+  if (hit && Date.now() - hit.at < hit.ttl) return hit.value;
+  const entry = { at: Date.now(), ttl: TTL_MS, value: Promise.resolve<Weather | null>(null) };
   entry.value = load(lat, lon)
-    .catch(() => null)
+    .catch((e: unknown) => {
+      console.warn("[weather] 예보 못 받음", e instanceof Error ? e.message : e);
+      return null;
+    })
     .then((w) => {
-      entry.ok = w !== null;
+      entry.ttl = w === null ? FAIL_TTL_MS : w.pm10 === null && w.pm25 === null ? NO_AIR_TTL_MS : TTL_MS;
       return w;
     });
   cache.set(key, entry);

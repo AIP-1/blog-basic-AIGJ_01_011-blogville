@@ -60,3 +60,48 @@ test("날씨·캘린더 위젯", async ({ page, browser }) => {
   await expect(vcal.locator("[data-calendar-posts]")).toContainText("지난달 글");
 
 });
+
+test("📍 내 위치 날씨: 허락하면 그 자리, 다음에 와도 기억한 자리로 그린다(Safari처럼 다시 묻는 브라우저), 끄면 블로그 도시", async ({ page, browser }) => {
+  const me = await signUpOk(page);
+  const context = await browser.newContext({ geolocation: { latitude: 35.16, longitude: 129.06 }, permissions: ["geolocation"] });
+  const visitor = await context.newPage();
+  const asked: string[] = [];
+  await visitor.route("**/api/weather?**", (route) => {
+    asked.push(new URL(route.request().url()).search);
+    return route.fulfill({ json: WEATHER });
+  });
+  await visitor.goto(`/@${me}`);
+  const weather = visitor.locator("[data-weather-widget]");
+  await expect(weather.locator("[data-weather-temp]")).toHaveText("15.9°");
+  await weather.getByRole("button", { name: "📍 내 위치 날씨" }).click();
+  await expect(weather.locator("[data-weather-place]")).toHaveText("📍 내 위치");
+  await expect.poll(() => asked.at(-1)).toBe("?lat=35.2&lon=129.1");
+
+  // 허락이 풀린 다음 방문 (Safari 기본 "묻기"): 기억한 자리로 바로
+  await context.clearPermissions();
+  await visitor.reload();
+  await expect(weather.locator("[data-weather-place]")).toHaveText("📍 내 위치");
+  await expect.poll(() => asked.at(-1)).toBe("?lat=35.2&lon=129.1");
+
+  // 블로그 도시로 돌아가면 잊는다
+  await weather.getByRole("button", { name: "서울 날씨 보기" }).click();
+  await visitor.reload();
+  await expect(weather.locator("[data-weather-place]")).toHaveText("서울");
+  await context.close();
+});
+
+test("📍 내 위치 날씨: 권한이 꺼져 있으면 켜는 방법을 알려 준다", async ({ page, browser }) => {
+  const me = await signUpOk(page);
+  const context = await browser.newContext({ permissions: [] });
+  const visitor = await context.newPage();
+  await visitor.route("**/api/weather?**", (route) => route.fulfill({ json: WEATHER }));
+  await visitor.addInitScript(() => {
+    navigator.geolocation.getCurrentPosition = (_ok, fail) => fail?.({ code: 1, message: "denied", PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 } as GeolocationPositionError);
+  });
+  await visitor.goto(`/@${me}`);
+  const weather = visitor.locator("[data-weather-widget]");
+  await weather.getByRole("button", { name: "📍 내 위치 날씨" }).click();
+  await expect(weather.getByRole("status")).toContainText("위치 권한이 꺼져 있어요");
+  await expect(weather.locator("[data-weather-place]")).toHaveText("서울");
+  await context.close();
+});
