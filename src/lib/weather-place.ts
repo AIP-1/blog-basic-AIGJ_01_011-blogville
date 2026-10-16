@@ -18,9 +18,14 @@ export function roundTo(v: number, digits: number): number {
   return Math.round(v * k) / k;
 }
 
-/** "광주 서구 상무1동" → "상무1동" (위젯 머리에 짧게) */
+/** "광주 서구 상무1동" → "상무1동" (자리가 좁을 때도 꼭 보일 동 이름) */
 export function placeShort(name: string): string {
   return name.trim().split(/\s+/).pop() ?? name;
+}
+
+/** "광주 서구 상무1동" → "광주 서구" (동 이름 앞쪽, 좁으면 줄임표로 줄인다) */
+export function placeFront(name: string): string {
+  return name.trim().split(/\s+/).slice(0, -1).join(" ");
 }
 
 function num(v: unknown): number | null {

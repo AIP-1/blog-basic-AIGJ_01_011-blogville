@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { geoErrorText, locate } from "@/lib/geolocate";
 import { cityOf, dustGrade, formatTemp, WEATHER_CITIES, weatherLook, weekdayOf, type DustGrade, type Weather } from "@/lib/weather";
-import { placeShort, type WeatherPlace } from "@/lib/weather-place";
+import { placeFront, placeShort, type WeatherPlace } from "@/lib/weather-place";
 import { saveWeatherCity } from "./actions";
 import { WeatherPlacePicker } from "./WeatherPlacePicker";
 
@@ -66,13 +66,17 @@ async function fetchAir(lat: number, lon: number): Promise<{ pm10: number | null
 
 export function WeatherWidget({ blog, isOwner = false, placeSearch = false }: Props) {
   const [city, setCity] = useState(cityOf(blog.weatherCity).key);
-  // 주인이 고른 동네 ("광주 서구 상무1동"). 있으면 도시 대신 이 자리
+  // 주인이 고른 동네 ("광주 서구 상무1동"). 도시가 비어 있을 때만 쓴다 (동네를 고르면 도시를 비우고, 도시를 고르면 동네를 지운다)
   const [place, setPlace] = useState<WeatherPlace | null>(
-    blog.weatherPlace && blog.weatherLat != null && blog.weatherLon != null ? { name: blog.weatherPlace, lat: blog.weatherLat, lon: blog.weatherLon } : null,
+    !blog.weatherCity && blog.weatherPlace && blog.weatherLat != null && blog.weatherLon != null
+      ? { name: blog.weatherPlace, lat: blog.weatherLat, lon: blog.weatherLon }
+      : null,
   );
   const [picking, setPicking] = useState(false);
+  const pickToggle = useRef<HTMLButtonElement>(null);
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
-  const [data, setData] = useState<Data | null>(null);
+  // 받은 자료와 그 질문 (자리를 바꾸면 새 자료가 올 때까지 옛 자리 날씨를 새 이름으로 보여 주지 않는다)
+  const [data, setData] = useState<(Data & { q: string }) | null>(null);
   const [state, setState] = useState<"loading" | "ok" | "error">("loading");
   const [note, setNote] = useState("");
   const [saving, startSaving] = useTransition();
@@ -80,29 +84,30 @@ export function WeatherWidget({ blog, isOwner = false, placeSearch = false }: Pr
   // ↻를 누를 때마다 1씩 늘려 다시 받는다 (브라우저가 기억한 5분도 건너뛴다)
   const [tick, setTick] = useState(0);
 
+  // 지금 보여 줄 자리: 보는 사람 위치 > 주인이 고른 동네 > 블로그 도시
+  const spot = coords ?? place ?? cityOf(city);
+  const q = coords || place ? `lat=${spot.lat}&lon=${spot.lon}` : `city=${city}`;
+
   useEffect(() => {
     let stopped = false;
-    const at = coords ?? place;
-    const q = at ? `lat=${at.lat}&lon=${at.lon}` : `city=${city}`;
     fetch(`/api/weather?${q}`, tick > 0 ? { cache: "reload" } : undefined)
       .then(async (res) => {
         if (!res.ok) throw new Error(String(res.status));
         const json = (await res.json()) as Data;
         if (stopped) return;
-        setData(json);
+        setData({ ...json, q });
         setState("ok");
         // 서버가 미세먼지를 못 받아 왔으면(운영 서버에서 대기질 서버가 막힐 때가 있다) 브라우저가 직접 받아 채운다
         if (json.weather.pm10 === null && json.weather.pm25 === null) {
-          const spot = at ?? cityOf(city);
           const air = await fetchAir(spot.lat, spot.lon);
-          if (!stopped && air) setData((d) => (d ? { ...d, weather: { ...d.weather, ...air } } : d));
+          if (!stopped && air) setData((d) => (d && d.q === q ? { ...d, weather: { ...d.weather, ...air } } : d));
         }
       })
       .catch(() => !stopped && setState("error"));
     return () => {
       stopped = true;
     };
-  }, [city, coords, place, tick]);
+  }, [q, spot, tick]);
 
   const askHere = useCallback((quiet: boolean) => {
     if (!quiet) setNote("위치를 확인하는 중…");
@@ -137,13 +142,24 @@ export function WeatherWidget({ blog, isOwner = false, placeSearch = false }: Pr
     setCoords(null);
   }
 
+  // 동네 고르기 칸을 닫으면 ✎ 버튼으로 돌아간다 (키보드로 고른 사람이 맨 위로 튀지 않게)
+  function closePicker() {
+    setPicking(false);
+    pickToggle.current?.focus();
+  }
+
   function changeCity(key: string) {
     setCity(key);
     setPlace(null);
     setCoords(null);
-    setPicking(false);
+    closePicker();
     startSaving(async () => {
-      const { ok } = await saveWeatherCity(key);
+      let ok = false;
+      try {
+        ok = (await saveWeatherCity(key)).ok;
+      } catch {
+        // 아래 안내
+      }
       setNote(ok ? `블로그 날씨 도시를 바꿨어요: ${cityOf(key).name}` : "도시를 바꾸지 못했어요");
     });
   }
@@ -151,16 +167,18 @@ export function WeatherWidget({ blog, isOwner = false, placeSearch = false }: Pr
   function changePlace(p: WeatherPlace) {
     setPlace(p);
     setCoords(null);
-    setPicking(false);
+    closePicker();
     setNote(`블로그 날씨 동네를 바꿨어요: ${p.name}`);
   }
 
-  const w = data?.weather;
-  // 내 위치면 동 이름 ("📍 상무1동"), 동을 모르면 "📍 내 위치"
+  // 지금 자리의 자료만 쓴다
+  const shown = data?.q === q ? data : null;
+  const w = shown?.weather;
   // 블로그가 정한 자리 (주인이 고른 동네, 없으면 도시)
   const home = place ? placeShort(place.name) : cityOf(city).name;
-  const placeName = coords ? `📍 ${(data?.place.city === null && data.place.name) || "내 위치"}` : place ? home : (data?.place.name ?? cityOf(city).name);
-  const placeTitle = coords ? (data?.place.full ? `${data.place.full} 날씨` : undefined) : place ? `${place.name} 날씨` : undefined;
+  // 내 위치면 동 이름 ("📍 상무1동"), 동을 모르면 "📍 내 위치"
+  const placeName = coords ? `📍 ${(shown?.place.city === null && shown.place.name) || "내 위치"}` : place ? home : (shown?.place.name ?? cityOf(city).name);
+  const placeTitle = coords ? (shown?.place.full ? `${shown.place.full} 날씨` : undefined) : place ? `${place.name} 날씨` : undefined;
 
   return (
     <section className="widget @container" aria-labelledby="w-weather" data-weather-widget aria-busy={state === "loading"}>
@@ -168,8 +186,16 @@ export function WeatherWidget({ blog, isOwner = false, placeSearch = false }: Pr
         <h2 id="w-weather" className="font-bold">
           날씨
         </h2>
-        <span className="ml-auto truncate text-sm text-ink-soft" data-weather-place title={placeTitle}>
-          {placeName}
+        <span className="ml-auto flex min-w-0 text-sm text-ink-soft" data-weather-place title={placeTitle}>
+          {!coords && place && placeFront(place.name) ? (
+            // "광주 서구 상무1동": 좁으면 앞쪽만 줄이고 동 이름은 늘 보인다
+            <>
+              <span className="truncate">{placeFront(place.name)}&nbsp;</span>
+              <span className="shrink-0">{home}</span>
+            </>
+          ) : (
+            <span className="truncate">{placeName}</span>
+          )}
         </span>
         <button type="button" onClick={() => setTick((t) => t + 1)} className="grid size-8 shrink-0 place-items-center rounded-full text-ink-soft hover:bg-line/40" aria-label="날씨 새로 받기" title="새로 받기">
           ↻
@@ -253,6 +279,7 @@ export function WeatherWidget({ blog, isOwner = false, placeSearch = false }: Pr
         )}
         {isOwner && placeSearch && (
           <button
+            ref={pickToggle}
             type="button"
             onClick={() => setPicking((v) => !v)}
             aria-expanded={picking}
@@ -262,11 +289,17 @@ export function WeatherWidget({ blog, isOwner = false, placeSearch = false }: Pr
             블로그 동네 <b className="text-ink">{home}</b> ✎
           </button>
         )}
-        {isOwner && placeSearch && picking && <WeatherPlacePicker city={city} onPlace={changePlace} onCity={changeCity} onClose={() => setPicking(false)} />}
+        {isOwner && placeSearch && picking && <WeatherPlacePicker city={place ? null : city} onPlace={changePlace} onCity={changeCity} onClose={closePicker} />}
         {isOwner && !placeSearch && (
           <label className="ml-auto flex items-center gap-1 text-ink-soft">
             블로그 도시
-            <select value={city} onChange={(e) => changeCity(e.target.value)} disabled={saving} className="rounded-md border border-line bg-surface px-1 py-0.5 text-ink">
+            <select value={place ? "" : city} onChange={(e) => changeCity(e.target.value)} disabled={saving} className="rounded-md border border-line bg-surface px-1 py-0.5 text-ink">
+              {/* 동네를 쓰는 중이면 지금 도시를 다시 골라도 바뀌게 빈 칸을 보여 준다 */}
+              {place && (
+                <option value="" disabled>
+                  동네 사용 중
+                </option>
+              )}
               {WEATHER_CITIES.map((c) => (
                 <option key={c.key} value={c.key}>
                   {c.name}

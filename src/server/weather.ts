@@ -19,28 +19,36 @@ const NO_AIR_TTL_MS = 5 * 60_000;
 
 const KAKAO_BASE = () => process.env.KAKAO_API_BASE ?? "https://dapi.kakao.com";
 const DONG_TTL_MS = 24 * 3_600_000;
-const dongCache = new Map<string, { at: number; value: Promise<{ dong: string; full: string } | null> }>();
+const dongCache = new Map<string, { at: number; ttl: number; value: Promise<{ dong: string; full: string } | null> }>();
 
-/** 그 자리의 동 이름 (카카오 좌표→행정구역, 하루 기억). 카카오 열쇠가 없거나 못 받으면 null */
+/** 그 자리의 동 이름 (카카오 좌표→행정구역, 하루 기억, 실패는 잠깐만). 카카오 열쇠가 없거나 못 받으면 null */
 export function getDong(lat: number, lon: number): Promise<{ dong: string; full: string } | null> {
   const keyId = process.env.KAKAO_REST_API_KEY;
   if (!keyId) return Promise.resolve(null);
   const key = `${lat},${lon}`;
   const hit = dongCache.get(key);
-  if (hit && Date.now() - hit.at < DONG_TTL_MS) return hit.value;
-  const value = fetch(`${KAKAO_BASE()}/v2/local/geo/coord2regioncode.json?x=${lon}&y=${lat}`, {
+  if (hit && Date.now() - hit.at < hit.ttl) return hit.value;
+  const entry = { at: Date.now(), ttl: DONG_TTL_MS, value: Promise.resolve<{ dong: string; full: string } | null>(null) };
+  entry.value = fetch(`${KAKAO_BASE()}/v2/local/geo/coord2regioncode.json?x=${lon}&y=${lat}`, {
     headers: { Authorization: `KakaoAK ${keyId}` },
     signal: AbortSignal.timeout(TIMEOUT_MS),
     cache: "no-store",
   })
-    .then((res) => (res.ok ? res.json() : null))
+    .then((res) => {
+      if (!res.ok) throw new Error(`kakao ${res.status}`);
+      return res.json();
+    })
     .then(dongOfRegion)
     // "전남광주통합특별시 서구 상무1동" → "광주 서구 상무1동" (맛집과 같은 짧은 이름)
     .then((d) => (d ? { ...d, full: shortCity(d.full) } : null))
-    .catch(() => null);
-  dongCache.set(key, { at: Date.now(), value });
-  if (dongCache.size > 5_000) for (const [k, v] of dongCache) if (Date.now() - v.at >= DONG_TTL_MS) dongCache.delete(k);
-  return value;
+    .catch(() => {
+      // 한도 초과·시간 초과는 하루가 아니라 잠깐만 기억한다
+      entry.ttl = FAIL_TTL_MS;
+      return null;
+    });
+  dongCache.set(key, entry);
+  if (dongCache.size > 5_000) for (const [k, v] of dongCache) if (Date.now() - v.at >= v.ttl) dongCache.delete(k);
+  return entry.value;
 }
 
 const cache = new Map<string, { at: number; ttl: number; value: Promise<Weather | null> }>();

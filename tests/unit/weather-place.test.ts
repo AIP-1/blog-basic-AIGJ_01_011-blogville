@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { isKoreaCoord, parsePlaceHits, placeShort, roundTo } from "@/lib/weather-place";
+import { isKoreaCoord, parsePlaceHits, placeFront, placeShort, roundTo } from "@/lib/weather-place";
 
 // 저장은 DB 대신 받은 값만 본다
 const saved: unknown[] = [];
@@ -14,6 +14,8 @@ describe("날씨 동네 (순수 함수)", () => {
     expect(placeShort("광주 서구 상무1동")).toBe("상무1동");
     expect(placeShort("경기 성남시 분당구 정자1동")).toBe("정자1동");
     expect(placeShort(" 세종 조치원읍 ")).toBe("조치원읍");
+    expect(placeFront("경기 성남시 분당구 정자1동")).toBe("경기 성남시 분당구");
+    expect(placeFront("조치원읍")).toBe("");
   });
 
   it("우리나라 좌표만, 소수 n자리로 줄이기", () => {
@@ -44,6 +46,7 @@ describe("날씨 동네 (순수 함수)", () => {
 
 describe("날씨 동네 찾기·저장 (가짜 카카오)", () => {
   const calls: string[] = [];
+  let regionDown = false;
   // 좌표 → 행정동: 경도 126.84x는 상무1동, 126.85x는 상무2동, 그 밖은 화정1동
   function region(x: number) {
     const dong = x < 126.85 ? "상무1동" : x < 126.86 ? "상무2동" : "화정1동";
@@ -54,6 +57,7 @@ describe("날씨 동네 찾기·저장 (가짜 카카오)", () => {
     vi.resetModules();
     calls.length = 0;
     saved.length = 0;
+    regionDown = false;
     vi.stubEnv("KAKAO_REST_API_KEY", "test-key");
     vi.stubEnv("KAKAO_API_BASE", "http://kakao.test");
     vi.stubGlobal(
@@ -74,7 +78,10 @@ describe("날씨 동네 찾기·저장 (가짜 카카오)", () => {
             ],
           });
         }
-        if (url.pathname.endsWith("/coord2regioncode.json")) return Response.json(region(Number(url.searchParams.get("x"))));
+        if (url.pathname.endsWith("/coord2regioncode.json")) {
+          if (regionDown) return new Response("{}", { status: 429 });
+          return Response.json(region(Number(url.searchParams.get("x"))));
+        }
         return new Response("{}", { status: 404 });
       }),
     );
@@ -82,6 +89,7 @@ describe("날씨 동네 찾기·저장 (가짜 카카오)", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
+    vi.useRealTimers();
   });
 
   it("주소와 장소를 행정동으로 바꾸고 같은 동은 한 번만", async () => {
@@ -104,6 +112,27 @@ describe("날씨 동네 찾기·저장 (가짜 카카오)", () => {
     expect(places.map((p) => p.name)).toEqual(["광주 서구 상무1동", "광주 서구 상무2동", "광주 서구 화정1동"]);
   });
 
+  it("한쪽 검색만 받은 결과는 기억하지 않고 다음에 다시 묻는다", async () => {
+    const { searchWeatherPlaces } = await import("@/server/weather-place");
+    await searchWeatherPlaces("고장");
+    const n = calls.filter((c) => c.endsWith("/address.json")).length;
+    await searchWeatherPlaces("고장");
+    expect(calls.filter((c) => c.endsWith("/address.json")).length).toBe(n + 1);
+  });
+
+  it("동 이름을 하나도 못 받으면(한도 초과) 실패로 알리고, 잠시 뒤 다시 찾으면 나온다", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    regionDown = true;
+    const { searchWeatherPlaces, setBlogWeatherPlace } = await import("@/server/weather-place");
+    await expect(searchWeatherPlaces("상무")).rejects.toThrow();
+    expect(await setBlogWeatherPlace("u1", 35.153, 126.846)).toBeNull();
+    regionDown = false;
+    // 실패한 동 이름은 1분만 기억한다
+    vi.setSystemTime(Date.now() + 61_000);
+    expect((await searchWeatherPlaces("상무")).map((p) => p.name)).toEqual(["광주 서구 상무1동", "광주 서구 상무2동", "광주 서구 화정1동"]);
+    expect(await setBlogWeatherPlace("u1", 35.153, 126.846)).toEqual({ name: "광주 서구 상무1동", lat: 35.15, lon: 126.85 });
+  });
+
   it("열쇠가 없으면 찾지 않는다", async () => {
     vi.stubEnv("KAKAO_REST_API_KEY", "");
     const { searchWeatherPlaces, weatherPlaceEnabled, setBlogWeatherPlace } = await import("@/server/weather-place");
@@ -117,7 +146,8 @@ describe("날씨 동네 찾기·저장 (가짜 카카오)", () => {
     const { setBlogWeatherPlace } = await import("@/server/weather-place");
     const place = await setBlogWeatherPlace("u1", 35.1534, 126.8462);
     expect(place).toEqual({ name: "광주 서구 상무1동", lat: 35.15, lon: 126.85 });
-    expect(saved).toEqual([{ weatherPlace: "광주 서구 상무1동", weatherLat: 35.15, weatherLon: 126.85 }]);
+    // 도시는 비운다 (위젯은 도시가 비어 있을 때만 동네를 쓴다)
+    expect(saved).toEqual([{ weatherCity: null, weatherPlace: "광주 서구 상무1동", weatherLat: 35.15, weatherLon: 126.85 }]);
     // 나라 밖 좌표는 묻지도 않는다
     expect(await setBlogWeatherPlace("u1", 35.68, 139.69)).toBeNull();
     expect(saved).toHaveLength(1);

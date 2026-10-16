@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { WEATHER_CITIES } from "@/lib/weather";
-import { PLACE_QUERY_MAX, placeShort, type WeatherPlace } from "@/lib/weather-place";
+import { PLACE_QUERY_MAX, placeFront, placeShort, type WeatherPlace } from "@/lib/weather-place";
 import { findWeatherPlaces, saveWeatherPlace } from "./actions";
 
 // ☀️ 날씨 위젯의 블로그 동네 고르기 (주인만). 동네 이름이나 역·건물 이름을 치면 카카오로 찾아 행정동 목록을 보여 준다.
@@ -10,7 +10,8 @@ import { findWeatherPlaces, saveWeatherPlace } from "./actions";
 const DEBOUNCE_MS = 350;
 
 type Props = {
-  city: string;
+  /** 블로그 도시. 동네를 쓰는 중이면 null (그때는 어느 도시를 골라도 바뀐다) */
+  city: string | null;
   onPlace: (place: WeatherPlace) => void;
   onCity: (key: string) => void;
   onClose: () => void;
@@ -54,14 +55,28 @@ export function WeatherPlacePicker({ city, onPlace, onCity, onClose }: Props) {
 
   function pick(p: WeatherPlace) {
     startSaving(async () => {
-      const { place } = await saveWeatherPlace(p.lat, p.lon);
-      if (place) onPlace(place);
-      else setNote("동네를 정하지 못했어요. 잠시 뒤 다시 해 보세요");
+      try {
+        const { place } = await saveWeatherPlace(p.lat, p.lon);
+        if (place) return onPlace(place);
+      } catch {
+        // 아래 안내
+      }
+      setNote("동네를 정하지 못했어요. 잠시 뒤 다시 해 보세요");
     });
   }
 
   return (
-    <div className="w-full rounded-lg border border-line bg-bg/60 p-2" data-weather-picker>
+    <div
+      className="w-full rounded-lg border border-line bg-bg/60 p-2"
+      data-weather-picker
+      // Esc로 닫는다
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          onClose();
+        }
+      }}
+    >
       <form
         role="search"
         onSubmit={(e) => {
@@ -83,7 +98,8 @@ export function WeatherPlacePicker({ city, onPlace, onCity, onClose }: Props) {
           autoComplete="off"
           // 주인이 ✎를 눌러 연 칸이라 바로 칠 수 있게
           autoFocus
-          className="w-full rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+          // 16px보다 작으면 아이폰이 칸을 누를 때 화면을 확대한다
+          className="min-h-11 w-full rounded-md border border-line bg-surface px-2 text-base text-ink"
         />
       </form>
 
@@ -95,7 +111,7 @@ export function WeatherPlacePicker({ city, onPlace, onCity, onClose }: Props) {
           <ul className="mt-1 max-h-52 overflow-y-auto" aria-label="찾은 동네">
             {places.map((p) => {
               const short = placeShort(p.name);
-              const front = p.name.slice(0, p.name.length - short.length).trim();
+              const front = placeFront(p.name);
               return (
                 <li key={p.name}>
                   <button
@@ -122,7 +138,12 @@ export function WeatherPlacePicker({ city, onPlace, onCity, onClose }: Props) {
       <div className="mt-2 flex items-center gap-2 border-t border-line pt-2 text-xs text-ink-soft">
         <label className="flex items-center gap-1">
           도시로 고르기
-          <select value={city} onChange={(e) => onCity(e.target.value)} disabled={saving} className="rounded-md border border-line bg-surface px-1 py-0.5 text-ink">
+          <select value={city ?? ""} onChange={(e) => onCity(e.target.value)} disabled={saving} className="rounded-md border border-line bg-surface px-1 py-0.5 text-base text-ink sm:text-xs">
+            {city === null && (
+              <option value="" disabled>
+                동네 사용 중
+              </option>
+            )}
             {WEATHER_CITIES.map((c) => (
               <option key={c.key} value={c.key}>
                 {c.name}
