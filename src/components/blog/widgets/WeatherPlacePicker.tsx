@@ -1,12 +1,14 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { GeoError, geoErrorText, locate } from "@/lib/geolocate";
 import { WEATHER_CITIES } from "@/lib/weather";
-import { PLACE_QUERY_MAX, placeFront, placeShort, type WeatherPlace } from "@/lib/weather-place";
+import { PLACE_QUERY_MAX, placeFront, placeShort, roundTo, type WeatherPlace } from "@/lib/weather-place";
 import { findWeatherPlaces, saveWeatherPlace } from "./actions";
 
-// ☀️ 날씨 위젯의 블로그 동네 고르기 (주인만). 동네 이름이나 역·건물 이름을 치면 카카오로 찾아 행정동 목록을 보여 준다.
-// 목록에서 고르면 서버가 그 자리의 동 이름을 다시 확인해 저장한다. 도시 목록으로 되돌릴 수도 있다.
+// ☀️ 날씨 위젯의 블로그 동네 고르기 (주인만). 📍 한 번이면 지금 위치의 동네로 바로 정하고,
+// 다른 동네는 동네 이름이나 역·건물 이름으로 찾는다(카카오 → 행정동 목록). 어느 쪽이든 서버가 그 자리의 동 이름을 다시 확인해 저장한다.
+// 도시 목록으로 되돌릴 수도 있다.
 const DEBOUNCE_MS = 350;
 
 type Props = {
@@ -53,7 +55,7 @@ export function WeatherPlacePicker({ city, onPlace, onCity, onClose }: Props) {
     timer.current = setTimeout(() => run(q), DEBOUNCE_MS);
   }
 
-  function pick(p: WeatherPlace) {
+  function pick(p: { lat: number; lon: number }) {
     startSaving(async () => {
       try {
         const { place } = await saveWeatherPlace(p.lat, p.lon);
@@ -62,6 +64,21 @@ export function WeatherPlacePicker({ city, onPlace, onCity, onClose }: Props) {
         // 아래 안내
       }
       setNote("동네를 정하지 못했어요. 잠시 뒤 다시 해 보세요");
+    });
+  }
+
+  /** 지금 위치의 동네로 바로 정하기. 서버에는 0.001도(약 100m)로 줄여 보내고, 저장은 동 이름과 0.01도 좌표만 */
+  function pickHere() {
+    setNote("위치를 확인하는 중…");
+    startSaving(async () => {
+      try {
+        const p = await locate();
+        const { place } = await saveWeatherPlace(roundTo(p.lat, 3), roundTo(p.lng, 3));
+        if (place) return onPlace(place);
+        setNote("이 위치의 동네를 찾지 못했어요. 아래에서 동네 이름으로 찾아 주세요");
+      } catch (e) {
+        setNote(e instanceof GeoError ? geoErrorText(e) : "동네를 정하지 못했어요. 잠시 뒤 다시 해 보세요");
+      }
     });
   }
 
@@ -77,7 +94,19 @@ export function WeatherPlacePicker({ city, onPlace, onCity, onClose }: Props) {
         }
       }}
     >
+      <button
+        type="button"
+        onClick={pickHere}
+        disabled={saving}
+        // 주인이 ✎를 눌러 연 칸이라 바로 누를 수 있게
+        autoFocus
+        className="btn btn-primary w-full text-sm"
+      >
+        📍 지금 위치 동네로 정하기
+      </button>
+
       <form
+        className="mt-3"
         role="search"
         onSubmit={(e) => {
           e.preventDefault();
@@ -86,7 +115,7 @@ export function WeatherPlacePicker({ city, onPlace, onCity, onClose }: Props) {
         }}
       >
         <label className="mb-1 block text-xs font-semibold text-ink-soft" htmlFor="weather-place-q">
-          블로그 날씨 동네 찾기
+          다른 동네 찾기
         </label>
         <input
           id="weather-place-q"
@@ -96,8 +125,6 @@ export function WeatherPlacePicker({ city, onPlace, onCity, onClose }: Props) {
           maxLength={PLACE_QUERY_MAX}
           placeholder="동네 이름 (예: 상무1동, 역삼동)"
           autoComplete="off"
-          // 주인이 ✎를 눌러 연 칸이라 바로 칠 수 있게
-          autoFocus
           // 16px보다 작으면 아이폰이 칸을 누를 때 화면을 확대한다
           className="min-h-11 w-full rounded-md border border-line bg-surface px-2 text-base text-ink"
         />
