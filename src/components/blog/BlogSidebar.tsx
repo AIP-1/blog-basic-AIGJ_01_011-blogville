@@ -28,14 +28,16 @@ type Props = {
   categoryNav: React.ReactNode;
   isOwner?: boolean;
   layout: WidgetLayout;
-  /** ☀️ 날씨 위젯의 블로그 도시 (blogs.weather_city) */
-  weatherCity: string | null;
+  /** ☀️ 날씨 위젯의 블로그 도시·동네 (blogs.weather_city, weather_place·lat·lon) */
+  weather: { weatherCity: string | null; weatherPlace: string | null; weatherLat: number | null; weatherLon: number | null };
+  /** 주인이 날씨 동네를 찾아 고를 수 있는지 (카카오 열쇠) */
+  weatherPlaceSearch?: boolean;
   /** 👣 방문자를 크게 보일 때 최근 7일 (작게면 null) */
   visitDays: { date: string; count: number }[] | null;
 };
 
 /** 블로그 홈 오른쪽 옆 칸 (BLOG-09). 휴대폰에서는 글 목록 아래. */
-export function BlogSidebar({ blogId, slug, sidebar, visits, recordVisit, search, townSearch, activeTag, categoryNav, isOwner = false, layout, weatherCity, visitDays }: Props) {
+export function BlogSidebar({ blogId, slug, sidebar, visits, recordVisit, search, townSearch, activeTag, categoryNav, isOwner = false, layout, weather, weatherPlaceSearch = false, visitDays }: Props) {
   const empty = <p className="px-1 text-sm text-ink-soft">아직 없어요</p>;
   const linkClass = "flex min-h-11 items-center gap-2 rounded-lg px-2 hover:bg-bg";
   const sizeOf = (key: WidgetKey): WidgetSize => layout.items.find((it) => it.key === key)?.size ?? "lg";
@@ -69,7 +71,7 @@ export function BlogSidebar({ blogId, slug, sidebar, visits, recordVisit, search
           </Suspense>
         );
       case "weather":
-        return <WeatherWidget blog={{ weatherCity }} isOwner={isOwner} />;
+        return <WeatherWidget blog={weather} isOwner={isOwner} placeSearch={isOwner && weatherPlaceSearch} />;
       case "search":
         return (
           <section className="widget" aria-labelledby="w-search">

@@ -266,6 +266,10 @@ export const blogs = pgTable(
     widgetLayout: jsonb("widget_layout"),
     // ☀️ 날씨 위젯의 도시 (src/lib/weather.ts WEATHER_CITIES의 key). NULL이면 서울
     weatherCity: text("weather_city"),
+    // ☀️ 날씨 위젯의 동네 (주인이 검색해 고른 행정동, "광주 서구 상무1동"). 좌표는 0.01도로 줄여 둔다. NULL이면 weatherCity
+    weatherPlace: text("weather_place"),
+    weatherLat: doublePrecision("weather_lat"),
+    weatherLon: doublePrecision("weather_lon"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -284,6 +288,10 @@ export const blogs = pgTable(
     check("blogs_intro_check", sql`char_length(${t.intro}) <= 160`),
     check("blogs_list_style_check", sql`${t.listStyle} in ('list', 'gallery')`),
     check("blogs_accent_color_check", sql`${t.accentColor} in ('green', 'blue', 'purple', 'pink', 'orange', 'gray')`),
+    check(
+      "blogs_weather_place_check",
+      sql`(${t.weatherPlace} is null) = (${t.weatherLat} is null) and (${t.weatherPlace} is null) = (${t.weatherLon} is null) and (${t.weatherPlace} is null or (char_length(${t.weatherPlace}) between 1 and 60 and ${t.weatherLat} between 33 and 39 and ${t.weatherLon} between 124 and 132))`,
+    ),
     check(
       "blogs_roof_color_check",
       sql`${t.roofColor} in ('red', 'orange', 'yellow', 'green', 'sky', 'blue', 'purple', 'brown', 'pink', 'mint')`,
