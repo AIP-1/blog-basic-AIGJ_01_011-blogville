@@ -105,3 +105,16 @@ test("📍 내 위치 날씨: 권한이 꺼져 있으면 켜는 방법을 알려
   await expect(weather.locator("[data-weather-place]")).toHaveText("서울");
   await context.close();
 });
+
+test("서버가 미세먼지를 못 받아 오면 브라우저가 직접 받아 채운다", async ({ page }) => {
+  const me = await signUpOk(page);
+  await page.route("**/api/weather?**", (route) => route.fulfill({ json: { ...WEATHER, weather: { ...WEATHER.weather, pm10: null, pm25: null } } }));
+  await page.route("https://air-quality-api.open-meteo.com/**", (route) =>
+    route.fulfill({ json: { current: { pm10: 95, pm2_5: 20 } }, headers: { "Access-Control-Allow-Origin": "*" } }),
+  );
+  await page.setViewportSize({ width: 1280, height: 1400 });
+  await page.goto(`/@${me}`);
+  const weather = page.locator("[data-weather-widget]");
+  await expect(weather.locator("[data-weather-temp]")).toHaveText("15.9°");
+  await expect(weather).toContainText("미세 나쁨");
+});

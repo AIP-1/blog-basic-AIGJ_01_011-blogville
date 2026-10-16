@@ -41,6 +41,22 @@ function writeHere(here: Here | null) {
   }
 }
 
+const AIR_URL = "https://air-quality-api.open-meteo.com/v1/air-quality";
+
+/** 미세먼지만 브라우저에서 직접 (Open-Meteo는 열쇠가 없고 CORS를 연다). 못 받으면 null */
+async function fetchAir(lat: number, lon: number): Promise<{ pm10: number | null; pm25: number | null } | null> {
+  try {
+    const res = await fetch(`${AIR_URL}?latitude=${lat}&longitude=${lon}&timezone=auto&current=pm10,pm2_5`, { signal: AbortSignal.timeout(8_000) });
+    if (!res.ok) return null;
+    const cur = ((await res.json()) as { current?: { pm10?: unknown; pm2_5?: unknown } }).current;
+    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+    const air = { pm10: num(cur?.pm10), pm25: num(cur?.pm2_5) };
+    return air.pm10 === null && air.pm25 === null ? null : air;
+  } catch {
+    return null;
+  }
+}
+
 export function WeatherWidget({ blog, isOwner = false }: Props) {
   const [city, setCity] = useState(cityOf(blog.weatherCity).key);
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
@@ -62,6 +78,12 @@ export function WeatherWidget({ blog, isOwner = false }: Props) {
         if (stopped) return;
         setData(json);
         setState("ok");
+        // 서버가 미세먼지를 못 받아 왔으면(운영 서버에서 대기질 서버가 막힐 때가 있다) 브라우저가 직접 받아 채운다
+        if (json.weather.pm10 === null && json.weather.pm25 === null) {
+          const at = coords ?? cityOf(city);
+          const air = await fetchAir(at.lat, at.lon);
+          if (!stopped && air) setData((d) => (d ? { ...d, weather: { ...d.weather, ...air } } : d));
+        }
       })
       .catch(() => !stopped && setState("error"));
     return () => {
