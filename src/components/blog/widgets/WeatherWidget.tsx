@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
+import { geoErrorText, locate } from "@/lib/geolocate";
 import { cityOf, dustGrade, formatTemp, WEATHER_CITIES, weatherLook, weekdayOf, type DustGrade, type Weather } from "@/lib/weather";
 import { saveWeatherCity } from "./actions";
 
@@ -20,16 +21,20 @@ const DUST_TONE: Record<DustGrade, string> = {
   "매우 나쁨": UP,
 };
 
-function readHere(): boolean {
+type Here = { lat: number; lon: number };
+
+/** 이 브라우저에 기억한 내 위치(0.1도로 줄인 값). Safari는 허락을 그 방문 동안만 기억해 다음엔 다시 물으므로 좌표를 둔다 */
+function readHere(): Here | null {
   try {
-    return localStorage.getItem(HERE_KEY) === "1";
+    const v = JSON.parse(localStorage.getItem(HERE_KEY) ?? "null") as Here | null;
+    return v && Number.isFinite(v.lat) && Number.isFinite(v.lon) ? { lat: v.lat, lon: v.lon } : null;
   } catch {
-    return false;
+    return null;
   }
 }
-function writeHere(on: boolean) {
+function writeHere(here: Here | null) {
   try {
-    if (on) localStorage.setItem(HERE_KEY, "1");
+    if (here) localStorage.setItem(HERE_KEY, JSON.stringify(here));
     else localStorage.removeItem(HERE_KEY);
   } catch {
     // 저장이 막힌 브라우저는 이번에만 내 위치
@@ -65,37 +70,35 @@ export function WeatherWidget({ blog, isOwner = false }: Props) {
   }, [city, coords, tick]);
 
   const askHere = useCallback((quiet: boolean) => {
-    if (!("geolocation" in navigator)) {
-      if (!quiet) setNote("이 브라우저는 위치를 알려 주지 않아요");
-      return;
-    }
     if (!quiet) setNote("위치를 확인하는 중…");
-    navigator.geolocation.getCurrentPosition(
-      (p) => {
+    locate(30 * 60_000)
+      .then((p) => {
         // 0.1도(약 10km)로 줄여서만 보낸다
-        setCoords({ lat: Math.round(p.coords.latitude * 10) / 10, lon: Math.round(p.coords.longitude * 10) / 10 });
-        writeHere(true);
+        const here = { lat: Math.round(p.lat * 10) / 10, lon: Math.round(p.lng * 10) / 10 };
+        setCoords(here);
+        writeHere(here);
         setNote("");
-      },
-      () => {
-        writeHere(false);
-        if (!quiet) setNote("위치를 쓸 수 없어서 블로그 도시 날씨를 보여 드려요");
-      },
-      { maximumAge: 30 * 60_000, timeout: 10_000 },
-    );
+      })
+      .catch((e: unknown) => {
+        if (!quiet) writeHere(null);
+        if (!quiet) setNote(`${geoErrorText(e)} 지금은 블로그 도시 날씨를 보여 드려요.`);
+      });
   }, []);
 
-  // 전에 허락한 사람은 묻지 않고 바로 내 위치로
+  // 전에 내 위치를 쓴 사람은 기억한 자리로 바로 그리고, 지금 허락돼 있으면 조용히 새 자리로 바꾼다
   useEffect(() => {
-    if (!readHere() || !navigator.permissions) return;
+    const here = readHere();
+    if (!here) return;
+    // 서버 그림과 맞춘 다음에 바꾼다 (첫 그리기는 블로그 도시)
+    void Promise.resolve().then(() => setCoords(here));
     navigator.permissions
-      .query({ name: "geolocation" })
+      ?.query({ name: "geolocation" })
       .then((p) => p.state === "granted" && askHere(true))
       .catch(() => {});
   }, [askHere]);
 
   function backToCity() {
-    writeHere(false);
+    writeHere(null);
     setCoords(null);
   }
 

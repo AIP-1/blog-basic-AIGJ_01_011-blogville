@@ -129,8 +129,6 @@ export const FOOD_MESSAGES = {
   empty: "찾는 식당이 없어요. 이름을 조금 다르게 적어 보세요.",
   nearEmpty: "1km 안에 식당이 안 보여요.",
   regionEmpty: "이 조건에 맞는 곳을 아직 못 찾았어요. 동네나 분류를 바꿔 보세요.",
-  denied: "위치 권한이 꺼져 있어요. 브라우저 주소창 왼쪽 자물쇠에서 위치를 허용해 주세요.",
-  unsupported: "이 브라우저는 위치를 알려 주지 않아요. 지역 인기에서 동네를 골라 보세요.",
 } as const;
 
 export function isFoodTab(v: unknown): v is FoodTab {
