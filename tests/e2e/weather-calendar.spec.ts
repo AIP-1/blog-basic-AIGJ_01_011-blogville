@@ -75,13 +75,13 @@ test("📍 내 위치 날씨: 허락하면 그 자리, 다음에 와도 기억�
   await expect(weather.locator("[data-weather-temp]")).toHaveText("15.9°");
   await weather.getByRole("button", { name: "📍 내 위치 날씨" }).click();
   await expect(weather.locator("[data-weather-place]")).toHaveText("📍 내 위치");
-  await expect.poll(() => asked.at(-1)).toBe("?lat=35.2&lon=129.1");
+  await expect.poll(() => asked.at(-1)).toBe("?lat=35.16&lon=129.06");
 
   // 허락이 풀린 다음 방문 (Safari 기본 "묻기"): 기억한 자리로 바로
   await context.clearPermissions();
   await visitor.reload();
   await expect(weather.locator("[data-weather-place]")).toHaveText("📍 내 위치");
-  await expect.poll(() => asked.at(-1)).toBe("?lat=35.2&lon=129.1");
+  await expect.poll(() => asked.at(-1)).toBe("?lat=35.16&lon=129.06");
 
   // 블로그 도시로 돌아가면 잊는다
   await weather.getByRole("button", { name: "서울 날씨 보기" }).click();
