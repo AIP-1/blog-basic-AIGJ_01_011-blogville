@@ -194,7 +194,7 @@ export function StockWidget({
             <ul className="divide-y divide-line">
               {quotes.map((q) => {
                 const k = `${q.market}:${q.code}`;
-                const closed = q.status !== null && q.status !== "OPEN";
+                const closed = q.status !== null && q.status !== "OPEN" && !q.session;
                 return (
                   <li key={k} className={`flex items-center gap-2 ${size === "sm" ? "min-h-9 py-1" : "min-h-11 py-1.5"}`} data-stock={q.code} title={`${q.market === "KR" ? "국내" : "미국"} · ${q.code}${closed ? " · 장 마감" : ""}`}>
                     <span className="min-w-0 flex-1 truncate text-sm font-semibold">{q.name}</span>
