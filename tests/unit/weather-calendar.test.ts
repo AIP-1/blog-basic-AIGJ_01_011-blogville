@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cityOf, dustGrade, formatTemp, isCityKey, parseForecast, roundCoord, weatherLook, weekdayOf } from "@/lib/weather";
+import { cityOf, dongOfRegion, dustGrade, formatTemp, isCityKey, parseForecast, roundCoord, weatherLook, weekdayOf } from "@/lib/weather";
 import { dayTone, HOLIDAYS, monthGrid, parseMonth, shiftMonth } from "@/lib/calendar";
 
 // Open-Meteo forecast 응답 모양 (timezone=auto, 2시간 간격 칸을 고르는지 본다)
@@ -61,7 +61,7 @@ describe("날씨 위젯 자료", () => {
     expect(cityOf("<x>").key).toBe("seoul");
     expect(isCityKey("jeju")).toBe(true);
     expect(isCityKey("tokyo")).toBe(false);
-    expect(roundCoord(37.56789, 126.97812)).toEqual({ lat: 37.6, lon: 127 });
+    expect(roundCoord(37.56789, 126.97812)).toEqual({ lat: 37.57, lon: 126.98 });
     expect(roundCoord(91, 0)).toBeNull();
     expect(roundCoord(NaN, 0)).toBeNull();
   });
@@ -95,5 +95,20 @@ describe("캘린더 위젯", () => {
     expect(parseMonth(null)).toBeNull();
     expect(shiftMonth("2026-12", 1)).toBe("2027-01");
     expect(shiftMonth("2026-01", -1)).toBe("2025-12");
+  });
+});
+
+describe("날씨 동 이름 (dongOfRegion)", () => {
+  it("행정동(상무1동)을 법정동(치평동)보다 먼저 쓴다", () => {
+    const json = {
+      documents: [
+        { region_type: "B", region_1depth_name: "전남광주통합특별시", region_2depth_name: "서구", region_3depth_name: "치평동" },
+        { region_type: "H", region_1depth_name: "전남광주통합특별시", region_2depth_name: "서구", region_3depth_name: "상무1동" },
+      ],
+    };
+    expect(dongOfRegion(json)).toEqual({ dong: "상무1동", full: "전남광주통합특별시 서구 상무1동" });
+    expect(dongOfRegion({ documents: [json.documents[0]] })?.dong).toBe("치평동");
+    expect(dongOfRegion({ documents: [] })).toBeNull();
+    expect(dongOfRegion(null)).toBeNull();
   });
 });
