@@ -14,7 +14,7 @@
   /* 한 줄에 다 들어가면 칸을 키우고(최대 --cell-max), 안 들어가면 --cell-min에서 줄을 바꾼다 */
   --cell-max: 3.5rem;
   --cell-min: 1.75rem;
-  --cell: clamp(var(--cell-min), calc((100cqi - 1px) / var(--count, 12)), var(--cell-max));
+  --cell: 2.5rem;
   --gap: calc(var(--cell) * 0.16);
   --sheet-line: color-mix(in srgb, var(--accent) 42%, var(--surface));
   --sheet-band: color-mix(in srgb, var(--accent) 7%, var(--surface));
@@ -24,7 +24,6 @@
   /* 글자 칸만큼만 그린다. 넘치면 칸 크기의 배수에서 줄을 바꾸고, 오른쪽 1px에 마지막 세로줄 */
   width: fit-content;
   max-width: 100%;
-  max-width: calc(round(down, 100% - 1px, var(--cell)) + 1px);
   padding-right: 1px;
   background-color: var(--surface);
   background-image:
@@ -39,6 +38,14 @@
   font-family: var(--blog-serif);
   font-weight: 700;
   line-height: 1;
+}
+/* 칸 크기를 너비에 맞추는 것과 칸 배수에서 줄을 바꾸는 것은 지원하는 브라우저에서만 (아니면 2.5rem 칸) */
+@supports (width: 1cqi) {
+  .sheet { --cell: clamp(var(--cell-min), calc((100cqi - 2px) / var(--count, 12)), var(--cell-max)); }
+}
+@supports (width: round(down, 100%, 1px)) {
+  /* 소수점 오차로 마지막 글자가 혼자 줄을 바꾸지 않게 0.5px 여유 */
+  .sheet { max-width: calc(round(down, 100% - 1px, var(--cell)) + 1.5px); }
 }
 .sheet-cell {
   display: flex;
@@ -104,18 +111,21 @@
 /* ── 옆 칸 위젯 ───────────────────────────── */
 .widget { border-radius: 1rem; padding: 0.875rem; }
 .widget-title { padding: 0 0.25rem 0.625rem; font-size: 0.9375rem; }
-.blog-aside > * { break-inside: avoid; margin-bottom: 1rem; }
-.blog-aside > *:last-child { margin-bottom: 0; }
+/* 옆 칸은 앞 줄·뒤 줄 두 칸(BlogSidebar). 좁은 화면에서는 이어서 한 줄 */
+.blog-aside,
+.blog-aside-col { display: flex; flex-direction: column; gap: 1rem; }
+.blog-aside-col:empty { display: none; }
 
 /* ── 넓은 화면: 블로그 홈을 넓히고 옆 칸을 두 줄로 ───────────────────────────── */
 @media (min-width: 1280px) {
   main:has([data-blog-home]),
   body:has([data-blog-home]) > header > div,
-  body:has([data-blog-home]) > .site-footer > nav {
+  body:has([data-blog-home]) > .site-footer > nav,
+  body:has([data-blog-home]) > .site-notice > div {
     max-width: 76rem;
   }
   .blog-columns { grid-template-columns: minmax(0, 1fr) 37rem; }
-  .blog-aside { columns: 2; column-gap: 1rem; }
+  .blog-aside { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; column-gap: 1rem; }
 }
 
 /* ── 글 화면 ───────────────────────────── */

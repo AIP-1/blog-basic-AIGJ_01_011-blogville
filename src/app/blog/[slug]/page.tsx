@@ -331,6 +331,7 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
           weather={{ weatherCity: blog.weatherCity, weatherPlace: blog.weatherPlace, weatherLat: blog.weatherLat, weatherLon: blog.weatherLon }}
           weatherPlaceSearch={isOwner && weatherPlaceEnabled()}
           visitDays={visitDays}
+          categoryRows={1 + tree.length + tree.reduce((n, c) => n + c.subs.length, 0)}
           search={search ?? ""}
           townSearch={isOwner ? (town ?? "") : undefined}
           activeTag={tag}

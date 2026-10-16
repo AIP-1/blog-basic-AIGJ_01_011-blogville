@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultLayout, dropWidget, layoutOf, moveWidget, WIDGETS } from "@/lib/widgets";
+import { defaultLayout, dropWidget, layoutOf, moveWidget, splitColumns, widgetWeight, WIDGETS } from "@/lib/widgets";
 
 describe("layoutOf (위젯 배치 읽기)", () => {
   it("NULL·이상한 값이면 기본 배치 (모두 보이고 크게)", () => {
@@ -41,5 +41,24 @@ describe("moveWidget · dropWidget", () => {
   it("끌어 놓으면 놓은 자리로", () => {
     expect(keys(dropWidget(items, "news", "guestbook"))).toEqual(["news", "guestbook", "calendar", "weather"]);
     expect(keys(dropWidget(items, "guestbook", "weather"))).toEqual(["calendar", "weather", "guestbook", "news"]);
+  });
+});
+
+describe("splitColumns (넓은 화면 옆 칸 두 줄)", () => {
+  const w = (n: number) => n;
+  it("순서를 지키고 높이 차이가 가장 작은 곳에서 자른다", () => {
+    expect(splitColumns([5, 1, 1, 1, 2], w)).toEqual([[5], [1, 1, 1, 2]]);
+    expect(splitColumns([1, 1, 1, 1], w)).toEqual([[1, 1], [1, 1]]);
+  });
+  it("하나뿐이거나 없으면 앞 줄에", () => {
+    expect(splitColumns([3], w)).toEqual([[3], []]);
+    expect(splitColumns([], w)).toEqual([[], []]);
+  });
+  it("기본 배치는 두 줄로 나뉘고 이어 붙이면 원래 순서", () => {
+    const items = defaultLayout().items;
+    const [a, b] = splitColumns(items, (it) => widgetWeight(it, 6));
+    expect(a.length).toBeGreaterThan(0);
+    expect(b.length).toBeGreaterThan(0);
+    expect([...a, ...b]).toEqual(items);
   });
 });
