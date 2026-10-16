@@ -30,7 +30,7 @@ const DUST_TONE: Record<DustGrade, string> = {
 
 type Here = { lat: number; lon: number };
 
-/** 이 브라우저에 기억한 내 위치(0.1도로 줄인 값). Safari는 허락을 그 방문 동안만 기억해 다음엔 다시 물으므로 좌표를 둔다 */
+/** 이 브라우저에 기억한 내 위치(0.01도로 줄인 값). Safari는 허락을 그 방문 동안만 기억해 다음엔 다시 물으므로 좌표를 둔다 */
 function readHere(): Here | null {
   try {
     const v = JSON.parse(localStorage.getItem(HERE_KEY) ?? "null") as Here | null;
@@ -46,6 +46,20 @@ function writeHere(here: Here | null) {
   } catch {
     // 저장이 막힌 브라우저는 이번에만 내 위치
   }
+}
+// [도시 날씨 보기]를 누른 사람: 위치가 허락돼 있어도 저절로 내 위치로 바꾸지 않는다
+const OFF = "off";
+function readOff(): boolean {
+  try {
+    return localStorage.getItem(HERE_KEY) === OFF;
+  } catch {
+    return false;
+  }
+}
+function writeOff() {
+  try {
+    localStorage.setItem(HERE_KEY, OFF);
+  } catch {}
 }
 
 const AIR_URL = "https://air-quality-api.open-meteo.com/v1/air-quality";
@@ -125,12 +139,13 @@ export function WeatherWidget({ blog, isOwner = false, placeSearch = false }: Pr
       });
   }, []);
 
-  // 전에 내 위치를 쓴 사람은 기억한 자리로 바로 그리고, 지금 허락돼 있으면 조용히 새 자리로 바꾼다
+  // 전에 내 위치를 쓴 사람은 기억한 자리로 바로 그린다. 이 사이트에 위치가 허락돼 있으면(맛집에서 허락한 경우도)
+  // 누르지 않아도 조용히 내 동네로 바꾼다. 허락 창을 먼저 띄우지는 않는다
   useEffect(() => {
+    if (readOff()) return;
     const here = readHere();
-    if (!here) return;
     // 서버 그림과 맞춘 다음에 바꾼다 (첫 그리기는 블로그 도시)
-    void Promise.resolve().then(() => setCoords(here));
+    if (here) void Promise.resolve().then(() => setCoords(here));
     navigator.permissions
       ?.query({ name: "geolocation" })
       .then((p) => p.state === "granted" && askHere(true))
@@ -138,7 +153,7 @@ export function WeatherWidget({ blog, isOwner = false, placeSearch = false }: Pr
   }, [askHere]);
 
   function backToCity() {
-    writeHere(null);
+    writeOff();
     setCoords(null);
   }
 
