@@ -295,3 +295,11 @@ describe("이웃 새 글 읽음 (plaza-upgrade-2 B4)", () => {
     expect(unreadFresh(news)).toBe(1);
   });
 });
+
+describe("이사 올 이웃은 소식이 아니다 (plaza-upgrade-2 B1)", () => {
+  it("추천 집의 글은 이웃 새 글·게시판 쪽지에서 뺀다", () => {
+    const houses = [{ ...house(1, "a", [[1, 1]]) }, { ...house(10, "s", [[2, 1]]), suggested: true }];
+    expect(neighborNews(houses, NOW).map((p) => p.id)).toEqual([1]);
+    expect(boardPapers(houses, NOW)).toBe(1);
+  });
+});

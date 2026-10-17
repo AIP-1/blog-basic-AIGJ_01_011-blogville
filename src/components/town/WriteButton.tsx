@@ -62,10 +62,19 @@ function MemberWriteButton({ rewards, className }: { rewards: number; className:
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 브라우저 저장소를 읽은 뒤에만 정할 수 있다
     setAuto(true);
     const timer = window.setTimeout(() => setAuto(false), TIP_AUTO_MS);
-    return () => window.clearTimeout(timer);
+    // 창(☰·우체통)을 열면 저절로 띄운 설명은 접는다 (창 머리를 가리지 않게)
+    const onPanel = () => setAuto(false);
+    window.addEventListener("bv-panel", onPanel);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("bv-panel", onPanel);
+    };
   }, []);
   return (
-    <span className={`group/write relative inline-flex ${className.includes("pointer-events-auto") ? "pointer-events-auto" : ""}`}>
+    // 설명 쪽지를 버튼 바로 아래에 두는 틀: 버튼의 폭(휴대폰 광장의 w-full)과 클릭 받기(광장 간판 묶음)를 따른다
+    <span
+      className={`group/write relative ${className.includes("w-full") ? "flex w-full" : "inline-flex"} ${className.includes("pointer-events-auto") ? "pointer-events-auto" : ""}`}
+    >
       <Link
         href="/write"
         className={`px-btn px-btn--primary ${className}`}

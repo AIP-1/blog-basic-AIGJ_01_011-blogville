@@ -232,8 +232,13 @@ async function suggestHouses(userId: string, placed: readonly { ownerId: string;
   const tiers: HouseRow[][] = [close.filter((c) => c.tier === 1), close.filter((c) => c.tier === 2)];
   let chosen = pickSuggestions(tiers, (r) => r.ownerId, skip, lots.length, pick);
   if (chosen.length < lots.length) {
+    const settled = await loadSettledCandidates(seed, userId);
+    chosen = pickSuggestions([...tiers, settled], (r) => r.ownerId, skip, lots.length, pick);
+  }
+  if (chosen.length < lots.length) {
+    // 어제까지의 블로그가 모자라면(새로 연 사이트) 방문자 마을의 활동 블로그(1분 기억)에서
     const pool = await cached("guest-town-pool", GUEST_POOL_TTL, loadGuestPool);
-    chosen = pickSuggestions([...tiers, pool], (r) => r.ownerId, skip, lots.length, pick);
+    chosen = pickSuggestions([...tiers, chosen, pool], (r) => r.ownerId, skip, lots.length, pick);
   }
   return chosen.map((row, i) => ({ ...toHouse(row, lots[i], false), suggested: true }));
 }
@@ -253,6 +258,26 @@ export async function getGuestHouses(now = new Date(), visitorId: string | null 
     placed.map(({ item, lot }) => toHouse(item, lot, false)),
     visitorId,
   );
+}
+
+/**
+ * 이사 올 이웃의 활동 블로그 후보 (tier 3): 어제까지 만들어졌고 어제까지 쓴 공개 글이 있는 블로그(공지·나 제외) 중
+ * 하루 씨앗(`md5(씨앗 || 블로그 번호)`) 순으로 30곳. 오늘 생긴 블로그·오늘 쓴 글·방문 수와 상관없어서 하루 동안 같은 후보가 선다
+ * (방문 수 순 인기 100곳은 하루에도 들고 나서 후보가 바뀌었다).
+ */
+function loadSettledCandidates(seed: string, userId: string): Promise<HouseRow[]> {
+  const today = sql`(date_trunc('day', now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul')`;
+  return houseQuery(
+    and(
+      sql`${blogs.slug} <> ${NOTICE_SLUG}`,
+      sql`${blogs.ownerId} <> ${userId}`,
+      sql`${blogs.createdAt} < ${today}`,
+      sql`exists (select 1 from posts p where p.blog_id = ${blogs.id} and p.is_public and p.created_at < ${today})`,
+    ),
+  )
+    .orderBy(sql`md5(${seed} || ${blogs.id}::text)`)
+    .limit(30)
+    .then((rows) => rows);
 }
 
 function loadGuestPool(): Promise<HouseRow[]> {

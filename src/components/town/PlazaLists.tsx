@@ -129,7 +129,7 @@ function TaskMeter({ task }: { task: TodayTask }) {
   const { current, total } = task.progress;
   if (total > 3) {
     return (
-      <span className="px-bar w-14 text-(--accent)" aria-hidden="true">
+      <span className="px-bar w-10 shrink-0 text-(--accent)" aria-hidden="true">
         <span style={{ width: `${Math.round((current / total) * 100)}%` }} />
       </span>
     );
@@ -192,22 +192,20 @@ export function TaskList({
                 {task.done ? "✓" : ""}
               </span>
               <span className="min-w-0 flex-1">
-                <span className={`flex items-baseline gap-1.5 text-sm font-semibold ${task.done ? "text-(--kit-ink-soft)" : ""}`}>
-                  <span className="min-w-0">
-                    {task.done && <span className="sr-only">한 일, </span>}
-                    <span aria-hidden="true">{task.icon} </span>
-                    {task.label}
-                  </span>
+                <span className={`block text-sm font-semibold ${task.done ? "text-(--kit-ink-soft)" : ""}`}>
+                  {task.done && <span className="sr-only">한 일, </span>}
+                  <span aria-hidden="true">{task.icon} </span>
+                  {task.label}
+                </span>
+                <span className="mt-0.5 flex items-center gap-2 text-xs text-(--kit-ink-soft)">
+                  <TaskMeter task={task} />
+                  <span className="min-w-0 truncate">{taskProgressText(task)}</span>
                   {task.reward && (
-                    <span className="ml-auto shrink-0 text-xs font-bold text-(--kit-ink-soft)" data-task-reward>
+                    <span className="ml-auto shrink-0 font-bold" data-task-reward>
                       <span className="sr-only">보상 </span>
                       {task.reward}
                     </span>
                   )}
-                </span>
-                <span className="mt-0.5 flex items-center gap-2 text-xs text-(--kit-ink-soft)">
-                  <TaskMeter task={task} />
-                  {taskProgressText(task)}
                 </span>
                 {task.id === "post" && (
                   <Link href="/prompt" className="mt-1 block truncate text-xs font-semibold underline underline-offset-2 hover:text-(--kit-ink)" data-task-prompt>

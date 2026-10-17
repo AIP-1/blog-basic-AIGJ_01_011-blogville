@@ -31,6 +31,8 @@ export const FRESH_POST_HOURS = 24;
 type HousePosts = {
   lot: number;
   mine: boolean;
+  /** 이사 올 이웃(추천 집)은 아직 이웃이 아니라 소식·게시판 쪽지에서 뺀다 */
+  suggested?: boolean;
   slug: string;
   nickname: string;
   recentPosts: readonly { id: number; title: string; createdAt: string; read?: boolean }[];
@@ -42,14 +44,14 @@ function newestFirst(a: PlazaPost, b: PlazaPost): number {
 }
 
 /**
- * 마을 집들의 우체통 글(집마다 최근 3편)에서 이웃 새 글을 고른다: 내 집(`mine`)·0번 자리는 빼고, 7일 안의 글만, 최신순 8편.
+ * 마을 집들의 우체통 글(집마다 최근 3편)에서 이웃 새 글을 고른다: 내 집(`mine`)·0번 자리·이사 올 이웃(`suggested`)은 빼고, 7일 안의 글만, 최신순 8편.
  * 7일은 마을 소식이 즐겨찾는 이웃의 글을 맨 위로 올리는 기간과 같다 (한국 날짜로 오늘 포함 7일, `favoriteWindowStart`).
  * 쿼리를 더 하지 않으려고 집에 이미 실려 온 글을 쓴다 (한 이웃이 7일에 4편 넘게 써도 3편까지만 보인다).
  */
 export function neighborNews(houses: readonly HousePosts[], now = new Date()): PlazaPost[] {
   const since = favoriteWindowStart(now).getTime();
   return houses
-    .filter((h) => h.lot > 0 && !h.mine)
+    .filter((h) => h.lot > 0 && !h.mine && !h.suggested)
     .flatMap((h) =>
       h.recentPosts
         .filter((p) => Date.parse(p.createdAt) >= since)
@@ -94,8 +96,8 @@ export function isFreshPost(createdAt: string, now = new Date()): boolean {
 }
 
 /** 살아 있는 게시판의 쪽지 수: 마을에 선 집들의 오늘 공개 글 수 (집마다 우체통 3편 안에서), 5장까지 */
-export function boardPapers(houses: readonly Pick<HousePosts, "recentPosts">[], now = new Date()): number {
-  return Math.min(BOARD_PAPERS_MAX, houses.reduce((sum, h) => sum + countToday(h.recentPosts, now), 0));
+export function boardPapers(houses: readonly Pick<HousePosts, "recentPosts" | "suggested">[], now = new Date()): number {
+  return Math.min(BOARD_PAPERS_MAX, houses.reduce((sum, h) => sum + (h.suggested ? 0 : countToday(h.recentPosts, now)), 0));
 }
 
 /** 오늘 하루 한 번 루프의 상태 (서버가 원장·낚시 기록·글에서 한 번에 읽는다, `getTodayState`) */
