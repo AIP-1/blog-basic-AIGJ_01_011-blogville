@@ -178,6 +178,20 @@ export function dailyPick<T>(items: readonly T[], day: string, key: (item: T) =>
     .map((r) => r.item);
 }
 
+/**
+ * `dailyPick`으로 고른 것마다 마을 자리(1~`lots`)를 준다: 그날 날짜와 열쇠로 정한 자리가 먼저, 차 있으면 다음 자리.
+ * 순위로 자리를 주면 하나가 들고 날 때 그 뒤 집이 모두 옮겨 가서, 자리도 열쇠로 정한다. `lots`보다 많으면 뒤는 버린다.
+ */
+export function dailyLots<T>(picked: readonly T[], day: string, key: (item: T) => string | number, lots: number): { item: T; lot: number }[] {
+  const taken = new Set<number>();
+  return picked.slice(0, Math.max(0, lots)).map((item) => {
+    let lot = (hashSeed(`${day}:lot:${String(key(item))}`) % lots) + 1;
+    while (taken.has(lot)) lot = (lot % lots) + 1;
+    taken.add(lot);
+    return { item, lot };
+  });
+}
+
 const clockFormat = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
 /** 장소 간판 시계: 한국 시각을 하늘 이름과 12시간으로 (`밤 9:41`, `낮 2:05`). 하늘을 고정했으면(`?sky=`) 그 이름 */

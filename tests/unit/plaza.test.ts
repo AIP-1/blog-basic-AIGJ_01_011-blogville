@@ -4,6 +4,7 @@ import {
   boardPapers,
   clockText,
   countToday,
+  dailyLots,
   dailyPick,
   isFreshPost,
   neighborNews,
@@ -194,5 +195,35 @@ describe("장소 간판 시계 (광장 개편)", () => {
 
   it("하늘을 고정하면 그 이름", () => {
     expect(clockText(kst(14, 5), "night")).toBe("밤 2:05");
+  });
+});
+
+describe("방문자 마을 자리 (dailyLots)", () => {
+  const pool = Array.from({ length: 100 }, (_, i) => ({ blogId: i + 1 }));
+  const lotsOf = (items: { blogId: number }[], day: string) => new Map(dailyLots(items, day, (r) => r.blogId, 10).map((x) => [x.item.blogId, x.lot]));
+  it("고른 집마다 1~10 서로 다른 자리, 같은 날 같은 자리", () => {
+    const day = "2026-10-17";
+    const picked = dailyPick(pool, day, (r) => r.blogId, 10);
+    const lots = [...lotsOf(picked, day).values()];
+    expect(new Set(lots).size).toBe(10);
+    expect(lots.every((l) => l >= 1 && l <= 10)).toBe(true);
+    expect(lotsOf(picked, day)).toEqual(lotsOf(picked, day));
+    expect(dailyLots(pool.slice(0, 12), day, (r) => r.blogId, 10)).toHaveLength(10);
+    expect(dailyLots([], day, (r: { blogId: number }) => r.blogId, 10)).toEqual([]);
+  });
+  it("고른 집 하나가 빠져도 나머지는 대개 제자리 (순위대로 자리를 주면 뒤 집이 모두 옮겨 간다)", () => {
+    let moved = 0;
+    let cases = 0;
+    for (let d = 1; d <= 28; d++) {
+      const day = `2026-10-${String(d).padStart(2, "0")}`;
+      const picked = dailyPick(pool, day, (r) => r.blogId, 10);
+      const before = lotsOf(picked, day);
+      for (const gone of picked) {
+        const after = lotsOf(dailyPick(pool.filter((r) => r.blogId !== gone.blogId), day, (r) => r.blogId, 10), day);
+        for (const [id, lot] of before) if (after.has(id) && after.get(id) !== lot) moved++;
+        cases++;
+      }
+    }
+    expect(moved / cases).toBeLessThan(2.5);
   });
 });

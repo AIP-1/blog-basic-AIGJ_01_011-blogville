@@ -102,7 +102,7 @@ export function UserMenu({ userId, nickname, slug, isAdmin, level, ratio, isMax,
         data-user-menu-button
       >
         <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-bg">{avatar}</span>
-        <span className="max-w-[7rem] truncate text-sm font-semibold max-md:hidden">{nickname}</span>
+        <span className="max-w-[7rem] truncate text-sm font-semibold max-md:hidden max-lg:max-w-[5rem]">{nickname}</span>
         <svg viewBox="0 0 12 12" aria-hidden className={`size-3 shrink-0 text-ink-soft transition-transform ${open ? "rotate-180" : ""}`}>
           <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>

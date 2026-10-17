@@ -69,11 +69,11 @@ const LOGO = "flex min-h-11 shrink-0 items-center gap-1 whitespace-nowrap sm:gap
 
 /**
  * 로고 앞 도트 집 (파비콘·홈 화면 아이콘과 같은 그림, 칸 하나 2px). 먹선은 글자색이라 어두운 화면에서 밝아진다. 읽는 이름은 'Blogville' 그대로.
- * 휴대폰(640px 미만)에서는 숨긴다: 집 마크 자리(28px + 사이)만큼 넓어지면 360px 회원 헤더의 Lv 칩이 두 줄로 접히고
- * 375px 방문자 헤더(맛집 메뉴까지)가 옆으로 넘쳤다. 휴대폰 헤더의 사이·메뉴 여백도 조금씩 줄여 두었다 (큰 레벨·코인 자리)
+ * 1024px 미만에서는 숨긴다: 집 마크 자리(28px + 사이)만큼 넓어지면 360px 회원 헤더의 Lv 칩이 두 줄로 접히고, 375px 방문자 헤더(맛집 메뉴까지)와
+ * 태블릿 폭 회원 헤더(메뉴 글자·글쓰기 글자·긴 닉네임이 나오는 폭)가 옆으로 넘쳤다. 휴대폰 헤더의 사이·메뉴 여백도 조금씩 줄여 두었다 (큰 레벨·코인 자리)
  */
 function LogoMark() {
-  return <PixelArtSvg art={houseMarkArt()} cell={2} className="text-ink max-sm:hidden" />;
+  return <PixelArtSvg art={houseMarkArt()} cell={2} className="text-ink max-lg:hidden" />;
 }
 
 /** 헤더를 그리는 동안 자리를 지키는 막대 (로고만). 본문은 헤더를 기다리지 않고 먼저 그린다 */
@@ -135,8 +135,9 @@ async function Header() {
                 <span className="contents max-sm:hidden">
                   <NotificationBell unread={{ count: unread }} iconOnly className="relative flex size-11 items-center justify-center rounded-full text-lg hover:bg-bg" />
                 </span>
-                <Link href="/write" className="btn btn-primary gap-1 rounded-full px-4 max-sm:size-11 max-sm:px-0" aria-label="글쓰기">
-                  ✏️<span className="max-sm:hidden">글쓰기</span>
+                {/* 768px 미만은 ✏️만 (태블릿 폭에서 메뉴 글자와 함께 헤더가 넘치지 않게) */}
+                <Link href="/write" className="btn btn-primary gap-1 rounded-full px-4 max-md:size-11 max-md:px-0" aria-label="글쓰기">
+                  ✏️<span className="max-md:hidden">글쓰기</span>
                 </Link>
                 <UserMenu
                   userId={member.userId}

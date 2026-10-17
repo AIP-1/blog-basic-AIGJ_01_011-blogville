@@ -233,6 +233,23 @@ test.describe("광장 HUD", () => {
     }
   });
 
+  test("입구 안내 말풍선을 눌러도 들어가고, 게시판 아래 `출석` 팻말을 누르면 걸어가서 출석 화면으로", async ({ page }) => {
+    await signUpOk(page);
+    await openTown(page, "/town?from=shop");
+    await expect(prompt(page)).toHaveText("🏪 상점 · Space 들어가기");
+    const bubble = (await prompt(page).boundingBox())!;
+    await page.mouse.click(bubble.x + bubble.width / 2, bubble.y + bubble.height / 2);
+    await expect(page).toHaveURL("/shop");
+
+    // 팻말은 판 그림 밖(다리 사이)에 매달려 있다: 게시판(1000, 500) 아래 오른쪽 `출석` 팻말 (1060, 464)
+    await openTown(page);
+    await teleport(page, 1250, 620);
+    await expect.poll(() => feet(page)).toEqual([1250, 620]);
+    const plank = await screenAt(page, 1060, 464);
+    await page.mouse.click(plank.x, plank.y);
+    await expect(page).toHaveURL("/attendance", { timeout: 10_000 });
+  });
+
   test("터치 화면: 입구 안내에 Space 키 없이 장소 이름과 [동작] 버튼, 오른쪽 끝에서도 버튼이 화면 안에 있다", async ({ browser }) => {
     const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 }, hasTouch: true });
     const page = await ctx.newPage();

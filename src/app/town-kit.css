@@ -403,6 +403,7 @@
   --kit-loss: #a8321f; /* 🪙 쓴 코인·오류 글자 */
   --kit-water: #dceef6; /* 연못·거울 유리 */
   --kit-sun-paper: #fff0bf; /* 오늘·다 키운 동물 */
+  --kit-sun-paper-hover: #ffe6a3;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -411,6 +412,7 @@
     --kit-loss: #ff9b8f;
     --kit-water: #1d3346;
     --kit-sun-paper: #3d3418;
+    --kit-sun-paper-hover: #4d4220;
   }
 }
 :root[data-theme="dark"] {
@@ -419,6 +421,7 @@
   --kit-loss: #ff9b8f;
   --kit-water: #1d3346;
   --kit-sun-paper: #3d3418;
+  --kit-sun-paper-hover: #4d4220;
 }
 
 /* 간판: 건물 외관이 판자 위로 솟고, 판자 양쪽 위에 못 두 개.

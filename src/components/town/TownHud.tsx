@@ -308,7 +308,8 @@ export function TownHud({
           className={
             phone
               ? "px-box mx-auto w-full max-w-md p-4"
-              : "px-box px-float absolute left-3 top-[4.5rem] z-30 m-0 max-h-[calc(100%-6rem)] w-[min(22rem,calc(100vw-1.5rem))] overflow-y-auto border-0 p-4"
+              : // 친구 마을의 좁은 화면(xl 미만)은 장소 간판이 둘째 줄이라 그 아래에서 연다
+                `px-box px-float absolute left-3 top-[4.5rem] z-30 m-0 max-h-[calc(100%-6rem)] w-[min(22rem,calc(100vw-1.5rem))] overflow-y-auto border-0 p-4 ${host ? "max-xl:top-[7.75rem] max-xl:max-h-[calc(100%-9.25rem)]" : ""}`
           }
           data-town-panel={panel}
         >

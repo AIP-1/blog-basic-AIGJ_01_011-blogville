@@ -20,7 +20,7 @@ export function NotificationList({ notifications }: { notifications: readonly Hu
                 <button
                   type="submit"
                   className={`flex min-h-11 w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm ${
-                    n.read ? "bg-(--kit-paper-2)/60 hover:bg-(--kit-paper-2)" : "bg-(--kit-sun-paper) font-bold hover:bg-[#ffe6a3] dark:hover:bg-[#4d4220]"
+                    n.read ? "bg-(--kit-paper-2)/60 hover:bg-(--kit-paper-2)" : "bg-(--kit-sun-paper) font-bold hover:bg-(--kit-sun-paper-hover)"
                   }`}
                   data-notification={n.read ? "read" : "unread"}
                 >
@@ -28,7 +28,7 @@ export function NotificationList({ notifications }: { notifications: readonly Hu
                     {!n.read && <span className="sr-only">안 읽음, </span>}
                     {n.text}
                   </span>
-                  {/* 햇빛 종이 바탕은 화면 밝기를 따라 뒤집혀(밝게 #fff0bf·어둡게 #3d3418) 먹색 글자(이것도 뒤집힌다)와 대비가 맞다 */}
+                  {/* 햇빛 종이 바탕과 먹색 글자는 같은 토큰이라 함께 뒤집힌다(휴대폰 메뉴). PC 광장([data-town])은 늘 밝은 값이다 */}
                   <span className={`text-xs font-normal ${n.read ? "text-(--kit-ink-soft)" : ""}`}>{n.time}</span>
                 </button>
               </form>

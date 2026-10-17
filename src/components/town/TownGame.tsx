@@ -392,8 +392,19 @@ export function TownGame({
     let hoverStructure: Structure | null = null;
     const npcAt = (p: Point): Npc | undefined =>
       npcs.find((n) => Math.abs(p.x - n.pos.x) <= 22 && p.y >= n.pos.y - PLAYER_SIZE + 8 && p.y <= n.pos.y + 4);
-    // 그림의 칠한 칸만 (집 양옆 풀밭을 눌렀으면 집이 아니라 그 풀밭으로 걷는다)
-    const structureAt = (p: Point): Structure | undefined => structureAtPoint(structures, p);
+    // 이름표 자리 (그림 위 빈 칸에 걸린다). 이름표를 눌러도 그 건물·집이다
+    const tagStyle = (s: Structure) => ((s.tag ?? "sign") === "sign" ? "sign" : s.id === mineId ? "mine" : "plate");
+    const inTag = (p: Point, text: string, style: "sign" | "mine" | "plate", x: number, bottom: number) => {
+      const size = tags.size(text, style);
+      return Math.abs(p.x - x) <= size.width / 2 && p.y <= bottom && p.y >= bottom - size.height;
+    };
+    const tagAt = (p: Point): Structure | undefined => labeled.find((s) => inTag(p, s.label!, tagStyle(s), s.x, s.y - tagLift.get(s)!));
+    // 게시판 아래 두 팻말 (`소식`·`출석`)은 판 그림 밖 다리 사이에 매달려 있다
+    const onBoardPlank = (p: Point) =>
+      inTag(p, "소식", "sign", BOARD_POS.x - 60, BOARD_POS.y - 24) || inTag(p, "출석", "sign", BOARD_POS.x + 60, BOARD_POS.y - 24);
+    // 그림의 칠한 칸만 (집 양옆 풀밭을 눌렀으면 집이 아니라 그 풀밭으로 걷는다), 그리고 이름표·팻말
+    const structureAt = (p: Point): Structure | undefined =>
+      structureAtPoint(structures, p) ?? tagAt(p) ?? (boardStructure && onBoardPlank(p) ? boardStructure : undefined);
     // 입구마다 안내 말풍선을 띄울 이름표 자리 (건물·집). 없으면 입구 위
     const promptOwner = new Map(entrances.map((e) => [e, entranceOwner(e, structures)]));
     const ground = bakeGround();
@@ -409,6 +420,8 @@ export function TownGame({
     let walking = false;
     let walkTime = 0;
     let shown: string | null = null;
+    // 지금 안내 말풍선이 가리키는 입구 (말풍선을 누르면 그리로 들어간다)
+    let promptNear: TownEntrance | null = null;
     let stuck = 0;
     let zone: Zone | null = null;
     const held = new Set<string>();
@@ -497,6 +510,12 @@ export function TownGame({
       if (event.button !== 0) return;
       const p = toWorld(event);
       pending = null;
+      // 떠 있는 입구 안내 말풍선을 누르면 들어간다 (말풍선은 누르기를 막지 않아 캔버스가 받는다)
+      if (promptNear && Number.isFinite(promptX)) {
+        const sx = p.x - camera.x;
+        const sy = p.y - camera.y;
+        if (Math.abs(sx - promptX) <= promptHalf && sy <= promptY && sy >= promptY - promptHeight) return go(promptNear);
+      }
       // 걷는 이웃을 누르면 그 집 우체통 (TOWN-19)
       const npc = npcAt(p);
       if (npc) {
@@ -702,6 +721,7 @@ export function TownGame({
         shown = text;
         setPrompt(text);
       }
+      promptNear = text ? near : null;
       if (enterNext) {
         enterNext = false;
         if (near) go(near);

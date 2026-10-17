@@ -49,7 +49,8 @@ export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle,
         <p className="mt-1.5 line-clamp-2 leading-relaxed text-ink-soft">{excerpt(post.contentText)}</p>
         <p className="mt-3 text-sm text-ink-soft">
           {blogTitle && `${blogTitle} · `}
-          <Time date={post.createdAt} />
+          {/* 글 링크가 카드 전체를 덮어도(::after) 시각 위에 마우스를 올리면 전체 시각이 보이게 위로 */}
+          <Time date={post.createdAt} className="relative z-10" />
           <span aria-label={`공감 ${likeCount}`}> · ♥ {likeCount}</span>
           {commentCount > 0 && <span aria-label={`댓글 ${commentCount}개`}> · 💬 {commentCount}</span>}
           <span aria-label={`조회 ${post.viewCount}`}> · 👀 {post.viewCount}</span>

@@ -146,14 +146,11 @@ export function step(from: Point, delta: Point, bodies: readonly Rect[]): Point 
  * 프레임이 느려도(20fps 아래) 걷는 거리는 지난 시간만큼이라 빠르기가 프레임 수에 따르지 않는다.
  */
 export function subSteps(seconds: number): number[] {
-  let left = Math.min(Math.max(seconds, 0), MAX_FRAME_SECONDS);
-  const out: number[] = [];
-  while (left > 1e-9) {
-    const dt = Math.min(MAX_STEP_SECONDS, left);
-    out.push(dt);
-    left -= dt;
-  }
-  return out;
+  const left = Math.min(Math.max(seconds, 0), MAX_FRAME_SECONDS);
+  if (left <= 1e-9) return [];
+  // 똑같이 나눈다: 끝에 아주 짧은 걸음이 남으면 그 걸음이 "멈춤"으로 읽혀 걷는 그림이 깜빡인다
+  const n = Math.ceil(left / MAX_STEP_SECONDS - 1e-9);
+  return Array.from({ length: n }, () => left / n);
 }
 
 /** `around`: 이 상자(건물 둘레) 안에 서 있어도 입구 가까이로 본다 (집 옆·뒤에서도 들어가기) */

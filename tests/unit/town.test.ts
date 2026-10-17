@@ -144,6 +144,14 @@ describe("걷는 빠르기는 프레임 수와 상관없다", () => {
     expect(subSteps(0)).toEqual([]);
     expect(subSteps(-0.01)).toEqual([]);
   });
+  it("걸음을 똑같이 나눠 끝에 아주 짧은 걸음이 남지 않는다 (느린 화면에서 걷는 그림이 멈춤으로 깜빡이지 않게)", () => {
+    for (const frame of [0.0667, 0.1667, 0.05, 0.034]) {
+      const steps = subSteps(frame);
+      expect(Math.min(...steps)).toBeCloseTo(Math.max(...steps), 12);
+      expect(steps.every((dt) => dt <= MAX_STEP_SECONDS + 1e-12)).toBe(true);
+      expect(steps.reduce((a, b) => a + b, 0)).toBeCloseTo(frame, 12);
+    }
+  });
 });
 
 describe("건물·집을 누르는 자리", () => {
