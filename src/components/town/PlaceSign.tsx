@@ -33,7 +33,7 @@ function useClock(sky: Sky | null): string | null {
 
 /**
  * 장소 간판 (광장 개편): 화면 위 가운데 작은 나무 간판에 지금 선 구역(게임이 보내는 `bv-zone`)과 한국 시각.
- * 친구 마을(TOWN-15)이면 구역 대신 `🏘 {닉네임}님의 마을`과 [🏠 내 마을로] (시험 훅 `data-town-host`).
+ * 친구 마을(TOWN-15)이면 구역 대신 `🏘 {닉네임}님의 마을`과 [🏠 내 마을로] (시험 훅 `data-town-host`). 1280px 미만은 왼쪽 간판 묶음 아래 둘째 줄(TownHud).
  */
 export function PlaceSign({ start, sky, host = null }: { start: Point; sky: Sky | null; host?: { nickname: string; slug: string } | null }) {
   const [zone, setZone] = useState<Zone>(() => zoneAt(start));
@@ -51,10 +51,13 @@ export function PlaceSign({ start, sky, host = null }: { start: Point; sky: Sky 
   );
 
   if (host) {
+    // 마을 이름은 12rem에서 줄인다: 긴 닉네임도 간판이 왼쪽 간판 묶음과 겹치지 않게. 768px 미만은 시계를 접는다(펼친 서랍과 부딪히지 않게)
     return (
       <div className="px-plank px-float flex min-h-11 items-center gap-2 py-1 pl-3 pr-1" data-town-host={host.slug}>
-        <span className="max-w-[40vw] truncate font-bold">🏘 {host.nickname}님의 마을</span>
-        {time}
+        <span className="max-w-[min(40vw,12rem)] truncate font-bold" title={`${host.nickname}님의 마을`}>
+          🏘 {host.nickname}님의 마을
+        </span>
+        <span className="contents max-md:hidden">{time}</span>
         <Link href="/town" className="px-btn px-btn--sm shrink-0">
           🏠 내 마을로
         </Link>

@@ -6,9 +6,22 @@ import { findArt } from "@/lib/art";
 import { pixelRects, type PixelArt } from "@/lib/art/characters";
 import { walkDir, walkFrame, WALK_DIRS, WALK_FPS, WALK_FRAMES, type ColorGrid, type WalkDir } from "@/lib/art/walk";
 import { cellGroups, chimneyTop, glowCells, lampArt, LIT_GLOW, mailboxArt, smokeArt, SMOKE_FRAMES, TOWN_CELL } from "@/lib/art/town";
-import { BOARD_POS, entranceDistance, HOUSE_LOTS, INTERACT_DISTANCE, lotFront, PLAYER_SIZE, shortName, SPEED, WORLD, nearestEntrance, normalize, step, type Point } from "@/lib/town/layout";
+import { BOARD_POS, entranceDistance, HOUSE_LOTS, INTERACT_DISTANCE, lotFront, PLAYER_SIZE, shortName, SPEED, subSteps, WORLD, nearestEntrance, normalize, step, type Point } from "@/lib/town/layout";
 import { createNpcs, NPC_TAG_DISTANCE, npcGraph, updateNpcs, type Npc } from "@/lib/town/npc";
-import { artSize, artVisibleHeight, entrancePrompt, lotChoice, mailboxLot, townLayout, type BoardState, type Structure, type TownEntrance, type TownHouseInput } from "@/lib/town/structures";
+import {
+  artSize,
+  artVisibleHeight,
+  entranceOwner,
+  entrancePrompt,
+  lotChoice,
+  mailboxLot,
+  structureAt as structureAtPoint,
+  townLayout,
+  type BoardState,
+  type Structure,
+  type TownEntrance,
+  type TownHouseInput,
+} from "@/lib/town/structures";
 import { emitTown, onTown } from "@/lib/town/events";
 import { lampsOn, msUntilNextSky, skyAt, SKY_TINT, type Sky } from "@/lib/town/sky";
 import { zoneAt, type Zone } from "@/lib/town/zones";
@@ -38,8 +51,13 @@ const LOT_DISTANCE = 200;
 const BUBBLE_DISTANCE = 160;
 /** 입구 안내 말풍선을 입구(내가 더 위에 있으면 내 발밑) 위로 띄우는 높이: 내 이름표 바로 위 */
 const PROMPT_LIFT = 96;
-/** 입구 안내가 화면 위 메뉴(☰)에 가리지 않게 */
+/** 입구 안내 말풍선의 윗변은 적어도 이만큼 아래부터: 화면 위 간판 묶음(☰·지갑·글쓰기, 장소 간판, 그림자 포함 60px)에 가리지 않게 */
 const PROMPT_TOP = 72;
+/** 안내 말풍선과 터치 [들어가기] 버튼 사이 (ml-3), 말풍선 아래 꼬리 자리 (pb-[10px]) */
+const ENTER_GAP = 12;
+const PROMPT_TAIL = 10;
+/** 입구 안내 글에서 동작을 가르는 곳 (`🏪 상점 · Space 들어가기`) */
+const PROMPT_SPLIT = " · Space ";
 /** 물·연기 그림을 바꾸는 간격: 초당 3장, 뚝뚝 끊어서 (도트 그림 움직임) */
 const ANIM_MS = 333;
 /** 하늘마다 불빛 세기 (낮은 끈다) */
@@ -51,6 +69,15 @@ function subscribePhone(onChange: () => void) {
   const media = window.matchMedia(PHONE_MEDIA);
   media.addEventListener("change", onChange);
   return () => media.removeEventListener("change", onChange);
+}
+
+/** 지금 창 폭이 휴대폰 조건(`PHONE_MEDIA`)인가. 서버 그림과 첫 그림은 false (효과를 켜고 끄는 데만 쓴다) */
+export function usePhoneWidth(): boolean {
+  return useSyncExternalStore(
+    subscribePhone,
+    () => window.matchMedia(PHONE_MEDIA).matches,
+    () => false,
+  );
 }
 
 /** 도트 그림을 칸 `scale`px짜리 캔버스로 한 번 굽는다 */
@@ -97,10 +124,20 @@ function yieldsKey(event: KeyboardEvent): boolean {
   return false;
 }
 
-/** 입구 안내 글: 문구(textContent)는 그대로 두고 `Space`만 키 모양으로, 가운뎃점은 화면 낭독기에만 */
-function PromptText({ text }: { text: string }) {
-  const at = text.indexOf(" · Space ");
+/**
+ * 입구 안내 글: 문구(textContent)는 그대로 두고 `Space`만 키 모양으로, 가운뎃점은 화면 낭독기에만.
+ * 터치 화면은 키가 없고 옆에 [들어가기] 버튼이 있어 장소 이름만 보이고 나머지는 화면 낭독기에만
+ */
+function PromptText({ text, touch = false }: { text: string; touch?: boolean }) {
+  const at = text.indexOf(PROMPT_SPLIT);
   if (at < 0) return <>{text}</>;
+  if (touch)
+    return (
+      <>
+        {text.slice(0, at)}
+        <span className="sr-only">{text.slice(at)}</span>
+      </>
+    );
   return (
     <>
       {text.slice(0, at)}
@@ -126,7 +163,9 @@ const HINT_FOLD_AFTER = 3;
  * 등불 마을 (광장 개편 "글 쓴 집에 불이 켜진다"): 하늘이 한국 시각을 따르고(`data-sky`), 노을·밤·새벽에는 세계를 한 번 덧칠한 뒤
  * 가로등과 24시간 안에 글을 쓴 집(`data-lit`)의 창에 불빛을 더한다. 글 쓴 집은 낮에도 창이 따뜻하고 굴뚝에 연기가 난다.
  * 게시판은 오늘 새 글 쪽지와 출석 도장을 보인다(`data-board`). 이벤트: `bv-mail`(내 우체통 깃발), `bv-enter`(들어가기),
- * `bv-panel`(창이 열려 있으면 캔버스 첫 클릭은 걷지 않는다)을 듣고, 구역이 바뀌면 `bv-zone`을 보낸다.
+ * `bv-panel`(창이 열리면 멀리서 누른 건물에 걸어가 들어가기를 그만둔다)을 듣고, 구역이 바뀌면 `bv-zone`을 보낸다.
+ * 창이 열린 채 캔버스를 누르면 HUD가 창을 닫고(`TownHud`), 같은 클릭은 여기서 평소대로 걷거나 그 우체통을 연다.
+ * 입구 안내 말풍선은 그 건물·집 이름표 자리에 뜨고(이름표는 쉰다), 이름표가 없는 우체통·빈 집터는 입구 위에 뜬다.
  */
 export function TownGame({
   houses,
@@ -171,11 +210,7 @@ export function TownGame({
   const visited = useRef(false);
   const data = JSON.stringify({ houses, member, layers, name, start, startKey, mailFlag, chooseLots, sky, board });
   // 창 폭이 휴대폰 조건을 넘나들면 게임을 끄고 다시 만든다
-  const phone = useSyncExternalStore(
-    subscribePhone,
-    () => window.matchMedia(PHONE_MEDIA).matches,
-    () => false,
-  );
+  const phone = usePhoneWidth();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -195,7 +230,8 @@ export function TownGame({
     };
     const { houses, member, layers, name, start, startKey, mailFlag, chooseLots, board } = parsed;
     const fixedSky = parsed.sky;
-    setTouch(window.matchMedia("(pointer: coarse)").matches);
+    const touchScreen = window.matchMedia("(pointer: coarse)").matches;
+    setTouch(touchScreen);
     // 조작 안내: 이 기기에서 마을을 여러 번 열었으면 `?` 팻말로 접는다 (글은 그대로 남아 화면 낭독기·마우스 올리기로 읽는다)
     if (!visited.current) {
       visited.current = true;
@@ -302,17 +338,8 @@ export function TownGame({
       if (currentSky === "night" && !stars) stars = bakeStars();
     };
     applySky();
-    let skyTimer = 0;
-    if (!fixedSky) {
-      const arm = () => {
-        skyTimer = window.setTimeout(() => {
-          currentSky = skyAt();
-          applySky();
-          arm();
-        }, msUntilNextSky());
-      };
-      arm();
-    }
+    // 다음 하늘로 바뀌는 벽시계 시각. 프레임마다 견준다: 긴 타이머는 컴퓨터가 잠들거나 탭이 쉬면 늦게 와서 하늘이 멈춰 있을 수 있다
+    let skyDue = fixedSky ? Infinity : Date.now() + msUntilNextSky();
     // 움직임 줄이기: 물·연기는 첫 그림에 멈춘다
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let still = motion.matches;
@@ -365,11 +392,10 @@ export function TownGame({
     let hoverStructure: Structure | null = null;
     const npcAt = (p: Point): Npc | undefined =>
       npcs.find((n) => Math.abs(p.x - n.pos.x) <= 22 && p.y >= n.pos.y - PLAYER_SIZE + 8 && p.y <= n.pos.y + 4);
-    const structureAt = (p: Point): Structure | undefined =>
-      structures.find((s) => {
-        const { width, height } = artSize(s.art);
-        return p.x >= s.x - width / 2 && p.x <= s.x + width / 2 && p.y >= s.y - height && p.y <= s.y;
-      });
+    // 그림의 칠한 칸만 (집 양옆 풀밭을 눌렀으면 집이 아니라 그 풀밭으로 걷는다)
+    const structureAt = (p: Point): Structure | undefined => structureAtPoint(structures, p);
+    // 입구마다 안내 말풍선을 띄울 이름표 자리 (건물·집). 없으면 입구 위
+    const promptOwner = new Map(entrances.map((e) => [e, entranceOwner(e, structures)]));
     const ground = bakeGround();
 
     // 시작 자리(?at)가 바뀌었으면 새 자리에서. 환영(?welcome)을 주소에서 지운 뒤 다시 그려도 자리는 그대로
@@ -385,8 +411,6 @@ export function TownGame({
     let shown: string | null = null;
     let stuck = 0;
     let zone: Zone | null = null;
-    // HUD 창이 열려 있는 동안 캔버스 첫 클릭은 창 닫기에만 쓴다 (`bv-panel`)
-    let panelOpen = false;
     const held = new Set<string>();
     const camera = { x: 0, y: 0 };
 
@@ -400,11 +424,19 @@ export function TownGame({
 
     // 화면 배율(devicePixelRatio)만큼 캔버스를 키워 고해상도 화면에서도 또렷하게. 그리는 좌표는 CSS px
     let dpr = 1;
+    // 입구 안내 말풍선 윗변의 하한: 화면 위 간판 묶음(`data-town-hud-row`) 아래. 친구 마을의 좁은 화면은 장소 간판이 둘째 줄이라 더 아래
+    let promptTop = PROMPT_TOP;
     const resize = () => {
       dpr = window.devicePixelRatio || 1;
       canvas.width = Math.round(canvas.clientWidth * dpr);
       canvas.height = Math.round(canvas.clientHeight * dpr);
       tags.setScale(dpr);
+      const top = canvas.getBoundingClientRect().top;
+      promptTop = PROMPT_TOP;
+      for (const row of document.querySelectorAll<HTMLElement>("[data-town-hud-row]")) {
+        const r = row.getBoundingClientRect();
+        if (r.height > 0) promptTop = Math.max(promptTop, Math.round(r.bottom - top) + 12);
+      }
     };
     resize();
     const observer = new ResizeObserver(resize);
@@ -416,6 +448,7 @@ export function TownGame({
     let promptY = Number.NaN;
     const promptObserver = new ResizeObserver(() => {
       promptHalf = (promptBox?.offsetWidth ?? 0) / 2;
+      // 말풍선 높이 (아래 꼬리 자리 pb-[10px] 포함)
       promptHeight = promptBox?.offsetHeight ?? 0;
       promptX = Number.NaN;
     });
@@ -449,10 +482,6 @@ export function TownGame({
     };
     const onPointer = (event: PointerEvent) => {
       if (event.button !== 0) return;
-      if (panelOpen) {
-        panelOpen = false;
-        return;
-      }
       const p = toWorld(event);
       pending = null;
       // 걷는 이웃을 누르면 그 집 우체통 (TOWN-19)
@@ -500,8 +529,9 @@ export function TownGame({
     const offEnter = onTown("bv-enter", () => {
       enterNext = true;
     });
+    // 걸어가는 사이에 창(☰·지갑·우체통)을 열면 문 앞에 닿아도 들어가지 않는다 (걷기는 그대로)
     const offPanel = onTown("bv-panel", ({ open }) => {
-      panelOpen = open;
+      if (open) pending = null;
     });
     // 헤더 🏘 마을 링크에 포커스가 남아 있으면 Space·Enter가 그 링크로 가므로 놓아 준다
     if (document.activeElement instanceof HTMLElement && !document.activeElement.closest("[data-town]")) document.activeElement.blur();
@@ -590,12 +620,8 @@ export function TownGame({
 
     let last = performance.now();
     let frame = 0;
-    const tick = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
-      anim = Math.floor(now / ANIM_MS);
-
-      // 움직이기: 키보드가 클릭 목표보다 먼저
+    /** `dt`초만큼 걷는다 (한 걸음은 `MAX_STEP_SECONDS` 이하라 몸체를 뚫고 지나가지 않는다). 키보드가 클릭 목표보다 먼저 */
+    const walkFor = (dt: number) => {
       let dx = 0;
       let dy = 0;
       for (const code of held) {
@@ -610,22 +636,40 @@ export function TownGame({
         }
       }
       const dir = normalize(dx, dy);
-      const moving = dir.x !== 0 || dir.y !== 0;
-      if (moving) {
-        // 계단에서는 조금 느리게 (TOWN-05)
-        const speed = onStairs(pos) ? SPEED * STAIR_SLOW : SPEED;
-        const next = step(pos, { x: dir.x * speed * dt, y: dir.y * speed * dt }, bodies);
-        // 클릭 목표로 가다 막히면 멈춘다
-        stuck = Math.hypot(next.x - pos.x, next.y - pos.y) < 0.5 ? stuck + dt : 0;
-        if (stuck > 0.25) target = null;
-        facing = walkDir(dir.x, dir.y, facing);
-        // 벽에 막혀 제자리면 걷지 않는다
-        walking = Math.hypot(next.x - pos.x, next.y - pos.y) > 0.01;
-        pos = next;
-        if (walking) walkTime += dt;
-      } else {
+      if (dir.x === 0 && dir.y === 0) {
         walking = false;
         walkTime = 0;
+        return;
+      }
+      // 계단에서는 조금 느리게 (TOWN-05). 목표를 지나치지 않게 남은 거리까지만
+      const speed = onStairs(pos) ? SPEED * STAIR_SLOW : SPEED;
+      const reach = held.size === 0 && target ? Math.min(speed * dt, Math.hypot(target.x - pos.x, target.y - pos.y)) : speed * dt;
+      const next = step(pos, { x: dir.x * reach, y: dir.y * reach }, bodies);
+      // 클릭 목표로 가다 막히면 멈춘다
+      stuck = Math.hypot(next.x - pos.x, next.y - pos.y) < 0.5 ? stuck + dt : 0;
+      if (stuck > 0.25) target = null;
+      facing = walkDir(dir.x, dir.y, facing);
+      // 벽에 막혀 제자리면 걷지 않는다
+      walking = Math.hypot(next.x - pos.x, next.y - pos.y) > 0.01;
+      pos = next;
+      if (walking) walkTime += dt;
+    };
+    const tick = (now: number) => {
+      const frameSeconds = (now - last) / 1000;
+      last = now;
+      anim = Math.floor(now / ANIM_MS);
+      // 하늘이 바뀔 때가 지났으면 바꾼다 (잠들었다 깨어나거나 탭으로 돌아온 첫 프레임에도)
+      if (Date.now() >= skyDue) {
+        currentSky = skyAt();
+        applySky();
+        skyDue = Date.now() + msUntilNextSky();
+      }
+
+      // 움직이기: 지난 시간을 잘게 나눠 걷는다 (화면이 느려 프레임이 드물어도 같은 빠르기, `subSteps`)
+      let elapsed = 0;
+      for (const dt of subSteps(frameSeconds)) {
+        walkFor(dt);
+        elapsed += dt;
       }
       // 눌러 둔 건물 문 앞에 닿았으면 (막혀 멈췄어도 문이 가까우면) 들어간다
       if (pending && target === null) {
@@ -633,8 +677,8 @@ export function TownGame({
         pending = null;
         if (entranceDistance(pos, e) <= INTERACT_DISTANCE) go(e);
       }
-      updateNpcs(npcs, graph, dt, Math.random);
-      for (const n of npcs) npcTime.set(n.lot, n.walking ? (npcTime.get(n.lot) ?? 0) + dt : 0);
+      updateNpcs(npcs, graph, elapsed, Math.random);
+      for (const n of npcs) npcTime.set(n.lot, n.walking ? (npcTime.get(n.lot) ?? 0) + elapsed : 0);
       const pose = `${walking ? "walk" : "idle"}-${facing}`;
       if (canvas.dataset.walk !== pose) canvas.dataset.walk = pose;
 
@@ -658,11 +702,20 @@ export function TownGame({
       camera.x = Math.round(camera.x);
       camera.y = Math.round(camera.y);
 
-      // 입구 안내 말풍선은 그 입구 위 (값이 바뀔 때만 옮긴다)
+      // 입구 안내 말풍선: 건물·집이면 그 이름표 자리(지붕 위, 이름표는 쉰다), 아니면 입구 위. 내 이름표는 가리지 않는다.
+      // 화면 가장자리에서 잘리지 않게, 윗변은 화면 위 간판 묶음 아래에 (값이 바뀔 때만 옮긴다)
+      const owner = near ? promptOwner.get(near) : undefined;
       if (near && promptBox) {
-        const margin = promptHalf + 8;
-        const ax = Math.round(Math.min(Math.max(near.x - camera.x, margin), Math.max(margin, vw - margin)));
-        const ay = Math.round(Math.min(Math.max(Math.min(near.y, pos.y) - PROMPT_LIFT - camera.y, PROMPT_TOP), vh - 8));
+        // 터치 [들어가기] 버튼은 말풍선 오른쪽에 붙어(absolute) 말풍선 폭에 들지 않으니 그 폭·높이도 남긴다
+        const button = touchScreen ? promptBox.querySelector<HTMLElement>("[data-town-enter]") : null;
+        const left = promptHalf + 8;
+        const right = left + (button ? button.offsetWidth + ENTER_GAP : 0);
+        const top = promptTop + Math.max(promptHeight, button ? button.offsetHeight + PROMPT_TAIL : 0);
+        // 문이 둘인 게시판은 그 문 쪽 위에
+        const anchorX = owner && (doors.get(owner)?.length ?? 0) < 2 ? owner.x : near.x;
+        const anchorY = owner ? Math.min(owner.y - tagLift.get(owner)!, pos.y - PROMPT_LIFT) : Math.min(near.y, pos.y) - PROMPT_LIFT;
+        const ax = Math.round(Math.min(Math.max(anchorX - camera.x, left), Math.max(left, vw - right)));
+        const ay = Math.round(Math.min(Math.max(anchorY - camera.y, top), vh - 8));
         if (ax !== promptX || ay !== promptY) {
           promptX = ax;
           promptY = ay;
@@ -761,6 +814,8 @@ export function TownGame({
 
       // 이름표는 맨 위에: 건물 간판은 늘, 집 문패와 빈 집터 팻말은 가까이 가거나 마우스를 올렸을 때만 (내 집은 늘)
       for (const s of labeled) {
+        // 입구 안내 말풍선이 이 이름표 자리에 떠 있다
+        if (s === owner) continue;
         const kind = s.tag ?? "sign";
         if (kind !== "sign" && s.id !== mineId && s !== hoverStructure) {
           const limit = kind === "lot" ? LOT_DISTANCE : PLATE_DISTANCE;
@@ -824,7 +879,6 @@ export function TownGame({
     return () => {
       disposed = true;
       cancelAnimationFrame(raf);
-      window.clearTimeout(skyTimer);
       observer.disconnect();
       promptObserver.disconnect();
       motion.removeEventListener("change", onMotion);
@@ -874,7 +928,7 @@ export function TownGame({
       {/* 입구 안내: 세계 안 그 입구 위에 뜨는 종이 말풍선 (자리는 게임이 transform으로 옮긴다) */}
       <div ref={promptRef} className="pointer-events-none absolute left-0 top-0 z-10 pb-[10px] will-change-transform">
         <p role="status" className={`px-bubble px-float whitespace-nowrap px-3 py-1.5 text-[15px] font-semibold leading-6 ${prompt ? "" : "hidden"}`} data-town-prompt>
-          {prompt && <PromptText text={prompt} />}
+          {prompt && <PromptText text={prompt} touch={touch} />}
         </p>
         {touch && prompt && (
           <button
@@ -887,7 +941,8 @@ export function TownGame({
               event.currentTarget.blur();
             }}
           >
-            들어가기
+            {/* 말풍선에서 뺀 동작 이름 (들어가기·소식 보기·이웃 자리 고르기·로그인하고 이용하기) */}
+            {prompt.includes(PROMPT_SPLIT) ? prompt.slice(prompt.indexOf(PROMPT_SPLIT) + PROMPT_SPLIT.length) : "들어가기"}
           </button>
         )}
       </div>

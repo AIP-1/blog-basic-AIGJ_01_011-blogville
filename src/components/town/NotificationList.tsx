@@ -4,7 +4,7 @@ import type { HudNotification } from "@/server/town";
 
 /**
  * 최근 알림 5개 (☰ 🔔 알림·내 우체통·휴대폰 광장의 내 우체통이 같이 쓴다, TOWN-12·13).
- * 누르면 읽음으로 바꾸고 그 글로 간다. 안 읽은 알림은 햇빛 바탕에 굵게, 화면 낭독기에는 `안 읽음,`.
+ * 누르면 읽음으로 바꾸고 그 글로 간다. 안 읽은 알림은 햇빛 종이 바탕(`--kit-sun-paper`)에 굵게, 화면 낭독기에는 `안 읽음,`.
  */
 export function NotificationList({ notifications }: { notifications: readonly HudNotification[] }) {
   return (
@@ -20,7 +20,7 @@ export function NotificationList({ notifications }: { notifications: readonly Hu
                 <button
                   type="submit"
                   className={`flex min-h-11 w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm ${
-                    n.read ? "bg-(--kit-paper-2)/60 hover:bg-(--kit-paper-2)" : "bg-(--kit-glow)/35 font-bold hover:bg-(--kit-glow)/55"
+                    n.read ? "bg-(--kit-paper-2)/60 hover:bg-(--kit-paper-2)" : "bg-(--kit-sun-paper) font-bold hover:bg-[#ffe6a3] dark:hover:bg-[#4d4220]"
                   }`}
                   data-notification={n.read ? "read" : "unread"}
                 >
@@ -28,7 +28,7 @@ export function NotificationList({ notifications }: { notifications: readonly Hu
                     {!n.read && <span className="sr-only">안 읽음, </span>}
                     {n.text}
                   </span>
-                  {/* 햇빛 바탕 위에서는 어두운 화면에서도 대비가 맞게 먹색 그대로 */}
+                  {/* 햇빛 종이 바탕은 화면 밝기를 따라 뒤집혀(밝게 #fff0bf·어둡게 #3d3418) 먹색 글자(이것도 뒤집힌다)와 대비가 맞다 */}
                   <span className={`text-xs font-normal ${n.read ? "text-(--kit-ink-soft)" : ""}`}>{n.time}</span>
                 </button>
               </form>

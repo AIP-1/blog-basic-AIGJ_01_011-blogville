@@ -4,11 +4,11 @@ import {
   boardPapers,
   clockText,
   countToday,
+  dailyPick,
   isFreshPost,
   neighborNews,
   PLAZA_NEWS_SIZE,
   plazaNews,
-  seededShuffle,
   taskProgressText,
   todayTasks,
   type PlazaPost,
@@ -29,7 +29,7 @@ const house = (lot: number, slug: string, posts: [number, number][], mine = fals
   recentPosts: posts.map(([id, h]) => ({ id, title: `${slug} 글 ${id}`, createdAt: hoursAgo(h) })),
 });
 
-const IDLE: TodayState = { attended: false, postRewards: 0, postedToday: false, fished: false, farmCares: 0 };
+const IDLE: TodayState = { attended: false, postRewards: 0, postedToday: false, fished: false, farmCares: 0, canCare: true };
 
 describe("광장 소식: 이웃 새 글 (광장 개편)", () => {
   it("내 집·0번 자리는 빼고 7일 안의 글만 최신순으로", () => {
@@ -46,6 +46,14 @@ describe("광장 소식: 이웃 새 글 (광장 개편)", () => {
     const posts = neighborNews(houses, NOW);
     expect(posts.map((p) => p.id)).toEqual([20, 10, 11]);
     expect(posts[0]).toMatchObject({ slug: "b", nickname: "b님", title: "b 글 20" });
+  });
+
+  it("7일은 마을 소식의 즐겨찾기 기간과 같은 한국 날짜 7일 (오늘 포함, 6일 전 0시부터)", () => {
+    // 2026-10-17 01:00 KST: 10월 11일 0시부터
+    const now = kst(1, 0, 17);
+    const at = (h: number, day: number, id: number) => ({ id, title: `글 ${id}`, createdAt: kst(h, 0, day).toISOString() });
+    const houses: House[] = [{ lot: 1, mine: false, slug: "a", nickname: "a님", recentPosts: [at(0, 11, 2), at(12, 10, 1)] }];
+    expect(neighborNews(houses, now).map((p) => p.id)).toEqual([2]);
   });
 
   it("같은 시각이면 글 번호가 큰 것 먼저, 8편까지", () => {
@@ -107,10 +115,10 @@ describe("광장 소식: 이웃 새 글 (광장 개편)", () => {
 });
 
 describe("오늘 할 일 (광장 개편)", () => {
-  it("출석·글쓰기·낚시·동물 돌보기, 장소가 있는 일은 텔레포트 자리", () => {
+  it("출석·글쓰기·낚시·동물 돌보기, 장소가 있는 일은 텔레포트 자리 (출석은 게시판 앞이 마을 소식 입구와 겹쳐 링크)", () => {
     const tasks = todayTasks(IDLE);
     expect(tasks.map((t) => t.id)).toEqual(["attendance", "post", "fishing", "farm"]);
-    expect(tasks.map((t) => t.spot ?? null)).toEqual(["board", null, "pond", "farm"]);
+    expect(tasks.map((t) => t.spot ?? null)).toEqual([null, null, "pond", "farm"]);
     expect(tasks.every((t) => !t.done)).toBe(true);
     expect(tasks.map((t) => t.progress.total)).toEqual([1, 3, 1, 15]);
   });
@@ -126,31 +134,52 @@ describe("오늘 할 일 (광장 개편)", () => {
     expect(todayTasks({ ...IDLE, postRewards: 9 })[1].progress.current).toBe(3);
   });
 
-  it("돌보기는 15번을 채워야 끝, 출석·낚시는 했어요/아직이에요", () => {
+  it("돌보기는 15번을 채우거나 오늘 돌볼 동물을 다 돌보면 끝, 출석·낚시는 했어요/아직이에요", () => {
     const [attendance, , fishing, farm] = todayTasks({ ...IDLE, attended: true, farmCares: 4 });
     expect(farm.done).toBe(false);
     expect(taskProgressText(farm)).toBe("돌보기 보상 4/15");
     expect(todayTasks({ ...IDLE, farmCares: 15 })[3].done).toBe(true);
+    // 키우는 동물이 2마리면 6번이 끝: 더 돌볼 동물이 없으면 한 것 (보상 수는 그대로 6/15)
+    const twoAnimals = todayTasks({ ...IDLE, farmCares: 6, canCare: false })[3];
+    expect(twoAnimals.done).toBe(true);
+    expect(taskProgressText(twoAnimals)).toBe("돌보기 보상 6/15");
+    // 동물이 없어 한 번도 못 돌봤으면 아직
+    expect(todayTasks({ ...IDLE, canCare: false })[3].done).toBe(false);
     expect(taskProgressText(attendance)).toBe("오늘 했어요");
     expect(taskProgressText(fishing)).toBe("아직이에요");
   });
 });
 
-describe("방문자 마을 섞기 (광장 개편)", () => {
-  const pool = Array.from({ length: 30 }, (_, i) => i);
+describe("방문자 마을 고르기 (광장 개편)", () => {
+  const pool = Array.from({ length: 100 }, (_, i) => ({ blogId: i + 1 }));
+  const ids = (rows: { blogId: number }[]) => rows.map((r) => r.blogId);
 
-  it("같은 씨앗이면 같은 순서, 다른 날이면 다른 순서", () => {
-    const a = seededShuffle(pool, "2026-10-17");
-    expect(seededShuffle(pool, "2026-10-17")).toEqual(a);
-    expect(seededShuffle(pool, "2026-10-18")).not.toEqual(a);
-    expect([...a].sort((x, y) => x - y)).toEqual(pool);
+  it("같은 날이면 같은 10곳, 다른 날이면 다른 10곳", () => {
+    const a = dailyPick(pool, "2026-10-17", (r) => r.blogId, 10);
+    expect(a).toHaveLength(10);
+    expect(dailyPick(pool, "2026-10-17", (r) => r.blogId, 10)).toEqual(a);
+    expect(ids(dailyPick(pool, "2026-10-18", (r) => r.blogId, 10))).not.toEqual(ids(a));
+    expect(new Set(ids(a)).size).toBe(10);
   });
 
-  it("원래 배열은 그대로 둔다", () => {
-    const input = [1, 2, 3, 4, 5];
-    seededShuffle(input, "seed");
-    expect(input).toEqual([1, 2, 3, 4, 5]);
-    expect(seededShuffle([], "seed")).toEqual([]);
+  it("후보 순서(방문 수)가 바뀌어도 같고, 후보 하나가 빠지면 많아야 한 곳만 바뀐다", () => {
+    const day = "2026-10-17";
+    const a = ids(dailyPick(pool, day, (r) => r.blogId, 10));
+    expect(ids(dailyPick([...pool].reverse(), day, (r) => r.blogId, 10))).toEqual(a);
+    // 고른 집 하나가 100곳에서 빠지면 그 자리만 다음 순위로 바뀐다
+    const b = ids(dailyPick(pool.filter((r) => r.blogId !== a[3]), day, (r) => r.blogId, 10));
+    expect(a.filter((id) => !b.includes(id))).toEqual([a[3]]);
+    expect(b.filter((id) => !a.includes(id))).toHaveLength(1);
+    // 안 고른 후보가 빠지면 그대로
+    const c = ids(dailyPick(pool.filter((r) => !a.includes(r.blogId)).slice(1).concat(pool.filter((r) => a.includes(r.blogId))), day, (r) => r.blogId, 10));
+    expect(c).toEqual(a);
+  });
+
+  it("원래 배열은 그대로 두고, 후보가 적으면 있는 만큼", () => {
+    const input = [{ blogId: 1 }, { blogId: 2 }, { blogId: 3 }];
+    expect(dailyPick(input, "seed", (r) => r.blogId, 10)).toHaveLength(3);
+    expect(input).toEqual([{ blogId: 1 }, { blogId: 2 }, { blogId: 3 }]);
+    expect(dailyPick([], "seed", (r: { blogId: number }) => r.blogId, 10)).toEqual([]);
   });
 });
 

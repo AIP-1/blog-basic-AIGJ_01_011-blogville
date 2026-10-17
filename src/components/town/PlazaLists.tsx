@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Time } from "@/components/common/Time";
+import { shortName } from "@/lib/town/layout";
 import { taskProgressText, type PlazaNews, type TodayTask } from "@/lib/town/plaza";
 import type { TownSpot } from "@/lib/town/structures";
 
@@ -18,22 +19,38 @@ function FreshMark() {
 /**
  * 이웃 새 글: 제목은 사람이 쓴 글이라 고운바탕, 아래에 쓴 사람과 시각. 누르면 그 글로.
  * 이웃 글이 없으면(`village`) '마을 소식'으로 바꿔 마을 전체 새 글을 보이고 마을 소식·인기 글로 가는 길을 둔다.
+ * 친구 마을(`host`)이면 그 회원이 즐겨찾는 이웃의 글이라 그렇게 적고, 내 이웃 새 글(/feed/following)로 가는 길은 두지 않는다.
  * 시험 훅 `data-town-news`(neighbors|village), 글마다 `data-news-post`.
  */
-export function NewsList({ news, compact = false, limit, member = true }: { news: PlazaNews; compact?: boolean; limit?: number; member?: boolean }) {
+export function NewsList({
+  news,
+  compact = false,
+  limit,
+  member = true,
+  host = null,
+}: {
+  news: PlazaNews;
+  compact?: boolean;
+  limit?: number;
+  member?: boolean;
+  /** 친구 마을 구경이면 그 마을 주인 (TOWN-15) */
+  host?: { nickname: string; slug: string } | null;
+}) {
   const village = news.scope === "village";
   const posts = limit ? news.posts.slice(0, limit) : news.posts;
+  const whose = host ? `${host.nickname}님이 즐겨찾는 이웃` : "즐겨찾는 이웃";
   return (
     <div className="space-y-2" data-town-news={news.scope}>
       {village && (
         <div className={compact ? "px-3 pt-1" : ""}>
-          {/* 휴대폰 광장은 칸 제목이 이미 '마을 소식'이라 설명만 */}
+          {/* 칸 제목(PC 서랍 탭·휴대폰 광장)이 이미 '마을 소식'이라 설명만 */}
           {!compact && <p className="font-bold">📋 마을 소식</p>}
           <p className="text-sm text-(--kit-ink-soft)">
-            {member ? "⭐ 즐겨찾는 이웃의 새 글이 없어서 마을 전체의 새 글을 보여 드려요." : "마을 사람들이 쓴 새 글이에요. 가입하면 즐겨찾는 이웃의 새 글이 먼저 보여요."}
+            {member ? `⭐ ${whose}의 새 글이 없어서 마을 전체의 새 글을 보여 드려요.` : "마을 사람들이 쓴 새 글이에요. 가입하면 즐겨찾는 이웃의 새 글이 먼저 보여요."}
           </p>
         </div>
       )}
+      {!village && host && <p className={`text-sm text-(--kit-ink-soft) ${compact ? "px-3 pt-1" : ""}`}>⭐ {whose}의 새 글이에요.</p>}
       {posts.length === 0 ? (
         <p className={`text-sm text-(--kit-ink-soft) ${compact ? "px-3" : ""}`}>아직 마을에 공개 글이 없어요. 첫 글을 써서 마을에 불을 켜 보세요.</p>
       ) : (
@@ -62,6 +79,11 @@ export function NewsList({ news, compact = false, limit, member = true }: { news
               🔥 인기 글
             </Link>
           </>
+        ) : host ? (
+          <Link href={`/@${host.slug}`} className="px-btn px-btn--quiet px-btn--sm">
+            {/* 서랍 폭(280px)에 한 줄로: 닉네임은 8자에서 줄인다 */}
+            🏠 {shortName(host.nickname, 8)}님 블로그 ›
+          </Link>
         ) : (
           <Link href="/feed/following" className="px-btn px-btn--quiet px-btn--sm">
             이웃 새 글 모두 보기 ›
@@ -135,7 +157,8 @@ export function TaskList({
               <button
                 type="button"
                 className="px-btn px-btn--quiet px-btn--sm shrink-0"
-                aria-label={`${task.label}: ${spot.label} 앞으로 텔레포트`}
+                // 이름은 보이는 글자로 시작한다 (말로 누르기, WCAG 2.5.3)
+                aria-label={`가기: ${task.label}, ${spot.label} 앞으로 텔레포트`}
                 onClick={(event) => {
                   onTeleport!(spot);
                   event.currentTarget.blur();
@@ -144,7 +167,7 @@ export function TaskList({
                 ✨ 가기
               </button>
             ) : (
-              <Link href={task.href} className="px-btn px-btn--quiet px-btn--sm shrink-0" aria-label={`${task.label}: ${task.id === "post" ? "글쓰기" : "가기"}`}>
+              <Link href={task.href} className="px-btn px-btn--quiet px-btn--sm shrink-0" aria-label={`${task.id === "post" ? "쓰기" : "가기"}: ${task.label}`}>
                 {task.id === "post" ? "✏️ 쓰기" : "가기"}
               </Link>
             )}

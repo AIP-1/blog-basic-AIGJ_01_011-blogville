@@ -2,8 +2,26 @@ import { describe, expect, it } from "vitest";
 import { houseArt, HOUSE_ART_WIDTH } from "@/lib/art/town";
 import { CLIFF_FACE, CLIFF_LINES, heightAt, onStairs, stairEnds, STAIRS, TERRAIN_WALLS } from "@/lib/town/terrain";
 import { ROOF_HEX } from "@/lib/roof";
-import { feetRect, HOUSE_LOTS, INTERACT_DISTANCE, lotFront, nearestEntrance, normalize, overlaps, shortName, START_POS, step, WORLD, type Point } from "@/lib/town/layout";
-import { EMPTY_LOT_HINT, entrancePrompt, mailboxLot, townLayout, townSpots, type TownHouseInput } from "@/lib/town/structures";
+import { TOWN_CELL } from "@/lib/art/town";
+import {
+  feetRect,
+  HOUSE_LOTS,
+  INTERACT_DISTANCE,
+  lotFront,
+  MAX_FRAME_SECONDS,
+  MAX_STEP_SECONDS,
+  nearestEntrance,
+  normalize,
+  overlaps,
+  shortName,
+  SPEED,
+  START_POS,
+  step,
+  subSteps,
+  WORLD,
+  type Point,
+} from "@/lib/town/layout";
+import { artSize, EMPTY_LOT_HINT, entranceOwner, entrancePrompt, mailboxLot, onArt, structureAt, townLayout, townSpots, type TownHouseInput } from "@/lib/town/structures";
 
 const house = (lot: number, mine = false): TownHouseInput => ({ lot, slug: `blog${lot}`, nickname: `주민${lot}`, blogTitle: `블로그 ${lot}`, stage: 1, roof: ROOF_HEX.red, mine });
 
@@ -103,6 +121,59 @@ describe("마을 배치 (TOWN-03·04)", () => {
     expect([...seen].some((k) => heightAt(Number(k.split(",")[1]) * cell) === 0)).toBe(true);
     // 계단이 아닌 곳의 절벽 앞면은 걸을 수 없다
     for (const line of CLIFF_LINES) expect(free({ x: 1000, y: line + CLIFF_FACE / 2 })).toBe(false);
+  });
+});
+
+describe("걷는 빠르기는 프레임 수와 상관없다", () => {
+  /** 빈 땅에서 `seconds`초 동안 `fps`로 오른쪽으로 걸은 거리 (게임과 같이 프레임마다 잘게 나눠 `step`) */
+  const walk = (fps: number, seconds: number) => {
+    let p = { x: 200, y: 800 };
+    for (let f = 0; f < Math.round(seconds * fps); f++) for (const dt of subSteps(1 / fps)) p = step(p, { x: SPEED * dt, y: 0 }, []);
+    return p.x - 200;
+  };
+  it("느린 화면(10·15fps)도 60fps와 같은 거리를 걷는다", () => {
+    expect(walk(60, 0.6)).toBeCloseTo(SPEED * 0.6, 5);
+    expect(walk(15, 0.6)).toBeCloseTo(SPEED * 0.6, 5);
+    expect(walk(10, 0.6)).toBeCloseTo(SPEED * 0.6, 5);
+  });
+  it("한 걸음은 1/30초 이하, 한 프레임은 0.25초까지 (탭을 비웠다 돌아와도 순간 이동하지 않는다)", () => {
+    const steps = subSteps(0.1);
+    expect(steps.every((dt) => dt <= MAX_STEP_SECONDS + 1e-12)).toBe(true);
+    expect(steps.reduce((a, b) => a + b, 0)).toBeCloseTo(0.1);
+    expect(subSteps(5).reduce((a, b) => a + b, 0)).toBeCloseTo(MAX_FRAME_SECONDS);
+    expect(subSteps(0)).toEqual([]);
+    expect(subSteps(-0.01)).toEqual([]);
+  });
+});
+
+describe("건물·집을 누르는 자리", () => {
+  const { structures, entrances } = townLayout([house(3)], true);
+  const home = structures.find((s) => s.id === "house:3")!;
+  const { width, height } = artSize(home.art);
+  it("그림의 칠한 칸만 그 집이고, 그림 상자 안이라도 양옆 풀밭은 아니다", () => {
+    // 집 몸통 가운데
+    expect(structureAt(structures, { x: home.x, y: home.y - 20 })?.id).toBe("house:3");
+    // 그림 상자 왼쪽 끝 칸 (빈 칸): 풀밭
+    const edge = { x: home.x - width / 2 + 2, y: home.y - 10 };
+    expect(onArt(home, edge)).toBe(false);
+    expect(structureAt(structures, edge)?.id).not.toBe("house:3");
+    // 지붕 위 빈 줄
+    expect(onArt(home, { x: home.x - width / 2 + TOWN_CELL * 3, y: home.y - height + 2 })).toBe(false);
+  });
+  it("겹치면 앞(아랫변이 아래)에 그린 것", () => {
+    const back = { id: "back", art: home.art, x: 500, y: 500 };
+    const front = { id: "front", art: home.art, x: 500, y: 520 };
+    expect(structureAt([front, back], { x: 500, y: 495 })?.id).toBe("front");
+  });
+  it("입구 안내는 그 건물·집 이름표 자리 (게시판 두 입구는 게시판), 우체통·빈 집터는 입구 위", () => {
+    const owner = (id: string) => entranceOwner(entrances.find((e) => e.id === id)!, structures)?.id;
+    expect(owner("house:3")).toBe("house:3");
+    expect(owner("shop")).toBe("shop");
+    expect(owner("feed")).toBe("board");
+    expect(owner("attendance")).toBe("board");
+    expect(owner("mailbox:3")).toBeUndefined();
+    const lots = townLayout([], true, false, true);
+    expect(entranceOwner(lots.entrances.find((e) => e.id === "lot:4")!, lots.structures)).toBeUndefined();
   });
 });
 

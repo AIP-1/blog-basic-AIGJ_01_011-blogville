@@ -7,7 +7,7 @@ import { houseStage } from "@/lib/house";
 import { todayKST } from "@/lib/kst";
 import { NOTICE_SLUG } from "@/lib/names";
 import { assignLots } from "@/lib/town/lots";
-import { seededShuffle, todayTasks } from "@/lib/town/plaza";
+import { dailyPick, todayTasks } from "@/lib/town/plaza";
 import { currentRoof, ROOF_HEX } from "@/lib/roof";
 import { feedbackNotificationText, guestbookNotificationText, levelUpText, notificationText, notificationTime } from "@/lib/notifications";
 import { getMyBlog, getNickname } from "./dal";
@@ -161,12 +161,13 @@ export async function getMemberHouses(userId: string, viewerId = userId): Promis
 
 /**
  * 방문자의 마을 (TOWN-04): 공개 글이 있고 공지 블로그가 아닌 블로그를 누적 방문자 수 → 최근 공개 글 순으로
- * 100곳 고른 뒤(1분 기억), 그 안에서 10곳. 고르는 순서는 한국 날짜를 씨앗으로 섞어 하루 동안 같은 마을이 선다
- * (새로고침마다 집이 바뀌지 않게). 우체통 글·불 켜진 집은 기억하지 않고 매번 읽는다. 0번(내 집 자리)은 비어 있다.
+ * 100곳 고른 뒤(1분 기억), 그 안에서 10곳. 한국 날짜와 블로그 번호로 매긴 순위로 골라(`dailyPick`) 하루 동안 같은 마을이 선다:
+ * 방문 수가 늘어 100곳의 순서가 바뀌어도 그대로고, 100곳에 하나가 들고 나도 많아야 한 집만 바뀐다.
+ * 우체통 글·불 켜진 집은 기억하지 않고 매번 읽는다. 0번(내 집 자리)은 비어 있다.
  */
 export async function getGuestHouses(now = new Date()): Promise<TownHouse[]> {
   const pool = await cached("guest-town-pool", GUEST_POOL_TTL, loadGuestPool);
-  const rows = seededShuffle(pool, todayKST(now)).slice(0, NEIGHBOR_HOUSES);
+  const rows = dailyPick(pool, todayKST(now), (r) => r.blogId, NEIGHBOR_HOUSES);
   return withRecentPosts(rows.map((r, i) => toHouse(r, i + 1, false)));
 }
 

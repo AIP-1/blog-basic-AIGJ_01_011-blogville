@@ -147,6 +147,41 @@ export function artSize(art: PixelArt): { width: number; height: number } {
   };
 }
 
+/**
+ * 점(세계 px)이 그 그림의 칠한 칸 위인가. 그림 상자 안이라도 빈 칸(`.`)은 풀밭이라 치지 않는다 (집 그림 양옆·지붕 위는 풀밭).
+ * `tolerance`칸 둘레까지 봐 준다 (그림 가장자리를 살짝 비껴 눌러도)
+ */
+export function onArt(s: Pick<Structure, "art" | "x" | "y">, p: { x: number; y: number }, tolerance = 1): boolean {
+  const { width, height } = artSize(s.art);
+  const cx = Math.floor((p.x - (s.x - width / 2)) / TOWN_CELL);
+  const cy = Math.floor((p.y - (s.y - height)) / TOWN_CELL);
+  for (let dy = -tolerance; dy <= tolerance; dy++) {
+    const row = s.art.rows[cy + dy];
+    if (!row) continue;
+    for (let dx = -tolerance; dx <= tolerance; dx++) {
+      const ch = row[cx + dx];
+      if (ch !== undefined && ch !== "." && s.art.palette[ch]) return true;
+    }
+  }
+  return false;
+}
+
+/** 그 점에 그려진 것 가운데 맨 앞(아랫변이 가장 아래, 나중에 그린 것) */
+export function structureAt<T extends Pick<Structure, "art" | "x" | "y">>(structures: readonly T[], p: { x: number; y: number }): T | undefined {
+  let best: T | undefined;
+  for (const s of structures) if ((!best || s.y >= best.y) && onArt(s, p)) best = s;
+  return best;
+}
+
+/**
+ * 입구의 이름표를 단 건물·집 (입구 안내 말풍선을 그 이름표 자리에 띄우고 이름표는 쉰다). 게시판의 두 입구(마을 소식·출석)는 게시판.
+ * 빈 집터 팻말(`lot`)과 이름표가 없는 우체통은 없음: 안내는 입구 위에 뜬다.
+ */
+export function entranceOwner<T extends Pick<Structure, "id" | "label" | "tag">>(e: { id: string }, structures: readonly T[]): T | undefined {
+  const id = e.id === "feed" || e.id === "attendance" ? "board" : e.id;
+  return structures.find((s) => s.id === id && s.label !== undefined && s.tag !== "lot");
+}
+
 /** 그림 맨 위 빈 줄을 뺀 실제 높이 (px). 이름표를 그림 바로 위에 붙인다 */
 export function artVisibleHeight(art: PixelArt): number {
   const first = art.rows.findIndex((row) => /[^.]/.test(row));

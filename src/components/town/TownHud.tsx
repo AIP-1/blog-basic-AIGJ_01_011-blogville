@@ -19,6 +19,7 @@ import { supportHref } from "@/lib/support-rules";
 import { NotificationList } from "./NotificationList";
 import { PlaceSign } from "./PlaceSign";
 import { PlazaDrawer } from "./PlazaDrawer";
+import { usePhoneWidth } from "./TownGame";
 import { TownThemeToggle } from "./TownThemeToggle";
 import { useLiveUnread } from "./useLiveUnread";
 import { WriteButton } from "./WriteButton";
@@ -61,8 +62,9 @@ function TownSignOut({ userId }: { userId: string }) {
  *  위 가운데 장소 간판  지금 구역과 한국 시각 (친구 마을이면 그 마을 이름과 [🏠 내 마을로])
  *  오른쪽 위 서랍      광장 소식: 이웃 새 글·오늘 할 일
  * ☰ 창에는 내 프로필·알림·텔레포트·친구 목록과 바로 가기, 내 정보·관리자·로그아웃. 방문자는 텔레포트와 로그인만.
- * 창이 열려 있으면(`dialog[open]`) 게임은 키보드를 쓰지 않는다. Esc나 [✕]로 닫고 [‹]로 메뉴에 돌아온다. 열고 닫을 때 `bv-panel`.
- * 안 읽은 알림은 1분마다·탭으로 돌아올 때 다시 읽어 ☰ 숫자를 바꾸고 `bv-mail`을 보낸다 (`useLiveUnread`).
+ * 창이 열려 있으면(`dialog[open]`) 게임은 키보드를 쓰지 않는다. Esc나 [✕]로 닫고 [‹]로 메뉴에 돌아온다. 마을(캔버스)을 눌러도 닫히고,
+ * 그 클릭은 게임이 평소대로 받는다(걷기·다른 우체통). 열고 닫을 때 `bv-panel`.
+ * 안 읽은 알림은 1분마다·탭으로 돌아올 때 다시 읽어 ☰ 숫자를 바꾸고 `bv-mail`을 보낸다 (`useLiveUnread`, 휴대폰 폭에서는 쉰다).
  * `phone`이면 휴대폰 아래 탭의 ☰ 메뉴 화면(`/town?menu=1`, specs/040-phone-tabs): 게임이 없어 늘 펼친 채 페이지에 놓이고,
  * 텔레포트와 ✨ 없이 내 프로필·알림·친구 목록·바로 가기만 보인다.
  */
@@ -111,7 +113,9 @@ export function TownHud({
   const titleId = useId();
   // 창을 바꿀 때만 제목으로 초점을 옮긴다. 휴대폰 메뉴 화면은 처음 열 때 초점을 빼앗지 않는다
   const shown = useRef<Panel | null>(panel);
-  const unreadCount = useLiveUnread(hud?.unread ?? 0, hud !== null && !phone);
+  // 휴대폰 폭에서는 이 HUD가 CSS로 숨어 있고 게임도 없으니 알림 수를 다시 읽지 않는다
+  const onPhone = usePhoneWidth();
+  const unreadCount = useLiveUnread(hud?.unread ?? 0, hud !== null && !phone && !onPhone);
   const unread = unreadBadge(unreadCount);
 
   // 게임(우체통)에서 연 창은 닫으면 초점을 게임에 돌려준다. ☰에 두면 다음 Space가 메뉴를 다시 연다
@@ -144,11 +148,22 @@ export function TownHud({
       setPanel(null);
       refocus();
     };
+    // 마을(캔버스)을 누르면 창을 닫는다. 캔버스보다 먼저(capture) 닫아 두면 같은 클릭으로 게임이 연 우체통(`bv-mailbox`)이 이긴다.
+    // 초점은 ☰에 돌려주지 않고 놓는다: ☰에 두면 다음 Space가 메뉴를 다시 연다
+    const onDown = (event: PointerEvent) => {
+      if (event.button !== 0 || !(event.target instanceof HTMLCanvasElement) || !event.target.closest("[data-town]")) return;
+      setPanel(null);
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", onDown, true);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onDown, true);
+    };
   }, [panel, phone]);
 
-  // 창이 열리고 닫힐 때 게임에 알린다 (열린 동안 캔버스 첫 클릭을 걷기로 쓰지 않게)
+  // 창이 열리고 닫힐 때 게임에 알린다 (열면 멀리서 누른 건물에 걸어가 들어가기를 그만둔다)
   const isOpen = panel !== null;
   const announced = useRef(isOpen);
   useEffect(() => {
@@ -201,8 +216,8 @@ export function TownHud({
     <>
       {!phone && (
         <>
-          {/* 왼쪽 위 간판 묶음 (TOWN-01·12): 캔버스 클릭을 막지 않게 묶음 틈은 비워 둔다 */}
-          <div className="pointer-events-none absolute left-3 top-3 z-20 flex items-start gap-2.5">
+          {/* 왼쪽 위 간판 묶음 (TOWN-01·12): 캔버스 클릭을 막지 않게 묶음 틈은 비워 둔다. `data-town-hud-row`: 입구 안내는 이 아래에 뜬다 */}
+          <div className="pointer-events-none absolute left-3 top-3 z-20 flex items-start gap-2.5" data-town-hud-row>
             <div className="px-plank px-float pointer-events-auto flex min-h-11 items-stretch">
               <button
                 ref={opener}
@@ -220,8 +235,8 @@ export function TownHud({
                   </span>
                 )}
               </button>
-              {/* 친구 마을에서는 위 가운데 간판이 마을 이름을 보이므로, 좁은 화면에서는 로고를 접는다 */}
-              <span className={`flex items-stretch ${host ? "max-xl:hidden" : ""}`}>
+              {/* 친구 마을에서는 장소 간판이 마을 이름을 보이므로 로고를 접는다 (간판이 묶음과 겹치지 않게) */}
+              <span className={`flex items-stretch ${host ? "hidden" : ""}`}>
                 <span className="w-0.5 bg-(--kit-wood-edge)" aria-hidden="true" />
                 {/* 로고 (TOWN-01): 회원은 내 마을, 방문자는 첫 화면 */}
                 <Link href={userId ? "/town" : "/"} className="px-font-2x flex min-h-11 items-center px-3">
@@ -236,7 +251,8 @@ export function TownHud({
                 className="px-box px-float pointer-events-auto flex min-h-11 flex-col items-start justify-center gap-1 px-2.5 py-1 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-(--kit-ink)"
                 aria-haspopup="dialog"
                 aria-expanded={panel === "profile"}
-                aria-label={`내 프로필 열기: Lv.${hud.level}, 코인 ${formatNumber(hud.coin)}, ${hud.exp.isMax ? "최고 레벨" : `다음 레벨까지 경험치 ${formatNumber(hud.exp.current)}/${formatNumber(hud.exp.needed)}`}`}
+                // 이름은 보이는 글자(Lv·🪙 코인)로 시작한다 (말로 누르기, WCAG 2.5.3)
+                aria-label={`Lv.${hud.level} 🪙 ${formatNumber(hud.coin)}, 내 프로필 열기, ${hud.exp.isMax ? "최고 레벨" : `다음 레벨까지 경험치 ${formatNumber(hud.exp.current)}/${formatNumber(hud.exp.needed)}`}`}
                 onClick={(event) => toggle(event.currentTarget, "profile")}
                 data-town-wallet
               >
@@ -256,8 +272,11 @@ export function TownHud({
             <WriteButton rewards={hud ? hud.postRewardsToday : null} className="px-float pointer-events-auto" />
           </div>
 
-          {/* 위 가운데 장소 간판: 친구 마을은 늘, 내 마을은 왼쪽 묶음과 겹치지 않는 넓은 화면에서만 */}
-          <div className={`pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 ${host ? "" : "max-xl:hidden"}`}>
+          {/* 위 가운데 장소 간판: 내 마을은 왼쪽 묶음과 겹치지 않는 넓은 화면에서만, 친구 마을은 늘 (좁은 화면은 묶음 아래 둘째 줄) */}
+          <div
+            className={`pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 ${host ? "max-xl:left-3 max-xl:top-[4.25rem] max-xl:translate-x-0" : "max-xl:hidden"}`}
+            data-town-hud-row
+          >
             <div className="pointer-events-auto">
               {/* 구역은 처음 자리에서 잡고 그 뒤로는 게임(bv-zone)을 따른다. 환영을 주소에서 지워 시작 자리가 바뀌어도 캐릭터는 그대로라 다시 잡지 않는다 */}
               <PlaceSign start={start} sky={sky} host={host} />
@@ -271,6 +290,7 @@ export function TownHud({
               places={spots.places}
               notice={notice}
               member={hud !== null}
+              host={host}
               onTeleport={(spot) => {
                 setPanel(null);
                 teleportTo(spot);
