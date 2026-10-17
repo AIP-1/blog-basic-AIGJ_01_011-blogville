@@ -10,7 +10,8 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     display: "standalone",
     background_color: "#fbfaf7",
-    theme_color: "#2f7d4f",
+    // 브랜드 초록 하나 (globals.css --accent, 헤더 로고·집 마크 지붕과 같은 색)
+    theme_color: "#2a7348",
     icons: [
       { src: "/icon.svg", sizes: "any", type: "image/svg+xml" },
       { src: "/apple-icon", sizes: "180x180", type: "image/png" },

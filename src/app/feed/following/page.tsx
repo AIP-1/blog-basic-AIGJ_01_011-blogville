@@ -18,7 +18,9 @@ export default async function FollowingFeedPage({ searchParams }: PageProps<"/fe
   const [feed, tags, neighbors] = await Promise.all([listFeed({ page, followerId: member.userId }), getPopularTags(), listMyNeighbors(member.userId)]);
   return (
     <FeedView
-      title="💛 이웃 새 글"
+      emoji="💛"
+      title="이웃 새 글"
+      mark="litHouse"
       tab="following"
       showFollowingTab
       feed={feed}
