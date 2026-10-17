@@ -1,7 +1,7 @@
 /* 블로그 화면 디자인 (블로그 홈·글 화면).
    - 원고지 제목: 블로그 이름을 원고지 칸에 한 글자씩. 칸 선은 블로그 강조색이라 꾸미기 색을 따라간다
    - 제목 글꼴: 명조 고운바탕 (LateFonts가 첫 화면 뒤에 받는다). 본문·버튼은 그대로 Pretendard
-   - 넓은 화면(1280px~): 블로그 홈을 넓히고 옆 칸을 두 줄로 나눠 길게 늘어지지 않게 한다 */
+   - 넓은 화면(80rem, 보통 1280px~): 블로그 홈을 넓히고 옆 칸을 두 줄로 나눠 길게 늘어지지 않게 한다 */
 
 :root {
   /* 받기 전에는 기기 명조로 */
@@ -62,6 +62,7 @@
 /* ── 블로그 홈 머리 ───────────────────────────── */
 .masthead-stat {
   display: inline-flex;
+  white-space: nowrap;
   align-items: baseline;
   gap: 0.25rem;
   color: var(--ink-soft);
@@ -117,15 +118,17 @@
 .blog-aside-col:empty { display: none; }
 
 /* ── 넓은 화면: 블로그 홈을 넓히고 옆 칸을 두 줄로 ───────────────────────────── */
-@media (min-width: 1280px) {
+/* 80rem(보통 1280px): 기본 글자 크기를 키운 브라우저에서는 넓은 칸(37rem)과 같이 커져 글 목록이 눌리지 않는다 */
+@media (min-width: 80rem) {
   main:has([data-blog-home]),
   body:has([data-blog-home]) > header > div,
   body:has([data-blog-home]) > .site-footer > nav,
   body:has([data-blog-home]) > .site-notice > div {
     max-width: 76rem;
   }
-  .blog-columns { grid-template-columns: minmax(0, 1fr) 37rem; }
-  .blog-aside { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; column-gap: 1rem; }
+  /* 위젯이 하나뿐(data-cols="1")이면 예전 좁은 한 줄 그대로 */
+  .blog-columns:has(> .blog-aside[data-cols="2"]) { grid-template-columns: minmax(0, 1fr) 37rem; }
+  .blog-aside[data-cols="2"] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; column-gap: 1rem; }
 }
 
 /* ── 글 화면 ───────────────────────────── */

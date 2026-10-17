@@ -148,18 +148,23 @@ export default async function BlogHome({ params, searchParams }: PageProps<"/blo
             </h1>
             {blog.intro && <p className="mt-4 max-w-[60ch] text-[1.0625rem] leading-relaxed text-ink-soft">{blog.intro}</p>}
             <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3">
-              <div className="flex min-w-0 items-center gap-3" aria-label="블로그 정보">
-                {/* 주인 프로필 사진 (BLOG-04, 없으면 캐릭터) */}
-                <ProfileAvatar photoKey={photoKey} nickname={nickname} character={avatar.layers} />
-                <span className="min-w-0 leading-tight">
-                  <span className="block font-bold">{nickname}</span>
-                  <span className="block text-sm text-ink-soft">@{blog.slug}</span>
+              {/* 좁은 화면에서 이름이 길면 글·이웃 수가 통째로 다음 줄로 (글자 사이에서 끊기지 않게) */}
+              <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2" aria-label="블로그 정보">
+                <span className="flex min-w-0 items-center gap-3">
+                  {/* 주인 프로필 사진 (BLOG-04, 없으면 캐릭터) */}
+                  <ProfileAvatar photoKey={photoKey} nickname={nickname} character={avatar.layers} />
+                  <span className="min-w-0 leading-tight">
+                    <span className="block font-bold">{nickname}</span>
+                    <span className="block text-sm text-ink-soft">@{blog.slug}</span>
+                  </span>
                 </span>
-                <span className="masthead-stat ml-2">
-                  글 <b>{allTotal}</b>
-                </span>
-                <span className="masthead-stat" data-followers>
-                  이웃 <b>{followers}</b>
+                <span className="flex items-baseline gap-3">
+                  <span className="masthead-stat">
+                    글 <b>{allTotal}</b>
+                  </span>
+                  <span className="masthead-stat" data-followers>
+                    이웃 <b>{followers}</b>
+                  </span>
                 </span>
               </div>
               {member && !isOwner && (

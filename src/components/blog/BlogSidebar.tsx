@@ -230,10 +230,11 @@ export function BlogSidebar({ blogId, slug, sidebar, visits, recordVisit, search
     .filter((it) => it.visible)
     .map((it) => ({ it, node: render(it.key) }))
     .filter((s) => s.node);
-  // 넓은 화면에서는 두 줄 (앞 줄 → 뒤 줄 순서는 그대로). 좁은 화면에서는 두 칸이 이어져 한 줄
+  // 넓은 화면에서는 두 줄 (앞 줄 → 뒤 줄 순서는 그대로). 좁은 화면에서는 두 칸이 이어져 한 줄.
+  // 위젯이 하나뿐이면 뒤 줄이 비므로 넓은 화면에서도 예전처럼 좁은 한 줄 (data-cols)
   const columns = splitColumns(slots, (s) => widgetWeight(s.it, categoryRows));
   return (
-    <aside aria-label="옆 칸" className="blog-aside min-w-0" data-sidebar>
+    <aside aria-label="옆 칸" className="blog-aside min-w-0" data-sidebar data-cols={columns[1].length > 0 ? 2 : 1}>
       {columns.map((col, i) => (
         <div key={i} className="blog-aside-col">
           {col.map(({ it, node }) => (
