@@ -34,11 +34,16 @@ export function zoneAt(p: Point): Zone {
  * 게임 화면에서 [광장으로] 나갈 때 돌아올 자리 (`/town?from={id}`). 텔레포트 목록(`townSpots`)의 장소 id와 같다.
  * 출석·마을 소식은 게시판, 낚시터는 연못.
  */
-export const RETURN_SPOTS = ["board", "shop", "clothes", "salon", "farm", "pond"] as const;
+export const RETURN_SPOTS = ["board", "shop", "clothes", "salon", "farm", "pond", "home", "prompt"] as const;
 export type ReturnSpot = (typeof RETURN_SPOTS)[number];
 
-export function townReturnHref(spot: ReturnSpot | null): string {
-  return spot ? `/town?from=${spot}` : "/town";
+/**
+ * `host`(친구 마을 블로그 주소)가 있으면 그 마을(`/town/{host}`)로 돌아간다. 없으면 중앙 광장.
+ * `home`·`prompt`는 아직 장소 좌표가 없어 광장 시작 자리(분수 아래)에 선다 (plaza-upgrade-2).
+ */
+export function townReturnHref(spot: ReturnSpot | null, host?: string): string {
+  const base = host ? `/town/${encodeURIComponent(host)}` : "/town";
+  return spot ? `${base}?from=${spot}` : base;
 }
 
 export function parseReturnSpot(value: unknown): ReturnSpot | null {

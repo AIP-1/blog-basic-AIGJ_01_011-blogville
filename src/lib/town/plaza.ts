@@ -8,7 +8,7 @@ import { SKY_LABELS, skyAt, type Sky } from "./sky";
 import type { ReturnSpot } from "./zones";
 
 /** 광장 소식 서랍·휴대폰 광장의 글 한 편. `createdAt`은 ISO 문자열 (화면에 그대로 넘긴다), `fresh`는 24시간 안에 쓴 글 */
-export type PlazaPost = { id: number; title: string; slug: string; nickname: string; createdAt: string; fresh?: boolean };
+export type PlazaPost = { id: number; title: string; slug: string; nickname: string; createdAt: string; fresh?: boolean; read?: boolean };
 
 /**
  * 광장 소식: 즐겨찾는 이웃(마을에 집이 선 이웃)의 7일 안 공개 글(`neighbors`), 그런 글이 없으면 마을 전체 새 글(`village`).

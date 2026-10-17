@@ -37,10 +37,17 @@ export type TownHouse = {
   fresh: boolean;
   /** 가장 최근 공개 글 제목 (`recentPosts[0]`, 걷는 이웃 말풍선·집 위 쪽지). 글이 없으면 없음 */
   latestTitle?: string;
+  /** 추천 이웃의 흐린 집 (plaza-upgrade-2) */
+  suggested?: boolean;
+  /** 내가 아직 안 읽은 글이 있다 (plaza-upgrade-2). 없으면 `fresh`로 대신한다 */
+  unread?: boolean;
+  /** 오늘·어제 방문 수 (plaza-upgrade-2) */
+  visitsToday?: number;
+  visitsYesterday?: number;
 };
 
 /** `createdAt`은 ISO 문자열 (클라이언트 게임에 그대로 넘긴다) */
-export type MailboxPost = { id: number; title: string; createdAt: string };
+export type MailboxPost = { id: number; title: string; createdAt: string; read?: boolean };
 
 /** 이 시간 안에 쓴 글이 있으면 불 켜진 집 */
 export const FRESH_HOURS = 24;

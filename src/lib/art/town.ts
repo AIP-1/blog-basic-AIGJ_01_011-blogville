@@ -756,3 +756,23 @@ export function salonArt(): PixelArt {
   g[23][24] = "Y";
   return art(g, { W: "#e3fafc", w: "#b2f2bb", B: "#12b886", b: "#087f5b", S: "#fff9db", K: "#343a40", R: "#e03131", V: "#ffffff", F: "#7a4a2a", G: "#bfe6ff", L: "#ffffff", D: "#0ca678", Y: "#f4c430" });
 }
+
+/**
+ * 등불 (plaza-upgrade-2): 글 쓴 날 수에 따라 크기가 다르다(`s`·`m`·`l`), `lit`이면 불이 켜진다.
+ * TODO(world): 지금은 빈 1칸 그림
+ */
+export function lanternArt(lit: boolean, size: "s" | "m" | "l"): PixelArt {
+  void lit;
+  void size;
+  return art(grid(1, 1), {});
+}
+
+/**
+ * 추천 이웃의 흐린 집 (plaza-upgrade-2): 아직 이웃이 아닌 추천 블로그를 빈 집터에 흐리게 보인다.
+ * TODO(world): 지금은 빈 1칸 그림
+ */
+export function ghostHouseArt(stage = 0, roof = "#c0c0c0"): PixelArt {
+  void stage;
+  void roof;
+  return art(grid(1, 1), {});
+}

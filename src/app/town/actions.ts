@@ -18,3 +18,26 @@ export async function chooseTownLot(formData: FormData): Promise<{ error: string
   if (!error) revalidatePath("/", "layout");
   return { error };
 }
+
+type TownActionResult = { ok: true } | { error: string };
+
+/**
+ * 이웃 초대 (plaza-upgrade-2): `slug` 블로그 주인을 `lot`번 자리로 초대한다.
+ * TODO(home): 아직 준비 중
+ */
+export async function inviteNeighbor(slug: string, lot: number): Promise<TownActionResult> {
+  void slug;
+  void lot;
+  return { error: "준비 중" };
+}
+
+/**
+ * 마을 우체통 쪽지 (plaza-upgrade-2): `slug` 블로그 주인에게 쪽지(방명록)를 남긴다. `isSecret`이면 비밀 쪽지.
+ * TODO(home): 아직 준비 중
+ */
+export async function leaveTownNote(slug: string, content: string, isSecret: boolean): Promise<TownActionResult> {
+  void slug;
+  void content;
+  void isSecret;
+  return { error: "준비 중" };
+}

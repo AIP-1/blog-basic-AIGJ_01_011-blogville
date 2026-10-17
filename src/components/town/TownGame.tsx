@@ -25,6 +25,8 @@ import {
 import { emitTown, onTown } from "@/lib/town/events";
 import { lampsOn, msUntilNextSky, skyAt, SKY_TINT, type Sky } from "@/lib/town/sky";
 import { zoneAt, type Zone } from "@/lib/town/zones";
+import type { TodayTask } from "@/lib/town/plaza";
+import type { Season } from "@/lib/town/season";
 import { onStairs, SKY_HEIGHT, STAIR_SLOW, stairEnds, STAIRS } from "@/lib/town/terrain";
 import { bubbleText, PIXEL_FONT_PROBE, TagCache } from "./canvas-text";
 import { bakeGlow, bakeGround, bakeSkyBand, bakeStars, GROUND_CELL } from "./ground";
@@ -180,6 +182,12 @@ export function TownGame({
   sky = null,
   board = { papers: 3, stamps: 3 },
 }: {
+  /** 오늘 할 일 (plaza-upgrade-2). TODO(world): 아직 쓰지 않는다 */
+  tasks?: TodayTask[];
+  /** 계절 고정 (`?season=`). null이면 지금 한국 시각 (plaza-upgrade-2). TODO(world): 아직 쓰지 않는다 */
+  season?: Season | null;
+  /** 글을 쓰고 돌아왔을 때 축하 (내 집이 보이는 마을 수, plaza-upgrade-2). TODO(world): 아직 쓰지 않는다 */
+  celebrate?: { villages: number } | null;
   houses: TownHouseInput[];
   member: boolean;
   layers: string[];
