@@ -38,7 +38,7 @@ export function PublishNotice({ rewarded }: { rewarded: boolean }) {
           ? `✨ 경험치 ${REWARD_RULES.post.exp} · 🪙 ${REWARD_RULES.post.coin} 코인을 받았어요`
           : `(비공개 글, 짧은 글, 또는 오늘 글쓰기 보상 ${REWARD_RULES.post.dailyLimit}번을 다 받아서 보상은 없어요)`}
       </p>
-      <Link href="/town?from=home&lit=1" className="px-btn px-btn--primary shrink-0 self-start sm:self-auto" data-publish-lantern>
+      <Link href="/town?from=home&lit=1" className="btn btn-primary shrink-0 justify-center self-stretch rounded-2xl px-5 sm:self-auto" data-publish-lantern>
         🏮 광장에서 내 초롱 켜기
       </Link>
     </div>
