@@ -1,23 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useUnreadCount } from "@/components/notifications/NotificationBell";
+import { PHONE_PLAZA } from "@/components/town/phone-plaza";
 import { unreadBadge } from "@/lib/notifications";
 
 /**
- * 휴대폰 회원의 아래 탭 (TOWN-11·12, NF-06, specs/040-phone-tabs): 휴대폰에는 마을이 없어
- * 🏠 내 블로그 · 📋 마을 소식 · 🏪 상점 · 🔔 알림 · ☰ 메뉴(`/town?menu=1`)로 다닌다. PC에서는 CSS가 숨긴다.
+ * 휴대폰 회원의 아래 탭 (TOWN-11·12, NF-06, specs/040-phone-tabs): 🏠 내 블로그 · 📋 마을 소식 · 🏘 마을(휴대폰 광장, `/town`) ·
+ * 🔔 알림 · ☰ 메뉴(`/town?menu=1`)로 다닌다. 마을과 메뉴는 주소가 같아 `?menu=1`로 지금 탭을 가른다.
+ * 휴대폰 광장을 끄면(`PHONE_PLAZA`) 가운데 탭은 예전처럼 🏪 상점. PC에서는 CSS가 숨긴다.
  */
 export function PhoneTabs({ slug, unread }: { slug: string; unread: { count: number } }) {
   const pathname = decodeURIComponent(usePathname());
+  const menu = useSearchParams().get("menu") === "1";
   const badge = unreadBadge(useUnreadCount(unread));
   const tabs = [
     { href: `/@${slug}`, icon: "🏠", label: "내 블로그", on: pathname === `/@${slug}` || pathname.startsWith(`/@${slug}/`) },
     { href: "/feed", icon: "📋", label: "마을 소식", on: pathname === "/feed" },
-    { href: "/shop", icon: "🏪", label: "상점", on: pathname === "/shop" },
+    PHONE_PLAZA
+      ? { href: "/town", icon: "🏘", label: "마을", on: pathname === "/town" && !menu }
+      : { href: "/shop", icon: "🏪", label: "상점", on: pathname === "/shop" },
     { href: "/notifications", icon: "🔔", label: "알림", on: pathname === "/notifications" },
-    { href: "/town?menu=1", icon: "☰", label: "메뉴", on: pathname === "/town" },
+    { href: "/town?menu=1", icon: "☰", label: "메뉴", on: pathname === "/town" && (menu || !PHONE_PLAZA) },
   ];
   return (
     <nav

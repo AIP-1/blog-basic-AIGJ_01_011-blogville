@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 /**
  * 첫 마을 환영 (TOWN-01): 가입 직후 블로그의 🚪 밖으로(`/town?welcome=1`)로 나왔을 때 한 번만.
- * 보여 준 직후 주소에서 `?welcome`을 지워 새로고침해도 다시 뜨지 않는다.
+ * 보여 준 직후 주소에서 `?welcome`을 지워 새로고침해도 다시 뜨지 않는다. 광장 개편: 종이 쪽지 모양과 [✏️ 첫 글 쓰기].
  */
 export function TownWelcome({ nickname, show }: { nickname: string; show: boolean }) {
   // 처음 그릴 때만 정한다
@@ -24,16 +25,26 @@ export function TownWelcome({ nickname, show }: { nickname: string; show: boolea
   return (
     <section
       aria-label="마을 환영"
-      className="absolute bottom-14 left-1/2 flex w-[min(34rem,calc(100%-1.5rem))] -translate-x-1/2 items-start gap-2 rounded-2xl border border-[#f4c430] bg-white/95 p-4 text-[#3b2a20] shadow-lg"
+      className="px-box px-float absolute bottom-14 left-1/2 z-20 w-[min(34rem,calc(100%-1.5rem))] -translate-x-1/2 p-4"
       data-town-welcome
     >
-      <p className="flex-1">
-        🎉 <strong>{nickname}</strong>님, 마을에 처음 나왔어요! 뒤에 있는 <strong>내 집</strong>에 다시 들어가면 글을 쓸 수 있어요. 왼쪽 위{" "}
-        <strong>☰ 메뉴</strong>의 텔레포트로 즐겨찾기한 이웃 집에 바로 갈 수 있고, 프로필·알림·친구 목록도 볼 수 있어요.
-      </p>
-      <button type="button" className="btn btn-ghost min-w-11 px-2" aria-label="환영 닫기" onClick={() => setOpen(false)}>
-        ✕
-      </button>
+      <div className="flex items-start gap-2">
+        <p className="flex-1">
+          🎉 <strong>{nickname}</strong>님, 마을에 처음 나왔어요! 글을 쓰면 뒤에 있는 <strong>내 집</strong> 창에 불이 켜지고, 이웃들도 광장에서 내 새 글을
+          봐요. 왼쪽 위 <strong>☰ 메뉴</strong>의 텔레포트로 즐겨찾기한 이웃 집에 바로 갈 수 있어요.
+        </p>
+        <button type="button" className="px-btn px-btn--quiet px-btn--sm shrink-0" aria-label="환영 닫기" onClick={() => setOpen(false)}>
+          ✕
+        </button>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2.5 p-0.5">
+        <Link href="/write" className="px-btn px-btn--primary">
+          ✏️ 첫 글 쓰기
+        </Link>
+        <button type="button" className="px-btn" onClick={() => setOpen(false)}>
+          마을 둘러보기
+        </button>
+      </div>
     </section>
   );
 }
