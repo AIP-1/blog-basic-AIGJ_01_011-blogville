@@ -72,18 +72,22 @@ export function PostCard({ slug, post, categoryName, subcategoryName, blogTitle,
     );
   }
   // 마을 소식·이웃 새 글·인기 글·스크랩: 작성자 줄을 카드 안 맨 위에 둔 쪽지 한 장. 링크 둘(블로그 홈·글)이 겹치지 않게
-  // 카드 틀은 article이 갖고, 글 링크에 마우스를 올리면 틀이 강조색이 된다(globals.css .post-note)
+  // 카드 틀은 article이 갖고, 글 링크에 마우스를 올리면 틀이 강조색이 된다(globals.css .post-note).
+  // 작성자 링크는 글자 폭만큼만이고, 카드의 나머지(작성자 줄 빈 곳 포함)는 글 링크가 덮는다(::after): 틀 안 어디를 눌러도 블로그 홈이 아니라 글로
   return (
-    <article className="post-note rounded-2xl border border-line bg-surface">
+    <article className="post-note relative rounded-2xl border border-line bg-surface">
       {/* 읽는 이름 = 보이는 글자 (Lighthouse label-content-name-mismatch). 사이 공백은 flex라 화면에 안 보인다. 첫 글자 칸은 꾸밈 */}
-      <Link href={`/@${slug}`} className="post-note-author flex min-h-11 min-w-0 items-center gap-1 px-4 pt-2 text-sm sm:px-5 sm:pt-3">
+      <Link href={`/@${slug}`} className="post-note-author relative z-10 flex min-h-11 w-fit min-w-0 max-w-full items-center gap-1 px-4 pt-2 text-sm sm:px-5 sm:pt-3" data-post-author>
         <span className="post-note-mark" aria-hidden="true">
           {sheetChars(author.nickname)[0] ?? ""}
         </span>
         <span className="shrink-0 font-bold">{author.nickname}</span>{" "}
         <span className="min-w-0 truncate text-ink-soft">· {author.blogTitle}</span>
       </Link>
-      <Link href={`/@${slug}/${post.id}`} className="group flex gap-4 px-4 pb-4 pt-1 sm:gap-5 sm:px-5 sm:pb-5">
+      <Link
+        href={`/@${slug}/${post.id}`}
+        className="group flex gap-4 px-4 pb-4 pt-1 after:absolute after:inset-0 after:rounded-2xl after:content-[''] sm:gap-5 sm:px-5 sm:pb-5"
+      >
         {body}
       </Link>
     </article>

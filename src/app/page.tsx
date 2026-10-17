@@ -33,9 +33,11 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   const member = await getSession();
   if (member) redirect(next ?? "/town");
 
+  // 휴대폰(한 줄)은 머리글 → 로그인 칸 → 마을 그림 순서라 첫 화면에 로그인 버튼까지 보인다 (가입이 이 화면의 일).
+  // 넓은 화면은 왼쪽에 머리글과 마을 그림을 붙여 쌓고 오른쪽에 로그인 칸, 묶음을 헤더와 아래 막대 사이 가운데에 (globals.css [data-landing])
   return (
-    <div className="grid items-center gap-8 py-4 md:grid-cols-[minmax(0,1fr)_380px] md:gap-10 md:py-10">
-      <section aria-labelledby="landing-title" className="min-w-0">
+    <div className="grid items-center gap-8 py-4 md:grid-cols-[minmax(0,1fr)_380px] md:gap-x-10 md:gap-y-6 md:py-10" data-landing>
+      <section aria-labelledby="landing-title" className="min-w-0 md:col-start-1 md:row-start-1 md:self-end">
         {/* 원고지 두 줄 (한 줄 9칸). 칸마다 상자라 읽는 글은 따로 준다 */}
         <h1 id="landing-title" className="sheet-wrap">
           <span className="sr-only">{HEADLINE}</span>
@@ -45,16 +47,18 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           </span>
         </h1>
         <p className="mt-4 max-w-prose text-[1.0625rem] leading-relaxed text-ink-soft">가입하면 내 블로그와 집이 생겨요. 글을 올리면 창에 불이 켜져요.</p>
-        <div className="px-box mt-6 overflow-hidden">
-          <VillageDiorama houses={HOUSES} sky="dusk" cell={4} label={SCENE_LABEL} />
-        </div>
       </section>
-      <AuthPanel
-        next={next}
-        characters={await listStarterCharacters()}
-        providers={enabledProviders(process.env)}
-        socialError={signInErrorMessage(query.error)}
-      />
+      <div className="min-w-0 md:col-start-2 md:row-span-2 md:row-start-1">
+        <AuthPanel
+          next={next}
+          characters={await listStarterCharacters()}
+          providers={enabledProviders(process.env)}
+          socialError={signInErrorMessage(query.error)}
+        />
+      </div>
+      <div className="px-box min-w-0 overflow-hidden md:col-start-1 md:row-start-2 md:self-start">
+        <VillageDiorama houses={HOUSES} sky="dusk" cell={4} label={SCENE_LABEL} />
+      </div>
     </div>
   );
 }

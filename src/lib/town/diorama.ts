@@ -134,6 +134,25 @@ export type DioramaScene = {
   front: Placed[];
 };
 
+/** 휴대폰 광장 머리 그림에 세우는 집 수: 내 집 + 이웃 2채 (390px 폭에서 집과 이름이 줄지 않고 읽히는 수) */
+export const PHONE_DIORAMA_HOUSES = 3;
+
+/** 휴대폰 광장 머리 그림에 고르는 집의 모양 (server/town TownHouse 중 쓰는 것만) */
+export type PlazaHouseLike = { mine: boolean; lot: number; fresh: boolean; recentPosts: readonly { createdAt: string }[] };
+
+/**
+ * 휴대폰 광장 머리 그림의 집: 내 집을 맨 앞에, 이웃은 불 켜진 집(24시간 안에 글) 중 가장 최근에 글 쓴 집부터,
+ * 모자라면 자리 순(1번 자리부터). 모두 `max`채까지
+ */
+export function phonePlazaHouses<T extends PlazaHouseLike>(houses: readonly T[], max = PHONE_DIORAMA_HOUSES): T[] {
+  const mine = houses.filter((h) => h.mine).slice(0, 1);
+  const latest = (h: T) => (h.recentPosts[0] ? Date.parse(h.recentPosts[0].createdAt) || 0 : 0);
+  const neighbors = houses
+    .filter((h) => !h.mine && h.lot > 0)
+    .sort((a, b) => Number(b.fresh) - Number(a.fresh) || (a.fresh && b.fresh ? latest(b) - latest(a) : 0) || a.lot - b.lot);
+  return [...mine, ...neighbors].slice(0, Math.max(0, max));
+}
+
 /** 자리 수에 맞춘 그림 폭 (칸) */
 export function dioramaWidth(count: number): number {
   return DIORAMA_PAD * 2 + DIORAMA_SLOT * Math.max(1, Math.min(count, DIORAMA_MAX_HOUSES));
