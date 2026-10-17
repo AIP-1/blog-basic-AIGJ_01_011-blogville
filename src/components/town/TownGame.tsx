@@ -426,21 +426,34 @@ export function TownGame({
     let dpr = 1;
     // 입구 안내 말풍선 윗변의 하한: 화면 위 간판 묶음(`data-town-hud-row`) 아래. 친구 마을의 좁은 화면은 장소 간판이 둘째 줄이라 더 아래
     let promptTop = PROMPT_TOP;
+    // 화면 위 간판 묶음·광장 소식 서랍이 덮는 자리 (캔버스 안 좌표). 이름표가 반쯤 가려 삐져나오지 않게, 겹치는 이름표는 쉰다
+    let hudRects: { left: number; top: number; right: number; bottom: number }[] = [];
+    const measureHud = () => {
+      const c = canvas.getBoundingClientRect();
+      promptTop = PROMPT_TOP;
+      hudRects = [];
+      for (const el of document.querySelectorAll<HTMLElement>("[data-town-hud-row], [data-town-drawer]")) {
+        const r = el.getBoundingClientRect();
+        if (r.height === 0) continue;
+        hudRects.push({ left: r.left - c.left, top: r.top - c.top, right: r.right - c.left, bottom: r.bottom - c.top });
+        if (el.hasAttribute("data-town-hud-row")) promptTop = Math.max(promptTop, Math.round(r.bottom - c.top) + 12);
+      }
+    };
+    const underHud = (x: number, bottom: number, size: { width: number; height: number }) =>
+      hudRects.some((r) => x + size.width / 2 > r.left && x - size.width / 2 < r.right && bottom > r.top && bottom - size.height < r.bottom);
     const resize = () => {
       dpr = window.devicePixelRatio || 1;
       canvas.width = Math.round(canvas.clientWidth * dpr);
       canvas.height = Math.round(canvas.clientHeight * dpr);
       tags.setScale(dpr);
-      const top = canvas.getBoundingClientRect().top;
-      promptTop = PROMPT_TOP;
-      for (const row of document.querySelectorAll<HTMLElement>("[data-town-hud-row]")) {
-        const r = row.getBoundingClientRect();
-        if (r.height > 0) promptTop = Math.max(promptTop, Math.round(r.bottom - top) + 12);
-      }
+      measureHud();
     };
     resize();
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);
+    // 서랍을 펴고 접거나 지갑 숫자가 바뀌어 간판 크기가 달라지면 다시 잰다
+    const hudObserver = new ResizeObserver(measureHud);
+    for (const el of document.querySelectorAll<HTMLElement>("[data-town-hud-row], [data-town-drawer]")) hudObserver.observe(el);
     // 입구 안내 말풍선 폭 (화면 가장자리에서 잘리지 않게)
     let promptHalf = 0;
     let promptHeight = 0;
@@ -824,7 +837,9 @@ export function TownGame({
         const x = s.x - camera.x;
         const y = s.y - tagLift.get(s)! - camera.y;
         if (x < -150 || x > vw + 150 || y < -20 || y > vh + 60) continue;
-        tags.draw(ctx, s.label!, kind === "sign" ? "sign" : s.id === mineId ? "mine" : "plate", x, y);
+        const style = kind === "sign" ? "sign" : s.id === mineId ? "mine" : "plate";
+        if (underHud(x, y, tags.size(s.label!, style))) continue;
+        tags.draw(ctx, s.label!, style, x, y);
       }
       // 이웃 이름표: 가까이 가거나 마우스를 올렸을 때만. 가장 가까운 글 쓴 이웃 한 명은 새 글 제목 말풍선
       const hovered = hover ? npcAt(hover) : undefined;
@@ -843,14 +858,16 @@ export function TownGame({
         const x = n.pos.x - camera.x;
         const y = n.pos.y - camera.y - PLAYER_SIZE;
         if (x < -150 || x > vw + 150 || y < -20 || y > vh + 60) continue;
-        const height = tags.draw(ctx, npcNames.get(n.lot) ?? "", "plate", x, y);
+        const plate = npcNames.get(n.lot) ?? "";
+        if (underHud(x, y, tags.size(plate, "plate"))) continue;
+        const height = tags.draw(ctx, plate, "plate", x, y);
         if (n !== speaker) continue;
         // 입구 안내 말풍선과 겹치면 안내가 먼저 (제목 말풍선은 쉰다)
         const bubble = titles.get(n.lot)!;
         const size = tags.size(bubble, "bubble");
         const bottom = y - height - 2;
         const underPrompt = shown !== null && Math.abs(x - promptX) < size.width / 2 + promptHalf && bottom > promptY - promptHeight && bottom - size.height < promptY;
-        if (!underPrompt) tags.draw(ctx, bubble, "bubble", x, bottom);
+        if (!underPrompt && !underHud(x, bottom, size)) tags.draw(ctx, bubble, "bubble", x, bottom);
       }
       tags.draw(ctx, name, "player", pos.x - camera.x, pos.y - camera.y - PLAYER_SIZE);
       lastPos.current = { from, pos };
@@ -880,6 +897,7 @@ export function TownGame({
       disposed = true;
       cancelAnimationFrame(raf);
       observer.disconnect();
+      hudObserver.disconnect();
       promptObserver.disconnect();
       motion.removeEventListener("change", onMotion);
       offMail();
