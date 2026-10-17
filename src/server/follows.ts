@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { blogs, follows, posts, profiles } from "@/db/schema";
 import { NOTICE_SLUG } from "@/lib/names";
 import { FAVORITE_MESSAGES, favoriteRefusal } from "@/lib/social";
-import { assignLots, isNeighborLot, LOT_ERRORS, moveToLot } from "@/lib/town/lots";
+import { assignLots, INVITE_ERRORS, isNeighborLot, LOT_ERRORS, moveToLot } from "@/lib/town/lots";
 
 /** 블로그 홈의 `이웃 N`: 이 블로그 주인을 이웃 추가한 사람 수 (SOC-04) */
 export async function countFollowers(ownerId: string): Promise<number> {
@@ -153,6 +153,37 @@ export async function setTownLot(followerId: string, followeeId: string, lot: un
     // 자리 하나에 한 이웃(부분 유일 인덱스)이라 바뀌는 이웃의 자리를 먼저 모두 비운다
     for (const f of changed) await tx.update(follows).set({ townLot: null }).where(row(f.id));
     for (const f of changed) if (f.lot !== null) await tx.update(follows).set({ townLot: f.lot }).where(row(f.id));
+    return null;
+  });
+}
+
+/**
+ * 이사 올 이웃 모시기 (plaza-upgrade-2): `slug` 블로그 주인을 이웃 추가하고(없으면) ⭐ 즐겨찾기로 켜서 `lot`번 빈 자리에 둔다.
+ * ⭐ 켜기·자리 고르기와 같은 회원별 잠금 하나의 트랜잭션: 공지 블로그·10명 제한은 `favoriteRefusal`, 자리 번호는 `LOT_ERRORS`를 그대로 쓴다.
+ * 그 자리에 이미 이웃이 서 있으면(고른 자리든 차례로 받은 자리든) 거절한다. 이미 ⭐한 이웃이면 그대로 거절한다.
+ * 새 보상은 없다. 거절하면 문구를, 모셨으면 null을 돌려준다.
+ */
+export async function inviteNeighbor(followerId: string, slug: string, lot: unknown): Promise<string | null> {
+  if (!isNeighborLot(lot)) return LOT_ERRORS.lot;
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"fav:" + followerId}))`);
+    const [blog] = await tx.select({ ownerId: blogs.ownerId }).from(blogs).where(eq(blogs.slug, slug));
+    if (!blog) return FAVORITE_MESSAGES.notFound;
+    if (blog.ownerId === followerId) return INVITE_ERRORS.self;
+    const rows = await tx
+      .select({ followeeId: follows.followeeId, townLot: follows.townLot })
+      .from(follows)
+      .innerJoin(blogs, eq(blogs.ownerId, follows.followeeId))
+      .where(and(eq(follows.followerId, followerId), eq(follows.isFavorite, true), sql`${blogs.slug} <> ${NOTICE_SLUG}`))
+      .orderBy(asc(follows.createdAt), asc(blogs.id));
+    if (rows.some((r) => r.followeeId === blog.ownerId)) return INVITE_ERRORS.already;
+    const refusal = favoriteRefusal({ turningOn: true, isNotice: slug === NOTICE_SLUG, count: rows.length });
+    if (refusal) return refusal;
+    if (assignLots(rows).some((p) => p.lot === lot)) return INVITE_ERRORS.taken;
+    await tx.execute(sql`
+      insert into follows (follower_id, followee_id, is_favorite, town_lot)
+      values (${followerId}, ${blog.ownerId}, true, ${lot})
+      on conflict (follower_id, followee_id) do update set is_favorite = true, town_lot = excluded.town_lot`);
     return null;
   });
 }

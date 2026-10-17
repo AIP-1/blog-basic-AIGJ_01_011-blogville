@@ -4,14 +4,17 @@ import { PhoneTown } from "@/components/town/PhoneTown";
 import { TownGame } from "@/components/town/TownGame";
 import { TownHud } from "@/components/town/TownHud";
 import { lotFront } from "@/lib/town/layout";
-import { boardPapers } from "@/lib/town/plaza";
+import { boardPapers, withCommentTarget } from "@/lib/town/plaza";
+import { parseSeason } from "@/lib/town/season";
 import { parseSky } from "@/lib/town/sky";
 import { townSpots } from "@/lib/town/structures";
+import { parseReturnSpot } from "@/lib/town/zones";
 import { getActiveNotice } from "@/server/admin-tools";
 import { ensureTodayAttendanceOnce } from "@/server/attendance";
 import { requireMember } from "@/server/dal";
 import { getPlazaNews, getVillageNews } from "@/server/plaza";
 import { getHudMember, getMemberHouses, getTownHost } from "@/server/town";
+import { readVisitorId } from "@/server/visitor";
 
 export async function generateMetadata({ params }: PageProps<"/town/[slug]">): Promise<Metadata> {
   const host = await getTownHost(decodeURIComponent((await params).slug));
@@ -22,19 +25,31 @@ export async function generateMetadata({ params }: PageProps<"/town/[slug]">): P
  * 친구 마을 구경 (TOWN-15, specs/047-friend-town): 0번은 그 회원의 집, 1~10번은 그 회원이 즐겨찾는 이웃의 집.
  * 나는 내 캐릭터로 그 집 앞에서 시작하고, HUD(☰ 메뉴·지갑·글쓰기·오늘 할 일)는 내 것, 광장 소식 서랍은 그 마을 이웃의 새 글이다.
  * 내 주소면 내 마을로, 없는 주소·공지 블로그는 404. 휴대폰은 그 회원의 블로그로 (`PhoneTown`).
+ * 게임 화면의 [광장으로]가 친구 마을로 돌아오면(`?from={장소}`, `townReturnHref(spot, host)`) 그 건물 문 앞에서 시작한다 (plaza-upgrade-2).
+ * 오늘 할 일·계절(`?season=`)도 내 마을과 같이 게임에 넘긴다.
  */
 export default async function FriendTownPage({ params, searchParams }: PageProps<"/town/[slug]">) {
   const member = await requireMember();
   const host = await getTownHost(decodeURIComponent((await params).slug));
   if (!host) notFound();
   if (host.userId === member.userId) redirect("/town");
-  const { sky: skyParam } = await searchParams;
+  const { sky: skyParam, from, season: seasonParam } = await searchParams;
+  const visitorId = await readVisitorId();
   // 출석은 레이아웃이 이미 했다 (한 요청에 한 번이라 다시 읽지 않는다): 게시판 도장 수
   const attendance = await ensureTodayAttendanceOnce(member.userId, member.sessionId).catch(() => null);
-  const [houses, hud, village, notice] = await Promise.all([getMemberHouses(host.userId, member.userId), getHudMember(member.userId), getVillageNews(), getActiveNotice()]);
+  const [houses, memberHud, village, notice] = await Promise.all([
+    getMemberHouses(host.userId, member.userId, visitorId),
+    getHudMember(member.userId),
+    getVillageNews(undefined, visitorId),
+    getActiveNotice(),
+  ]);
   const news = await getPlazaNews(member.userId, houses, village);
+  const hud = { ...memberHud, tasks: withCommentTarget(memberHud.tasks, news) };
   const who = { nickname: host.nickname, slug: host.slug };
-  const start = lotFront(0);
+  const spots = townSpots(houses, true);
+  const back = parseReturnSpot(from);
+  const door = spots.places.find((p) => p.id === back);
+  const start = door ? { x: door.x, y: door.y } : lotFront(0);
   const sky = parseSky(skyParam);
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
@@ -47,16 +62,18 @@ export default async function FriendTownPage({ params, searchParams }: PageProps
           layers={hud.layers}
           name={hud.nickname}
           start={start}
-          startKey={`host:${host.slug}`}
+          startKey={door ? `host:${host.slug}:from:${door.id}` : `host:${host.slug}`}
           place={`${host.nickname}님의 마을`}
           sky={sky}
           board={{ papers: boardPapers(houses), stamps: attendance?.cycleDay ?? 3 }}
+          tasks={hud.tasks}
+          season={parseSeason(seasonParam)}
         />
         <TownHud
           hud={hud}
           admin={member.role === "admin"}
           userId={member.userId}
-          spots={townSpots(houses, true)}
+          spots={spots}
           houses={houses}
           host={who}
           news={news}
