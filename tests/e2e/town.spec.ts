@@ -153,6 +153,30 @@ test.describe("TOWN 마을", () => {
     await expect(page).toHaveURL("/feed");
   });
 
+  test("살아 있는 마을 (광장 개편): 하늘·게시판 표시, 24시간 안에 글 쓴 이웃 집은 불이 켜진다, 구역이 바뀌면 data-zone", async ({ page, browser }) => {
+    const username = await signUpOk(page);
+    const other = await browser.newPage();
+    const neighbor = await signUpOk(other);
+    await other.close();
+    await sql`insert into follows (follower_id, followee_id, is_favorite)
+      select a.id, b.id, true from users a, users b where a.username = ${username} and b.username = ${neighbor}`;
+
+    await openTown(page);
+    await expect(canvas(page)).toHaveAttribute("data-sky", /^(dawn|day|dusk|night)$/);
+    await expect(canvas(page)).toHaveAttribute("data-board", /^\d,\d$/);
+    await expect(canvas(page)).toHaveAttribute("data-lit", "");
+    await expect(canvas(page)).toHaveAttribute("data-zone", "plaza");
+    await teleport(page, 650, 840);
+    await expect(canvas(page)).toHaveAttribute("data-zone", "pond");
+
+    // 이웃이 방금 글을 썼다 → 1번 자리 집에 불
+    await sql`insert into posts (blog_id, title, content_html, content_text, is_public, created_at)
+      select b.id, '방금 쓴 글', '<p>본문</p>', '본문', true, now() - interval '1 hour'
+      from blogs b join users u on u.id = b.owner_id where u.username = ${neighbor}`;
+    await openTown(page);
+    await expect(canvas(page)).toHaveAttribute("data-lit", "1");
+  });
+
   test("글자 칸에 쓰는 동안에는 캐릭터가 움직이지 않는다", async ({ page }) => {
     await openTown(page);
     const start = await feet(page);
