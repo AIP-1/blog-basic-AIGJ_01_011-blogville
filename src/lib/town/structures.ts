@@ -1,6 +1,6 @@
 // 마을에 놓을 것과 입구 (TOWN-03·04, specs/038-town). 그림은 `src/lib/art/town.ts`, 좌표는 `layout.ts`.
 import type { PixelArt } from "@/lib/art/characters";
-import { benchArt, boardArt, cherryTreeArt, clothesShopArt, emptyLotArt, farmArt, fenceArt, fencePostArt, flowerBedArt, pondArt, fountainArt, houseArt, lampArt, mailboxArt, rosesArchArt, salonArt, shopArt, TOWN_CELL, treeArt } from "@/lib/art/town";
+import { benchArt, boardArt, cherryTreeArt, clothesShopArt, emptyLotArt, farmArt, fenceArt, fencePostArt, flowerBedArt, FOUNTAIN_FRAMES, fountainArt, houseArt, lampArt, litHouseArt, mailboxArt, POND_FRAMES, pondArt, rosesArchArt, salonArt, shopArt, TOWN_CELL, treeArt } from "@/lib/art/town";
 import {
   BOARD_POS,
   CENTER,
@@ -39,7 +39,12 @@ export type TownHouseInput = {
   layers?: string[];
   /** 최근 24시간 안에 공개 글을 썼다 (불 켜진 창·굴뚝 연기, 광장 개편) */
   fresh?: boolean;
+  /** 가장 최근 공개 글 제목: 글 쓴 이웃이 가까이 오면 머리 위 말풍선 (광장 개편) */
+  latestTitle?: string;
 };
+
+/** 이름표 모양 (광장 개편): `sign` 늘 보이는 나무 간판(건물), `plate` 가까이 가면 보이는 집 문패, `lot` 빈 집터 팻말 */
+export type TagKind = "sign" | "plate" | "lot";
 
 /** 마을에 서는 것 하나: 그림(발밑 기준), 부딪히는 몸체, 이름표 */
 export type Structure = {
@@ -50,7 +55,19 @@ export type Structure = {
   body: Rect | null;
   label?: string;
   sub?: string;
+  /** 이름표 모양 (`label`이 있을 때) */
+  tag?: TagKind;
+  /** 움직이는 그림 (분수 물 3장·연못 2장): 0번이 `art`이고 모두 크기가 같다 */
+  frames?: readonly PixelArt[];
+  /** 글 쓴 집: 불 켜진 창과 굴뚝 연기 */
+  lit?: boolean;
 };
+
+/** 게시판 쪽지·도장 수 (살아 있는 게시판). 기본 (3, 3)은 예전 그림 */
+export type BoardState = { papers: number; stamps: number };
+
+/** 숲 나무는 발밑이 이 y보다 아래여야 한다 (위는 먼 하늘·산 띠라 나무가 하늘에 뜬다) */
+export const TREE_MIN_Y = 110;
 
 /** 들어갈 곳. `href`가 `login`이면 로그인이 필요한 곳(방문자), `mailbox:{자리}`면 우체통 창 (TOWN-13), `lots:{자리}`면 자리 고르기 창 (TOWN-18) */
 export type TownEntrance = Entrance & { label: string; href: string };
@@ -103,6 +120,7 @@ export function gardenStructures(name: string): Structure[] {
     // 기둥은 양옆 울타리 몸체가 막는다 (문 사이 80px)
     body: null,
     label: name,
+    tag: "sign",
   });
   [
     [GARDEN_GATE.x - 95, top + 60],
@@ -156,8 +174,15 @@ export function entrancePrompt(e: TownEntrance): string {
  * 마을 배치를 만든다: 게시판(마을 소식·출석 체크 입구 둘)·상점·분수·가로등, 집 자리 11곳(집이 없으면 빈 집터), 나무.
  * 방문자(`member = false`)에게 출석 체크·상점은 로그인 안내다. 집마다 오른쪽 앞에 우체통(TOWN-13), 내 우체통은 안 읽은 알림이 있으면(`mailFlag`) 깃발을 올린다.
  * 내 마을(`chooseLots`)이면 1~10번 빈 집터 앞이 자리 고르기 입구다 (TOWN-18).
+ * 24시간 안에 글을 쓴 집(`fresh`)은 창에 불이 켜지고, 이웃 집이면 우체통 깃발도 올린다 (광장 개편 "글 쓴 집에 불이 켜진다").
  */
-export function townLayout(houses: readonly TownHouseInput[], member: boolean, mailFlag = false, chooseLots = false): TownLayout {
+export function townLayout(
+  houses: readonly TownHouseInput[],
+  member: boolean,
+  mailFlag = false,
+  chooseLots = false,
+  board: BoardState = { papers: 3, stamps: 3 },
+): TownLayout {
   const lotArt = emptyLotArt();
   const lamp = lampArt();
   const structures: Structure[] = [];
@@ -165,11 +190,12 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean, m
 
   structures.push({
     id: "board",
-    art: boardArt(),
+    art: boardArt(board.papers, board.stamps),
     x: BOARD_POS.x,
     y: BOARD_POS.y,
     body: { x: BOARD_POS.x - 120, y: BOARD_POS.y - 40, width: 240, height: 40 },
     label: "마을 게시판",
+    tag: "sign",
   });
   entrances.push({
     id: "feed",
@@ -193,6 +219,7 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean, m
     y: SHOP_POS.y,
     body: { x: SHOP_POS.x - 95, y: SHOP_POS.y - 60, width: 190, height: 60 },
     label: "상점",
+    tag: "sign",
   });
   entrances.push({
     id: "shop",
@@ -207,7 +234,7 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean, m
     { id: "clothes", art: clothesShopArt(), pos: CLOTHES_POS, label: "꼬까 옷가게", entrance: "👗 옷가게", href: "/clothes" },
     { id: "salon", art: salonArt(), pos: SALON_POS, label: "반짝 미용실", entrance: "💇 미용실", href: "/salon" },
   ]) {
-    structures.push({ id: shop.id, art: shop.art, x: shop.pos.x, y: shop.pos.y, body: { x: shop.pos.x - 70, y: shop.pos.y - 50, width: 140, height: 50 }, label: shop.label });
+    structures.push({ id: shop.id, art: shop.art, x: shop.pos.x, y: shop.pos.y, body: { x: shop.pos.x - 70, y: shop.pos.y - 50, width: 140, height: 50 }, label: shop.label, tag: "sign" });
     entrances.push({ id: shop.id, x: shop.pos.x + 30, y: shop.pos.y + 30, label: shop.entrance, href: member ? shop.href : "login" });
   }
 
@@ -218,6 +245,7 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean, m
     y: FARM_POS.y,
     body: { x: FARM_POS.x - 110, y: FARM_POS.y - 50, width: 220, height: 50 },
     label: "동물 농장",
+    tag: "sign",
   });
   entrances.push({
     id: "farm",
@@ -230,13 +258,16 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean, m
   const owner = houses.find((h) => h.lot === 0);
   structures.push(...gardenStructures(owner && !owner.mine ? `${shortName(owner.nickname)}의 정원` : "내 정원"));
 
+  const pond = Array.from({ length: POND_FRAMES }, (_, f) => pondArt(f));
   structures.push({
     id: "pond",
-    art: pondArt(),
+    art: pond[0],
+    frames: pond,
     x: POND_POS.x,
     y: POND_POS.y,
     body: { x: POND_POS.x - 100, y: POND_POS.y - 110, width: 200, height: 70 },
     label: "연못 낚시터",
+    tag: "sign",
   });
   entrances.push({
     id: "pond",
@@ -246,9 +277,11 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean, m
     href: member ? "/fishing" : "login",
   });
 
+  const fountain = Array.from({ length: FOUNTAIN_FRAMES }, (_, f) => fountainArt(f));
   structures.push({
     id: "fountain",
-    art: fountainArt(),
+    art: fountain[0],
+    frames: fountain,
     x: FOUNTAIN_POS.x,
     y: FOUNTAIN_POS.y,
     body: {
@@ -283,6 +316,7 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean, m
     y: HILL_ROAD - 32,
     body: { x: CENTER.x - 40, y: HILL_ROAD - 44, width: 80, height: 12 },
     label: "전망대",
+    tag: "sign",
   });
 
   HOUSE_LOTS.forEach((lot, i) => {
@@ -290,14 +324,17 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean, m
     if (house) {
       const name = house.mine ? "내 집" : `${shortName(house.nickname)}의 집`;
       const body = { x: lot.x - 55, y: lot.y - 55, width: 105, height: 55 };
+      const art = houseArt(house.stage, house.roof);
       structures.push({
         id: `house:${i}`,
-        art: houseArt(house.stage, house.roof),
+        art: house.fresh ? litHouseArt(art) : art,
         x: lot.x,
         y: lot.y,
         body,
         label: name,
         sub: house.blogTitle,
+        tag: "plate",
+        ...(house.fresh ? { lit: true } : {}),
       });
       const front = lotFront(i);
       entrances.push({
@@ -312,7 +349,8 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean, m
       const box = { x: lot.x + MAILBOX_OFFSET.x, y: lot.y + MAILBOX_OFFSET.y };
       structures.push({
         id: `mailbox:${i}`,
-        art: mailboxArt(house.mine, house.mine && mailFlag),
+        // 내 우체통은 안 읽은 알림, 이웃 우체통은 새 글이 있으면 깃발
+        art: mailboxArt(house.mine, house.mine ? mailFlag : house.fresh === true),
         x: box.x,
         y: box.y,
         body: { x: box.x - 8, y: box.y - 8, width: 16, height: 8 },
@@ -332,6 +370,7 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean, m
         y: lot.y + 10,
         body: null,
         label: i === 0 ? "내 집 자리" : "빈 집터",
+        tag: "lot",
       });
       if (chooseLots && i > 0) {
         const front = lotFront(i);
@@ -383,6 +422,8 @@ export function townLayout(houses: readonly TownHouseInput[], member: boolean, m
       else if (side === 2) y = 80 + random() * 120;
       else y = WORLD.height - random() * 60;
     }
+    // 하늘·산 띠에 뜬 나무는 심지 않는다 (광장 개편)
+    if (y < TREE_MIN_Y) continue;
     const spot = { x: x - 30, y: y - 20, width: 60, height: 24 };
     if (keepOut.some((k) => overlaps(spot, k)) || trees.some((t) => Math.hypot(t.x - x, t.y - y) < 46)) continue;
     trees.push({

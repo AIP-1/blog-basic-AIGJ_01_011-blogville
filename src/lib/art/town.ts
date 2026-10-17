@@ -194,6 +194,86 @@ export function houseArt(stage: number, roof: string): PixelArt {
   });
 }
 
+/** 글 쓴 집의 불 켜진 유리 (광장 개편 "글 쓴 집에 불이 켜진다"): 낮에도 따뜻한 노랑으로 보인다 */
+export const LIT_GLASS = "#ffd56e";
+/** 밤·노을·새벽에 덧칠(multiply) 위로 다시 얹는 창 불빛 */
+export const LIT_GLOW = "#ffe9a6";
+
+/** 집 그림의 유리 칸('G')만 불 켜진 색으로 바꾼다. 칸 배치는 그대로라 몸체·이름표 자리가 같다 */
+export function litHouseArt(house: PixelArt): PixelArt {
+  return { rows: house.rows, palette: { ...house.palette, G: LIT_GLASS } };
+}
+
+/** 그림에서 글자 `ch` 칸만 남긴 덧칠 그림 (밤에 창·가로등 불빛을 어둠 위에 다시 그린다) */
+export function glowCells(source: PixelArt, ch: string, color: string): PixelArt {
+  const keep = new RegExp(`[^${ch}]`, "g");
+  return { rows: source.rows.map((r) => r.replace(keep, ".")), palette: { [ch]: color } };
+}
+
+/** 글자 `ch`가 이어진 덩어리(창 하나)마다 가운데 칸 좌표 (빛 무리 자리) */
+export function cellGroups(source: PixelArt, ch: string): { x: number; y: number }[] {
+  const seen = new Set<string>();
+  const out: { x: number; y: number }[] = [];
+  source.rows.forEach((row, y) =>
+    [...row].forEach((c, x) => {
+      if (c !== ch || seen.has(`${x},${y}`)) return;
+      const stack = [[x, y]];
+      seen.add(`${x},${y}`);
+      let sx = 0;
+      let sy = 0;
+      let n = 0;
+      while (stack.length) {
+        const [cx, cy] = stack.pop()!;
+        sx += cx + 0.5;
+        sy += cy + 0.5;
+        n++;
+        for (const [nx, ny] of [
+          [cx + 1, cy],
+          [cx - 1, cy],
+          [cx, cy + 1],
+          [cx, cy - 1],
+        ]) {
+          if (source.rows[ny]?.[nx] === ch && !seen.has(`${nx},${ny}`)) {
+            seen.add(`${nx},${ny}`);
+            stack.push([nx, ny]);
+          }
+        }
+      }
+      out.push({ x: sx / n, y: sy / n });
+    }),
+  );
+  return out;
+}
+
+/** 굴뚝 꼭대기 가운데 칸 (집 그림의 굴뚝 뚜껑 'c' 줄). 굴뚝이 없으면 null */
+export function chimneyTop(house: PixelArt): { x: number; y: number } | null {
+  const y = house.rows.findIndex((r) => r.includes("c"));
+  if (y < 0) return null;
+  const row = house.rows[y];
+  return { x: (row.indexOf("c") + row.lastIndexOf("c") + 1) / 2, y };
+}
+
+/** 굴뚝 연기 그림 수 (초당 3장으로 돌린다) */
+export const SMOKE_FRAMES = 3;
+
+/**
+ * 굴뚝 연기 (9×12칸, 아랫변 가운데가 굴뚝 꼭대기): 김 세 덩이가 오른쪽 위로 오르며 커지고 옅어진다.
+ * 장마다 덩이가 1/3씩 올라가서 0 → 1 → 2 → 0으로 이어 돌린다.
+ */
+export function smokeArt(frame: number): PixelArt {
+  const g = grid(9, 12);
+  const f = ((frame % SMOKE_FRAMES) + SMOKE_FRAMES) % SMOKE_FRAMES;
+  for (let i = 0; i < 3; i++) {
+    const t = i + f / SMOKE_FRAMES;
+    const cx = 3.5 + t * 1.1;
+    const cy = 10.5 - t * 3.2;
+    const r = 0.8 + t * 0.55;
+    const ch = t < 1 ? "S" : t < 2 ? "s" : "f";
+    for (let y = 0; y < 12; y++) for (let x = 0; x < 9; x++) if (Math.hypot(x + 0.5 - cx, y + 0.5 - cy) <= r) g[y][x] = ch;
+  }
+  return art(g, { S: "#e6dfd4", s: "#f0ebe3", f: "#f8f5f0" });
+}
+
 /** 빈 집터: 점선 집터와 말뚝 팻말 */
 export function emptyLotArt(): PixelArt {
   const g = grid(30, 22);
@@ -211,8 +291,24 @@ export function emptyLotArt(): PixelArt {
   return art(g, { L: "#e8dcc0", N: "#d9b48a", n: "#8a5a34" });
 }
 
-/** 마을 게시판: 왼쪽은 마을 소식 코르크판, 오른쪽은 출석 도장 칸 */
-export function boardArt(): PixelArt {
+/** 게시판 쪽지 자리 (왼쪽 코르크판): 앞의 셋이 예전 그림이고, 넷째·다섯째는 위에 겹쳐 붙인다 */
+const BOARD_PAPERS: readonly { x: number; y: number; w: number; h: number; ch: string; pin: [number, number] }[] = [
+  { x: 5, y: 6, w: 7, h: 6, ch: "W", pin: [8, 6] },
+  { x: 14, y: 7, w: 8, h: 5, ch: "Y", pin: [17, 7] },
+  { x: 7, y: 14, w: 9, h: 6, ch: "W", pin: [11, 14] },
+  { x: 17, y: 13, w: 5, h: 6, ch: "Q", pin: [19, 13] },
+  { x: 13, y: 10, w: 5, h: 4, ch: "B", pin: [15, 10] },
+];
+/** 게시판 쪽지는 5장, 출석 도장 칸은 7칸까지 */
+export const BOARD_MAX = { papers: BOARD_PAPERS.length, stamps: 7 } as const;
+
+/**
+ * 마을 게시판: 왼쪽은 마을 소식 코르크판, 오른쪽은 출석 도장 칸 (살아 있는 게시판, 광장 개편).
+ * `papers`는 오늘 새 글 쪽지 수(0~5), `stamps`는 이번 주 출석 도장 수(0~7). 기본 (3, 3)은 예전 그림과 같다.
+ */
+export function boardArt(papers = 3, stamps = 3): PixelArt {
+  const notes = BOARD_PAPERS.slice(0, Math.max(0, Math.min(BOARD_MAX.papers, Math.floor(papers))));
+  const stamped = Math.max(0, Math.min(BOARD_MAX.stamps, Math.floor(stamps)));
   const g = grid(50, 34);
   fill(g, 4, 20, 2, 14, "N");
   fill(g, 44, 20, 2, 14, "N");
@@ -220,22 +316,15 @@ export function boardArt(): PixelArt {
   fill(g, 0, 0, 50, 3, "R");
   fill(g, 3, 4, 21, 18, "K");
   fill(g, 26, 4, 21, 18, "P");
-  // 소식 종이
-  fill(g, 5, 6, 7, 6, "W");
-  fill(g, 14, 7, 8, 5, "Y");
-  fill(g, 7, 14, 9, 6, "W");
-  for (const [x, y] of [
-    [8, 6],
-    [17, 7],
-    [11, 14],
-  ])
-    g[y][x] = "r";
+  // 소식 종이와 압정
+  for (const n of notes) fill(g, n.x, n.y, n.w, n.h, n.ch);
+  for (const n of notes) g[n.pin[1]][n.pin[0]] = "r";
   // 도장 칸 7개
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < BOARD_MAX.stamps; i++) {
     const x = 28 + (i % 4) * 5;
     const y = 6 + Math.floor(i / 4) * 7;
     frame(g, x, y, 4, 4, "n");
-    if (i < 3) fill(g, x + 1, y + 1, 2, 2, "r");
+    if (i < stamped) fill(g, x + 1, y + 1, 2, 2, "r");
   }
   return art(g, {
     N: "#7a4a2a",
@@ -247,6 +336,9 @@ export function boardArt(): PixelArt {
     Y: "#fff3a0",
     r: "#e74c3c",
     n: "#b07a4a",
+    // 넷째·다섯째 쪽지가 있을 때만 (기본 그림의 팔레트는 예전 그대로)
+    ...(notes.length > 3 ? { Q: "#ffd6e0" } : {}),
+    ...(notes.length > 4 ? { B: "#d8ecff" } : {}),
   });
 }
 
@@ -328,8 +420,12 @@ export function farmArt(): PixelArt {
   });
 }
 
-/** 연못 낚시터 (TOWN-14): 둥근 연못, 연잎, 앞쪽 나무 잔교와 낚싯대 */
-export function pondArt(): PixelArt {
+/** 연못 그림 수: 물결과 찌가 두 장으로 흔들린다 */
+export const POND_FRAMES = 2;
+
+/** 연못 낚시터 (TOWN-14): 둥근 연못, 연잎, 앞쪽 나무 잔교와 낚싯대. `frame` 1은 물결이 한 칸 옮겨 가고 찌 둘레에 동그란 물결 */
+export function pondArt(frame = 0): PixelArt {
+  const moved = frame % POND_FRAMES === 1;
   const g = grid(40, 22);
   // 연못 (타원): 가장자리 돌 → 물
   for (let y = 0; y < 18; y++) {
@@ -339,9 +435,15 @@ export function pondArt(): PixelArt {
     if (half > 1) fill(g, 21 - half, y + 2, half * 2 - 2, 1, y < 4 ? "L" : "W");
   }
   // 물결
-  fill(g, 8, 9, 4, 1, "L");
-  fill(g, 26, 12, 5, 1, "L");
-  fill(g, 14, 15, 3, 1, "L");
+  if (moved) {
+    fill(g, 9, 9, 3, 1, "L");
+    fill(g, 25, 12, 4, 1, "L");
+    fill(g, 15, 15, 3, 1, "L");
+  } else {
+    fill(g, 8, 9, 4, 1, "L");
+    fill(g, 26, 12, 5, 1, "L");
+    fill(g, 14, 15, 3, 1, "L");
+  }
   // 연잎과 꽃
   fill(g, 6, 13, 3, 2, "G");
   fill(g, 30, 7, 3, 2, "G");
@@ -354,8 +456,13 @@ export function pondArt(): PixelArt {
   fill(g, 22, 14, 1, 8, "d");
   // 낚싯대와 찌
   for (let i = 0; i < 6; i++) g[13 - i][23 + i] = "R";
-  fill(g, 29, 8, 1, 2, "n");
+  fill(g, 29, 8, 1, moved ? 3 : 2, "n");
   g[11][29] = "F";
+  if (moved) {
+    g[11][28] = "L";
+    g[11][30] = "L";
+    g[12][29] = "L";
+  }
   return art(g, {
     S: "#9a9a8a",
     W: "#4aa3df",
@@ -370,8 +477,15 @@ export function pondArt(): PixelArt {
   });
 }
 
-/** 분수: 둥근 돌 수반과 물줄기 */
-export function fountainArt(): PixelArt {
+/** 분수 그림 수: 물줄기 물빛과 수반 물결이 세 장으로 돈다 */
+export const FOUNTAIN_FRAMES = 3;
+
+/**
+ * 3단 분수: 큰 돌 수반 위에 가운데 접시와 꼭대기 접시. 꼭대기에서 솟은 물이 접시 가장자리로 넘쳐 아래 단으로 흐른다.
+ * `frame`(0~2)마다 물줄기의 밝은 칸이 한 칸씩 내려가고, 수반 물결 고리가 기둥에서 바깥으로 퍼진다. 크기(30×22칸)는 늘 같다.
+ */
+export function fountainArt(frame = 0): PixelArt {
+  const f = ((frame % FOUNTAIN_FRAMES) + FOUNTAIN_FRAMES) % FOUNTAIN_FRAMES;
   const g = grid(30, 22);
   // 수반 (타원)
   for (let y = 0; y < 10; y++) {
@@ -384,13 +498,37 @@ export function fountainArt(): PixelArt {
     const half = Math.round(12 * Math.sqrt(Math.max(0, 1 - t * t)));
     fill(g, 15 - half, 12 + y, half * 2, 1, "B");
   }
-  // 가운데 기둥과 물줄기
-  fill(g, 14, 6, 2, 10, "s");
-  fill(g, 11, 4, 8, 2, "S");
-  fill(g, 13, 0, 4, 4, "w");
-  fill(g, 10, 6, 1, 6, "w");
-  fill(g, 19, 6, 1, 6, "w");
-  return art(g, { S: "#c9c2b5", s: "#a39b8c", B: "#6ec6ff", w: "#d6f0ff" });
+  // 수반 물결: 기둥 밑에서 바깥으로 퍼지는 고리 (가로로 납작한 타원)
+  const ring = 3 + f * 2.5;
+  for (let y = 13; y < 20; y++) {
+    for (let x = 0; x < 30; x++) {
+      if (g[y][x] !== "B") continue;
+      const d = Math.hypot((x + 0.5 - 15) / 2, y + 0.5 - 15.5);
+      if (Math.abs(d * 2 - ring) < 0.6) g[y][x] = "v";
+    }
+  }
+  // 가운데 기둥
+  fill(g, 14, 3, 2, 13, "s");
+  // 가운데 접시 (둘째 단)
+  fill(g, 10, 6, 10, 2, "S");
+  fill(g, 11, 6, 8, 1, "B");
+  fill(g, 11, 8, 8, 1, "s");
+  // 꼭대기 접시 (셋째 단)
+  fill(g, 12, 2, 6, 2, "S");
+  fill(g, 13, 2, 4, 1, "B");
+  fill(g, 13, 4, 4, 1, "s");
+  // 솟는 물과 넘쳐 흐르는 물줄기: 밝은 칸(w)과 옅은 칸(v)이 장마다 한 칸씩 내려간다
+  const flow = (x: number, top: number, rows: number) => {
+    for (let r = 0; r < rows; r++) g[top + r][x] = (r + 3 - f) % 3 === 0 ? "v" : "w";
+  };
+  flow(14, 0, 2);
+  flow(15, 0, 2);
+  if (f === 1) g[0][13] = g[0][16] = "v";
+  flow(11, 3, 3);
+  flow(18, 3, 3);
+  flow(9, 7, 6);
+  flow(20, 7, 6);
+  return art(g, { S: "#c9c2b5", s: "#a39b8c", B: "#6ec6ff", w: "#d6f0ff", v: "#a6dcfb" });
 }
 
 /** 집 앞 우체통 (TOWN-13): 내 집은 파랑, 다른 집은 빨강. `flag`면 안 읽은 알림 깃발을 올린다 */
@@ -445,14 +583,14 @@ export function treeArt(variant: number): PixelArt {
   return art(g, variant % 2 === 0 ? { N: "#7a4a2a", L: "#4caf50", D: "#388e3c", H: "#81c784" } : { N: "#7a4a2a", L: "#2e7d32", D: "#1b5e20", H: "#66bb6a" });
 }
 
-/** 우체통 대신 쓰는 가로등 */
-export function lampArt(): PixelArt {
+/** 광장 가로등. 켜면(`lit`, 노을·밤·새벽) 노란 등, 끄면(낮) 흐린 유리. 기본은 예전 그림(켠 등) */
+export function lampArt(lit = true): PixelArt {
   const g = grid(6, 22);
   fill(g, 2, 4, 2, 18, "N");
   fill(g, 0, 21, 6, 1, "N");
   fill(g, 1, 0, 4, 4, "L");
   frame(g, 1, 0, 4, 4, "n");
-  return art(g, { N: "#4a4a4a", n: "#2b2b2b", L: "#ffe28a" });
+  return art(g, { N: "#4a4a4a", n: "#2b2b2b", L: lit ? "#ffe28a" : "#d5dde0" });
 }
 
 // 내 정원 (TOWN-20, specs/053-garden)

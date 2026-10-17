@@ -41,7 +41,7 @@ export const SKY_TINT: Record<Sky, { color: string; alpha: number } | null> = {
   dawn: { color: "#c9b8e8", alpha: 0.35 },
   day: null,
   dusk: { color: "#f2a65a", alpha: 0.32 },
-  night: { color: "#3a3f78", alpha: 0.55 },
+  night: { color: "#2b3270", alpha: 0.62 },
 };
 
 /** 주소 값(`?sky=night`)을 하늘로. 모르는 값이면 null (지금 시각을 쓴다) */
