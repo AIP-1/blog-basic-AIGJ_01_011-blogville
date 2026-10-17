@@ -71,7 +71,8 @@ export function WalkingMirror({ layers }: { layers: readonly string[] }) {
             {d.label}
           </button>
         ))}
-        <button type="button" className="px-btn px-btn--sm" aria-pressed={walking} onClick={() => setChosen(!walking)}>
+        {/* 글자가 누르면 할 일을 말하는 보통 버튼 (눌림 상태를 함께 바꾸면 '멈춤이 켜짐'처럼 두 번 뒤집혀 읽힌다) */}
+        <button type="button" className="px-btn px-btn--sm" onClick={() => setChosen(!walking)}>
           {walking ? "⏸ 멈춤" : "▶ 걷기"}
         </button>
       </div>

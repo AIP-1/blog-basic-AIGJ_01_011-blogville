@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { houseArt, HOUSE_ART_WIDTH } from "@/lib/art/town";
-import { DIORAMA_MAX_HOUSES, DIORAMA_PAD, DIORAMA_SLOT, dioramaScene, dioramaWidth, haloArt, LIT_GLASS, LIT_GLOW, smokeFrame, SMOKE_FRAMES, tintArt, tintHex } from "@/lib/town/diorama";
+import {
+  DIORAMA_MAX_HOUSES,
+  DIORAMA_PAD,
+  DIORAMA_SLOT,
+  dioramaScene,
+  dioramaWidth,
+  haloArt,
+  LIT_GLASS,
+  LIT_GLOW,
+  PHONE_DIORAMA_HOUSES,
+  phonePlazaHouses,
+  smokeFrame,
+  SMOKE_FRAMES,
+  tintArt,
+  tintHex,
+} from "@/lib/town/diorama";
 import { SKY_TINT } from "@/lib/town/sky";
 
 const rowsOk = (art: { rows: readonly string[]; palette: Readonly<Record<string, string>> }) => {
@@ -91,5 +106,25 @@ describe("작은 마을 그림 (광장 개편)", () => {
     }
     expect(new Set(frames.map((f) => f.rows.join("|"))).size).toBe(SMOKE_FRAMES);
     expect(smokeFrame(SMOKE_FRAMES)).toEqual(frames[0]);
+  });
+
+  it("휴대폰 광장 머리 그림: 내 집 + 가장 최근에 글 쓴 불 켜진 이웃 2채, 모자라면 자리 순 (3채까지)", () => {
+    const at = (h: number) => [{ createdAt: new Date(Date.UTC(2026, 9, 17, h)).toISOString() }];
+    const houses = [
+      { lot: 1, mine: false, fresh: false, recentPosts: at(1) },
+      { lot: 0, mine: true, fresh: true, recentPosts: at(9) },
+      { lot: 2, mine: false, fresh: true, recentPosts: at(3) },
+      { lot: 3, mine: false, fresh: false, recentPosts: [] },
+      { lot: 4, mine: false, fresh: true, recentPosts: at(8) },
+      { lot: 5, mine: false, fresh: true, recentPosts: at(5) },
+    ];
+    expect(PHONE_DIORAMA_HOUSES).toBe(3);
+    expect(phonePlazaHouses(houses).map((h) => h.lot)).toEqual([0, 4, 5]);
+    // 불 켜진 이웃이 하나뿐이면 나머지는 자리 순
+    const quiet = houses.map((h) => (h.lot === 4 || h.lot === 5 ? { ...h, fresh: false } : h));
+    expect(phonePlazaHouses(quiet).map((h) => h.lot)).toEqual([0, 2, 1]);
+    // 내 집이 없어도 (집 자리 전) 이웃만 3채
+    expect(phonePlazaHouses(houses.filter((h) => !h.mine)).map((h) => h.lot)).toEqual([4, 5, 2]);
+    expect(phonePlazaHouses([])).toEqual([]);
   });
 });

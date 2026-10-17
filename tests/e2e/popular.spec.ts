@@ -110,6 +110,17 @@ test.describe("🔥 인기 글", () => {
       order = (await ranked(page)).filter((id) => ids.includes(id));
       expect(order).toEqual([monthly, mixed, views, tieNew, tieOld, today]);
 
+      // 작성자 링크(블로그 홈)는 글자 폭만큼이라, 카드 틀 안 작성자 줄의 오른쪽 빈 곳을 눌러도 블로그 홈이 아니라 그 글
+      const author = card.locator("[data-post-author]");
+      await expect(author).toHaveAttribute("href", `/@${username}`);
+      const cardBox = (await card.boundingBox())!;
+      const authorBox = (await author.boundingBox())!;
+      expect(authorBox.x + authorBox.width).toBeLessThan(cardBox.x + cardBox.width - 48);
+      await page.mouse.click(cardBox.x + cardBox.width - 24, authorBox.y + authorBox.height / 2);
+      await expect(page).toHaveURL(new RegExp(`/@${username}/${mixed}$`));
+      await page.goBack();
+      await expect(page).toHaveURL(/\/popular\?range=month$/);
+
       // 카드를 누르면 그 글
       await page.locator(`[data-popular-post="${monthly}"]`).getByRole("link", { name: new RegExp(`${tag} 이번 달 글`) }).click();
       await expect(page).toHaveURL(new RegExp(`/@${username}/${monthly}$`));

@@ -136,7 +136,7 @@ export function TaskList({
           <li key={task.id} className="flex min-h-12 items-center gap-2.5 px-3 py-1.5" data-task={task.id} data-done={task.done ? "1" : "0"}>
             <span
               className={`grid size-5 shrink-0 place-items-center text-xs font-bold ${
-                task.done ? "bg-(--accent) text-[#fbf1dc] dark:text-[#0c1f14]" : "shadow-[inset_0_0_0_2px_var(--kit-ink-soft)]"
+                task.done ? "bg-(--accent) text-(--kit-on-accent)" : "shadow-[inset_0_0_0_2px_var(--kit-ink-soft)]"
               }`}
               aria-hidden="true"
             >

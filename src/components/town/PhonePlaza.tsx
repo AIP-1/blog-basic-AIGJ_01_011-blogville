@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { unreadBadge } from "@/lib/notifications";
+import { phonePlazaHouses } from "@/lib/town/diorama";
 import { shortName } from "@/lib/town/layout";
 import type { PlazaNews } from "@/lib/town/plaza";
 import type { Sky } from "@/lib/town/sky";
@@ -9,8 +10,6 @@ import { NewsList, TaskList } from "./PlazaLists";
 import { VillageDiorama } from "./VillageDiorama";
 import { WriteButton } from "./WriteButton";
 
-/** 휴대폰 광장 머리 그림에 세울 이웃 집 수 (내 집 + 이만큼) */
-const DIORAMA_NEIGHBORS = 4;
 /** 휴대폰 광장의 새 글 수 (나머지는 '모두 보기'로) */
 const PHONE_NEWS = 4;
 
@@ -26,16 +25,12 @@ const PLACES = [
 
 /**
  * 휴대폰 광장 (광장 개편, TOWN-01 결정 변경 · `PHONE_PLAZA`): 640px 미만 회원의 /town. 게임 캔버스 대신 세로 한 줄로
- * 마을 그림(내 집 + 글 쓴 이웃 먼저 4채, 글 쓴 집은 불이 켜진다) → ✏️ 글쓰기(오늘 글 보상 창문 3칸) → 이웃 새 글 →
+ * 마을 그림(내 집 + 최근에 글 쓴 이웃 먼저 2채, 글 쓴 집은 불이 켜진다) → ✏️ 글쓰기(오늘 글 보상 창문 3칸) → 이웃 새 글 →
  * 오늘 할 일 → 마을 장소 → 내 우체통(최근 알림). 방문자와 친구 마을은 예전 그대로(`PhoneTown`). 시험 훅 `data-phone-plaza`.
  */
 export function PhonePlaza({ hud, houses, news, sky }: { hud: HudMember; houses: readonly TownHouse[]; news: PlazaNews; sky: Sky }) {
-  const mine = houses.find((h) => h.mine);
-  const neighbors = houses
-    .filter((h) => h.lot > 0)
-    .sort((a, b) => Number(b.fresh) - Number(a.fresh) || a.lot - b.lot)
-    .slice(0, DIORAMA_NEIGHBORS);
-  const scene = [...(mine ? [mine] : []), ...neighbors].map((h) => ({ stage: h.stage, roof: h.roof, caption: h.mine ? "내 집" : shortName(h.nickname), fresh: h.fresh }));
+  // 휴대폰 폭에서 집이 작아지고 이름이 잘리지 않게 3채까지 (불 켜진 집 수 칩은 마을 전체를 센다)
+  const scene = phonePlazaHouses(houses).map((h) => ({ stage: h.stage, roof: h.roof, caption: h.mine ? "내 집" : shortName(h.nickname), fresh: h.fresh, mine: h.mine }));
   const unread = unreadBadge(hud.unread);
   const title = `${hud.nickname}님의 마을`;
   // 불 켜진 집: 24시간 안에 글을 쓴 이웃 집 (광장 개편 '등불 마을')

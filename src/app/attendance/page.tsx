@@ -10,7 +10,8 @@ export const metadata: Metadata = { title: "출석 체크 | Blogville" };
 
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
 
-// 출석 체크 (GAME-04): 버튼 없이 오늘 결과, 7일 보상표, 이번 달 달력. 간판은 광장의 마을 게시판(출석 도장 칸)
+// 출석 체크 (GAME-04): 버튼 없이 오늘 결과, 7일 보상표, 이번 달 달력. 간판은 광장의 마을 게시판(출석 도장 칸).
+// 도장은 광장 게시판처럼 이번 주기의 오늘 일차만큼 찍는다. 소식 종이 수는 집 정보를 읽지 않는 화면이라 기본값(3장)
 export default async function AttendancePage() {
   const member = await requireMember();
   // 헤더가 이미 기록했으면 읽기만 한다. 헤더에서 실패했으면 한 번 더 해 보고, 또 실패하면 오류 화면
@@ -21,7 +22,7 @@ export default async function AttendancePage() {
   const attendedSet = new Set(attended);
 
   return (
-    <GamePageShell room="attendance" art={boardArt()} description="하루에 한 번 Blogville에 들어오기만 하면 저절로 출석돼요. 7일을 이어 오면 보상이 커져요.">
+    <GamePageShell room="attendance" art={boardArt(3, today.cycleDay)} description="하루에 한 번 Blogville에 들어오기만 하면 저절로 출석돼요. 7일을 이어 오면 보상이 커져요.">
       <div className="space-y-6">
         <section className="px-tile p-6 text-center" data-tone="sun" aria-label="오늘 출석">
           <p className="text-5xl" aria-hidden="true">

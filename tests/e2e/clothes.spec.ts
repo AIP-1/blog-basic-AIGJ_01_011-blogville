@@ -29,6 +29,12 @@ test.describe("SHOP-08 옷가게", () => {
     // 돌려 보기
     await page.getByRole("button", { name: "뒤", exact: true }).click();
     await expect(page.locator("[data-mirror]")).toHaveAttribute("data-mirror-dir", "up");
+    await expect(page.getByRole("button", { name: "뒤", exact: true })).toHaveAttribute("aria-pressed", "true");
+    // [⏸ 멈춤]/[▶ 걷기]는 글자가 할 일을 말하는 보통 버튼 (눌림 상태가 없어 '멈춤이 켜짐'으로 읽히지 않는다)
+    const walk = page.getByRole("button", { name: "⏸ 멈춤" });
+    await expect(walk).not.toHaveAttribute("aria-pressed");
+    await walk.click();
+    await expect(page.getByRole("button", { name: "▶ 걷기" })).not.toHaveAttribute("aria-pressed");
 
     // 모자 탭의 요리사 모자는 Lv.2부터
     await page.getByRole("tab", { name: "🎩 모자" }).click();
