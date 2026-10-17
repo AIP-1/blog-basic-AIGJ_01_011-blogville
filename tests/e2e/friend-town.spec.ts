@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "./fixtures";
-import { signUpOk, sql } from "./helpers";
+import { insertPosts, signUpOk, sql } from "./helpers";
 
 // 친구 마을 구경 (TOWN-15), specs/047-friend-town
 test.describe.configure({ timeout: 90_000 });
@@ -42,7 +42,32 @@ test.describe("TOWN-15 친구 마을 구경", () => {
     await expect(lots.nth(2)).toContainText("🏠 내 집");
     await page.keyboard.press("Escape");
 
-    await page.locator(`[data-town-host="${host}"]`).getByRole("link", { name: "🏠 내 마을로" }).click();
+    // 마을 이름 간판은 왼쪽 간판 묶음과 겹치지 않는다 (1280px은 위 가운데, 좁으면 묶음 아래 둘째 줄)
+    const sign = page.locator(`[data-town-host="${host}"]`);
+    const group = page.locator("[data-town-hud-row]").first();
+    for (const width of [1280, 768]) {
+      await page.setViewportSize({ width, height: 720 });
+      const [a, b] = [(await sign.boundingBox())!, (await group.boundingBox())!];
+      const apart = a.x >= b.x + b.width || a.y >= b.y + b.height;
+      expect(apart, `${width}px`).toBe(true);
+    }
+    await page.setViewportSize({ width: 1280, height: 720 });
+
+    // 광장 소식 서랍은 그 마을 이웃의 새 글: 내 이웃 새 글(/feed/following)이 아니다
+    const drawer = page.getByRole("complementary", { name: "광장 소식" });
+    await drawer.getByRole("button", { name: /^마을 소식 펼치기/ }).click();
+    await expect(drawer.locator('[data-town-news="village"]')).toContainText(`⭐ ${host}님이 즐겨찾는 이웃의 새 글이 없어서 마을 전체의 새 글을 보여 드려요.`);
+    await insertPosts(friend, 1);
+    await page.reload();
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+    const news = drawer.locator('[data-town-news="neighbors"]');
+    await expect(drawer.getByRole("tab", { name: /이웃 새 글/ })).toHaveAttribute("aria-selected", "true");
+    await expect(news).toContainText(`⭐ ${host}님이 즐겨찾는 이웃의 새 글이에요.`);
+    await expect(news.locator("[data-news-post]")).toHaveAttribute("href", new RegExp(`^/@${friend}/\\d+$`));
+    await expect(news.locator('a[href="/feed/following"]')).toHaveCount(0);
+    await expect(news.getByRole("link", { name: /님 블로그 ›$/ })).toHaveAttribute("href", `/@${host}`);
+
+    await sign.getByRole("link", { name: "🏠 내 마을로" }).click();
     await expect(page).toHaveURL(/\/town$/);
   });
 

@@ -16,7 +16,7 @@ export function FishingView({ today, recent }: { today: CatchCode | null; recent
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-line bg-sky-50 p-6 text-center dark:bg-sky-950/30" aria-label="연못" data-fishing={caught ?? "ready"}>
+      <section className="px-tile p-6 text-center" data-tone="water" aria-label="연못" data-fishing={caught ?? "ready"}>
         {caught === null ? (
           <>
             <p className="text-5xl" aria-hidden="true">
@@ -24,12 +24,12 @@ export function FishingView({ today, recent }: { today: CatchCode | null; recent
             </p>
             <p className="mt-2 font-semibold">연못에 낚싯대를 던져 볼까요?</p>
             {state && !state.ok && (
-              <p role="alert" className="mt-2 font-semibold text-red-700">
+              <p role="alert" className="px-loss mt-2 font-semibold">
                 {state.message}
               </p>
             )}
             <form action={action} className="mt-4">
-              <button type="submit" className="btn btn-primary" disabled={pending}>
+              <button type="submit" className="px-btn px-btn--primary" disabled={pending}>
                 {pending ? "기다리는 중…" : "🎣 낚싯대 던지기"}
               </button>
             </form>
@@ -55,9 +55,9 @@ export function FishingView({ today, recent }: { today: CatchCode | null; recent
         <h2 id="fishing-catches" className="font-bold">
           🐟 낚을 수 있는 것
         </h2>
-        <ul className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <ul className="mt-3 grid grid-cols-2 gap-3.5 sm:grid-cols-3">
           {CATCHES.map((c) => (
-            <li key={c.code} className="rounded-xl border border-line bg-surface p-3 text-center">
+            <li key={c.code} className="px-tile p-3 text-center">
               <span className="text-2xl" aria-hidden="true">
                 {c.emoji}
               </span>
@@ -75,7 +75,7 @@ export function FishingView({ today, recent }: { today: CatchCode | null; recent
         {recent.length === 0 && !fresh ? (
           <p className="mt-2 text-ink-soft">아직 낚시 기록이 없어요.</p>
         ) : (
-          <ul className="mt-2 divide-y divide-line rounded-xl border border-line bg-surface" data-fishing-log>
+          <ul className="px-tile mt-3 divide-y-2 divide-line" data-fishing-log>
             {recent.map((r) => {
               const c = findCatch(r.catch)!;
               return (

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Pagination } from "@/components/blog/Pagination";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { FeedbackStatusBadge } from "@/components/support/FeedbackStatusBadge";
 import { SupportForm } from "@/components/support/SupportForm";
 import { formatDateTime } from "@/lib/time";
@@ -24,10 +25,7 @@ export default async function SupportPage({ searchParams }: PageProps<"/support"
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <header className="space-y-1 rounded-2xl border border-line bg-surface p-5">
-        <h1 className="text-2xl font-extrabold">🐞 버그·문의</h1>
-        <p className="text-sm text-ink-soft">고장 난 곳이나 궁금한 점을 알려 주세요. 답변은 알림으로 알려 드려요.</p>
-      </header>
+      <PageHeader emoji="🐞" title="버그·문의" mark="letter" description="고장 난 곳이나 궁금한 점을 알려 주세요. 답변은 알림으로 알려 드려요." />
 
       <section aria-label="문의 쓰기" className="rounded-2xl border border-line bg-surface p-5">
         {member ? (

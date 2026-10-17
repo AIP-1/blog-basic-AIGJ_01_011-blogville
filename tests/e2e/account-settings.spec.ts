@@ -34,7 +34,9 @@ test.describe("BLOG-06 블로그 관리 방문자 카드", () => {
     const phone = await browser.newContext({ viewport: { width: 375, height: 800 } });
     const p = await phone.newPage();
     await signIn(p, owner);
-    await expect(p).toHaveURL(new RegExp(`/@${owner}$`));
+    // 광장 개편: 휴대폰 회원도 로그인하면 마을(휴대폰 광장)에 머문다 (예전에는 내 블로그로 옮겼다)
+    await expect(p).toHaveURL("/town");
+    await expect(p.locator("[data-phone-plaza]")).toBeVisible();
     await p.goto("/settings/blog");
     await expect(p.locator("#visits [data-day]")).toHaveCount(7);
     expect(await p.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);

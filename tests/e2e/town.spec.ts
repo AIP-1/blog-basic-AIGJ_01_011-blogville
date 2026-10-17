@@ -153,6 +153,30 @@ test.describe("TOWN 마을", () => {
     await expect(page).toHaveURL("/feed");
   });
 
+  test("살아 있는 마을 (광장 개편): 하늘·게시판 표시, 24시간 안에 글 쓴 이웃 집은 불이 켜진다, 구역이 바뀌면 data-zone", async ({ page, browser }) => {
+    const username = await signUpOk(page);
+    const other = await browser.newPage();
+    const neighbor = await signUpOk(other);
+    await other.close();
+    await sql`insert into follows (follower_id, followee_id, is_favorite)
+      select a.id, b.id, true from users a, users b where a.username = ${username} and b.username = ${neighbor}`;
+
+    await openTown(page);
+    await expect(canvas(page)).toHaveAttribute("data-sky", /^(dawn|day|dusk|night)$/);
+    await expect(canvas(page)).toHaveAttribute("data-board", /^\d,\d$/);
+    await expect(canvas(page)).toHaveAttribute("data-lit", "");
+    await expect(canvas(page)).toHaveAttribute("data-zone", "plaza");
+    await teleport(page, 650, 840);
+    await expect(canvas(page)).toHaveAttribute("data-zone", "pond");
+
+    // 이웃이 방금 글을 썼다 → 1번 자리 집에 불
+    await sql`insert into posts (blog_id, title, content_html, content_text, is_public, created_at)
+      select b.id, '방금 쓴 글', '<p>본문</p>', '본문', true, now() - interval '1 hour'
+      from blogs b join users u on u.id = b.owner_id where u.username = ${neighbor}`;
+    await openTown(page);
+    await expect(canvas(page)).toHaveAttribute("data-lit", "1");
+  });
+
   test("글자 칸에 쓰는 동안에는 캐릭터가 움직이지 않는다", async ({ page }) => {
     await openTown(page);
     const start = await feet(page);
@@ -197,7 +221,7 @@ test.describe("TOWN 마을", () => {
     expect(await feet(page)).toEqual(start);
   });
 
-  test("휴대폰(375px): 회원은 내 블로그로 가고 🚪 문·🏘 마을이 숨는다, 방문자는 간단 메뉴", async ({ browser }) => {
+  test("휴대폰(375px): 회원은 게임 대신 휴대폰 광장이고 블로그의 🚪 문·🏘 마을이 숨는다, 방문자는 간단 메뉴", async ({ browser }) => {
     const page = await browser.newPage({ viewport: { width: 375, height: 800 } });
     const username = await signUpOk(page);
     await page.goto(`/@${username}`);
@@ -206,8 +230,12 @@ test.describe("TOWN 마을", () => {
     await expect(page.locator(`a[href="/town?at=${username}"]`)).toBeHidden();
     await expect(page.locator('header a[href="/town"]')).toBeAttached();
     await expect(page.locator('header a[href="/town"]')).toBeHidden();
+    // 광장 개편: 내 블로그로 옮기지 않고 휴대폰 광장 (PHONE_PLAZA, 자세한 것은 plaza.mobile.spec)
     await page.goto("/town");
-    await expect(page).toHaveURL(`/@${username}`);
+    await expect(page).toHaveURL("/town");
+    await expect(page.locator("[data-phone-plaza]")).toBeVisible();
+    await expect(page.locator("[data-town]")).toBeHidden();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
     await page.close();
 
     const guest = await browser.newPage({ viewport: { width: 375, height: 800 } });

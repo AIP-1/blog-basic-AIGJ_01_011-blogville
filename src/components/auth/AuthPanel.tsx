@@ -25,7 +25,8 @@ export function AuthPanel({
 }) {
   const [tab, setTab] = useState<"signin" | "signup">("signin");
   return (
-    <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+    // 겉모양은 마을 그림 옆의 종이 쪽지 (도트 키트 .px-box). 안쪽 폼은 사이트 그대로
+    <div className="px-box p-5">
       <div role="tablist" aria-label="로그인 또는 회원가입" className="mb-4 grid grid-cols-2 gap-1 rounded-lg bg-bg p-1">
         {(
           [

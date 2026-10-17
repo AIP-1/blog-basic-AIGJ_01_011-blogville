@@ -23,8 +23,8 @@ export function MainNav({ member, food = false }: { member: boolean; food?: bool
             <Link
               href={it.href}
               aria-current={on ? "page" : undefined}
-              className={`relative flex min-h-11 items-center whitespace-nowrap rounded-lg px-2.5 text-[15px] transition-colors hover:bg-bg ${
-                on ? "font-bold text-ink after:absolute after:inset-x-2.5 after:bottom-1 after:h-0.5 after:rounded-full after:bg-accent" : "font-medium text-ink-soft hover:text-ink"
+              className={`relative flex min-h-11 items-center whitespace-nowrap rounded-lg px-2 text-[15px] sm:px-2.5 transition-colors hover:bg-bg ${
+                on ? "font-bold text-ink after:absolute after:inset-x-2 after:bottom-1 sm:after:inset-x-2.5 after:h-0.5 after:rounded-full after:bg-accent" : "font-medium text-ink-soft hover:text-ink"
               }`}
             >
               {it.label}

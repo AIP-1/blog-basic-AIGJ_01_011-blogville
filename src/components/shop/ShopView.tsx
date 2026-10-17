@@ -19,11 +19,7 @@ export function ShopView({ items, level, coins, mySlug }: { items: ShopItem[]; l
   return (
     <div className="space-y-6">
       {state && (
-        <p
-          role={state.ok ? "status" : "alert"}
-          className={`sticky top-0 z-10 rounded-xl border px-4 py-3 font-semibold shadow-sm ${state.ok ? "border-green-300 bg-green-50 text-green-800" : "border-red-300 bg-red-50 text-red-700"}`}
-          data-buy-result={state.ok ? "ok" : "error"}
-        >
+        <p role={state.ok ? "status" : "alert"} className="px-note px-sticky" data-tone={state.ok ? "ok" : "error"} data-buy-result={state.ok ? "ok" : "error"}>
           {state.message}
           {state.ok && (
             <Link href={state.type === "furniture" ? `/@${mySlug}` : state.type === "growth" ? "/farm" : "/closet"} className="ml-2 underline">
@@ -55,7 +51,7 @@ export function ShopView({ items, level, coins, mySlug }: { items: ShopItem[]; l
             {list.length === 0 ? (
               <p className="mt-2 text-ink-soft">{SHOP_EMPTY}</p>
             ) : (
-              <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              <ul className="mt-3 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
                 {list.map((item) => (
                   <ShopCard key={item.id} item={item} level={level} coins={coins} action={action} pending={pending} />
                 ))}
@@ -72,19 +68,16 @@ function ShopCard({ item, level, coins, action, pending }: { item: ShopItem; lev
   const state = buttonState(item, level, coins);
   const label = state.kind === "owned" ? "보유 중" : state.kind === "level" ? `🔒 Lv.${state.level}` : state.kind === "coins" ? "코인 부족" : "사기";
   return (
-    <li
-      className={`flex flex-col rounded-2xl border border-line bg-surface p-3 ${state.kind === "owned" ? "opacity-60" : ""}`}
-      data-item={item.name}
-      aria-label={item.name}
-    >
-      <div className="flex justify-center rounded-xl bg-bg p-2">
+    <li className="px-tile flex flex-col p-3" data-item={item.name} aria-label={item.name}>
+      {/* 가진 것은 그림만 흐리게 (이름·설명 글자는 대비를 지킨다) */}
+      <div className={`flex justify-center bg-bg p-2 ${state.kind === "owned" ? "opacity-50" : ""}`}>
         <PixelLayers arts={isAvatarType(item.type) ? ["mannequin", item.art] : [item.art]} size={80} />
       </div>
       <h3 className="mt-2 font-bold">{item.name}</h3>
       <p className="mt-1 flex-1 text-sm text-ink-soft">{item.description}</p>
       <p className="mt-2 text-sm font-semibold">
         🪙 {formatNumber(item.price)}
-        {item.requiredLevel >= 2 && <span className="ml-2 rounded-full bg-accent/10 px-1.5 text-accent">Lv.{item.requiredLevel}+</span>}
+        {item.requiredLevel >= 2 && <span className="px-chip ml-2 align-[1px]">Lv.{item.requiredLevel}+</span>}
         {isStackable(item.type) && item.quantity > 0 && (
           <span className="ml-2 text-ink-soft" data-quantity>
             보유 {item.quantity}개
@@ -93,7 +86,7 @@ function ShopCard({ item, level, coins, action, pending }: { item: ShopItem; lev
       </p>
       <form action={action} className="mt-2">
         <input type="hidden" name="itemId" value={item.id} />
-        <button type="submit" className={`btn w-full ${state.kind === "buy" ? "btn-primary" : ""}`} disabled={state.kind !== "buy" || pending}>
+        <button type="submit" className={`px-btn w-full ${state.kind === "buy" ? "px-btn--primary" : ""}`} disabled={state.kind !== "buy" || pending}>
           {label}
         </button>
       </form>
