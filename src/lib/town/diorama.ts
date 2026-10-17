@@ -3,7 +3,7 @@
 // 덧칠 위에 그대로 밝다. 캔버스처럼 그릴 때마다 합성하지 않고 팔레트 색을 미리 곱해 둔다(그림은 한 번, 색마다 path 하나).
 
 import type { PixelArt } from "@/lib/art/characters";
-import { HOUSE_ART_WIDTH, houseArt, lampArt, mailboxArt, treeArt } from "@/lib/art/town";
+import { chimneyTop, HOUSE_ART_WIDTH, houseArt, lampArt, LIT_GLASS, LIT_GLOW, mailboxArt, smokeArt, SMOKE_FRAMES, treeArt } from "@/lib/art/town";
 import { lampsOn, SKY_TINT, type Sky } from "./sky";
 
 /** 집 한 채 자리 (집 그림 40칸 + 양옆 2칸) */
@@ -17,10 +17,8 @@ const HEAD = 6;
 /** 집 밑변 아래 땅: 잔디 2줄 · 흙길 4줄 · 잔디 3줄 */
 const GROUND = 9;
 
-/** 글 쓴 집의 불 켜진 유리 (광장 캔버스와 같은 색): 낮에도 따뜻한 노랑 */
-export const LIT_GLASS = "#ffd56e";
-/** 노을·밤·새벽의 창 불빛: 덧칠한 어둠 위에 그대로 얹는다 */
-export const LIT_GLOW = "#ffe9a6";
+// 글 쓴 집의 창 색(LIT_GLASS 낮, LIT_GLOW 노을·밤·새벽)과 굴뚝 연기는 광장 캔버스와 같은 것을 쓴다 (lib/art/town.ts)
+export { LIT_GLASS, LIT_GLOW, SMOKE_FRAMES };
 const LAMP_ON = "#ffe28a";
 const LAMP_OFF = "#d5dde0";
 /** 가로등 빛 무리 (옅게 얹는 따뜻한 노랑) */
@@ -102,23 +100,8 @@ export function discArt(r: number, color: string, squash = 1): PixelArt {
   return { rows, palette: { g: color } };
 }
 
-/** 굴뚝 연기 그림 수 (CSS steps()로 넘긴다) */
-export const SMOKE_FRAMES = 3;
-
-/** 굴뚝 연기 한 장 (9×12칸, 아랫변 가운데가 굴뚝 꼭대기): 김 세 덩이가 오른쪽 위로 오르며 커지고 옅어진다 (광장 캔버스와 같은 꼴) */
-export function smokeFrame(frame: number): PixelArt {
-  const f = ((frame % SMOKE_FRAMES) + SMOKE_FRAMES) % SMOKE_FRAMES;
-  const g = Array.from({ length: 12 }, () => Array.from({ length: 9 }, () => "."));
-  for (let i = 0; i < 3; i++) {
-    const t = i + f / SMOKE_FRAMES;
-    const cx = 3.5 + t * 1.1;
-    const cy = 10.5 - t * 3.2;
-    const r = 0.8 + t * 0.55;
-    const ch = t < 1 ? "S" : t < 2 ? "s" : "f";
-    for (let y = 0; y < 12; y++) for (let x = 0; x < 9; x++) if (Math.hypot(x + 0.5 - cx, y + 0.5 - cy) <= r) g[y][x] = ch;
-  }
-  return { rows: g.map((r) => r.join("")), palette: { S: "#e6dfd4", s: "#f0ebe3", f: "#f8f5f0" } };
-}
+/** 굴뚝 연기 한 장 (광장 캔버스의 `smokeArt`와 같다). CSS steps()로 장을 넘긴다 */
+export const smokeFrame = smokeArt;
 
 /** 그림 위의 한 장 (칸 좌표, 왼쪽 위) */
 export type Placed = { x: number; y: number; art: PixelArt };
@@ -259,14 +242,6 @@ function backdropArt(sky: Sky, width: number, height: number, baseY: number, sun
       e: t(LAND.pathEdge),
     },
   };
-}
-
-/** 굴뚝 뚜껑('c') 줄의 가운데 칸 */
-function chimneyTop(art: PixelArt): { x: number; y: number } | null {
-  const y = art.rows.findIndex((r) => r.includes("c"));
-  if (y < 0) return null;
-  const row = art.rows[y];
-  return { x: (row.indexOf("c") + row.lastIndexOf("c") + 1) / 2, y };
 }
 
 /**

@@ -11,7 +11,7 @@ test.describe("TOWN-11 휴대폰 아래 탭", () => {
     const page = await browser.newPage({ viewport: PHONE });
     const username = await signUpOk(page);
     // 가입 직후 환영 문구는 휴대폰 안내
-    await expect(page.getByText("화면 아래 탭으로 마을 소식·상점·알림을 오가고")).toBeVisible();
+    await expect(page.getByText("화면 아래 탭으로 마을·마을 소식·알림을 오가고")).toBeVisible();
     await expect(page.getByText("🚪 밖으로를 눌러 마을을 구경해 보세요")).toBeHidden();
 
     const tabs = page.getByRole("navigation", { name: "아래 탭" });
