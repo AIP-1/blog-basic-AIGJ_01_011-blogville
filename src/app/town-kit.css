@@ -1,0 +1,346 @@
+/* 마을 UI 키트 "나무 간판과 종이 쪽지" (광장 HUD·게임 화면·랜딩 마을 그림 틀·휴대폰 광장).
+   광장 도트 그림의 팔레트(외곽선 #3b2a20, 게시판 종이, 집 나무)에서 색을 가져오고, 모서리는 둥글리지 않고
+   2px 도트 홈(노치)으로 깎는다: 네 방향 box-shadow만 두면 모서리 2×2칸이 비어 계단처럼 보인다.
+   사이트의 둥근 카드(.btn·.widget)와는 일부러 갈린다: 글 화면은 원고지 칸, 마을 화면은 도트 칸.
+   클래스는 모두 px- 로 시작한다. 레이어 밖이라 Tailwind 유틸리티보다 이긴다(globals.css .btn과 같은 규칙). */
+
+/* 한글 도트 글꼴 갈무리11 굵게 (OFL, src/app/fonts/OFL-Galmuri.txt). 12px 설계라 12px·24px에서만 쓴다.
+   이 글꼴을 쓰는 글자가 화면에 있을 때만 브라우저가 받는다(블로그·피드 화면은 받지 않음) */
+@font-face {
+  font-family: "Galmuri11";
+  src: url("./fonts/Galmuri11-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-pixel: "Galmuri11", "Pretendard Variable", "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  --kit-ink: #3b2a20;
+  --kit-ink-soft: #6e523b;
+  --kit-paper: #fbf1dc;
+  --kit-paper-2: #f0e2c2;
+  --kit-paper-hover: #fffaf0;
+  --kit-wood: #8a5a34;
+  --kit-wood-edge: #5e3c2c;
+  --kit-wood-hi: #b07a4a;
+  --kit-sun: #f4c430;
+  --kit-glow: #ffd36b;
+  --kit-accent-deep: #1d5434;
+  --kit-shade: rgb(59 42 32 / 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --kit-ink: #f3e6c8;
+    --kit-ink-soft: #c9b896;
+    --kit-paper: #262a40;
+    --kit-paper-2: #30365a;
+    --kit-paper-hover: #353b62;
+    --kit-wood: #5a3a24;
+    --kit-wood-edge: #2e1d12;
+    --kit-wood-hi: #7a5232;
+    --kit-accent-deep: #2f8a57;
+    --kit-shade: rgb(0 0 0 / 0.45);
+  }
+}
+:root[data-theme="dark"] {
+  --kit-ink: #f3e6c8;
+  --kit-ink-soft: #c9b896;
+  --kit-paper: #262a40;
+  --kit-paper-2: #30365a;
+  --kit-paper-hover: #353b62;
+  --kit-wood: #5a3a24;
+  --kit-wood-edge: #2e1d12;
+  --kit-wood-hi: #7a5232;
+  --kit-accent-deep: #2f8a57;
+  --kit-shade: rgb(0 0 0 / 0.45);
+}
+
+/* 도트 글씨: 12px(1배)·24px(2배)만. 중간 크기는 도트가 뭉갠다 */
+.px-font {
+  font-family: var(--font-pixel);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: none;
+}
+.px-font-2x {
+  font-family: var(--font-pixel);
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 28px;
+  letter-spacing: 0;
+  -webkit-font-smoothing: none;
+}
+
+/* 종이 쪽지: 먹 2px 노치 테두리 */
+.px-box {
+  background: var(--kit-paper);
+  color: var(--kit-ink);
+  border-radius: 0;
+  box-shadow:
+    0 -2px 0 0 var(--kit-ink),
+    0 2px 0 0 var(--kit-ink),
+    -2px 0 0 0 var(--kit-ink),
+    2px 0 0 0 var(--kit-ink);
+}
+.px-box-head {
+  background: var(--kit-paper-2);
+}
+
+/* 세계(캔버스) 위에 뜬 것만: 흐림 없는 아래 그림자 하나 */
+.px-float {
+  filter: drop-shadow(0 4px 0 var(--kit-shade));
+}
+
+/* 나무 간판: 종이색 글자, 윗줄에 밝은 결 한 줄 */
+.px-plank {
+  background: var(--kit-wood);
+  color: var(--kit-paper);
+  border-radius: 0;
+  box-shadow:
+    inset 0 2px 0 0 var(--kit-wood-hi),
+    0 -2px 0 0 var(--kit-wood-edge),
+    0 2px 0 0 var(--kit-wood-edge),
+    -2px 0 0 0 var(--kit-wood-edge),
+    2px 0 0 0 var(--kit-wood-edge);
+}
+:root[data-theme="dark"] .px-plank {
+  color: #f3e6c8;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .px-plank {
+    color: #f3e6c8;
+  }
+}
+
+/* 버튼: 누르는 영역 44px 이상(NF-06), 누르면 2px 내려앉는다 */
+.px-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 0;
+  background: var(--kit-paper);
+  color: var(--kit-ink);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+  box-shadow:
+    0 -2px 0 0 var(--kit-ink),
+    0 2px 0 0 var(--kit-ink),
+    -2px 0 0 0 var(--kit-ink),
+    2px 0 0 0 var(--kit-ink),
+    inset 0 -3px 0 0 var(--kit-paper-2);
+}
+.px-btn:hover {
+  background: var(--kit-paper-hover);
+}
+.px-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    0 -2px 0 0 var(--kit-ink),
+    0 2px 0 0 var(--kit-ink),
+    -2px 0 0 0 var(--kit-ink),
+    2px 0 0 0 var(--kit-ink);
+}
+.px-btn:disabled,
+.px-btn[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.px-btn--primary {
+  background: var(--accent);
+  color: #fbf1dc;
+  box-shadow:
+    0 -2px 0 0 var(--kit-ink),
+    0 2px 0 0 var(--kit-ink),
+    -2px 0 0 0 var(--kit-ink),
+    2px 0 0 0 var(--kit-ink),
+    inset 0 -4px 0 0 var(--kit-accent-deep);
+}
+.px-btn--primary:hover {
+  background: var(--accent);
+  filter: brightness(1.08);
+}
+:root[data-theme="dark"] .px-btn--primary {
+  color: #0c1f14;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .px-btn--primary {
+    color: #0c1f14;
+  }
+}
+.px-btn--quiet {
+  background: transparent;
+  box-shadow: none;
+}
+.px-btn--quiet:hover {
+  background: var(--kit-paper-2);
+}
+.px-btn--quiet:active:not(:disabled) {
+  box-shadow: none;
+}
+/* 마우스 화면에서만 작게. 손가락 화면은 44px 그대로 */
+@media (pointer: fine) {
+  .px-btn--sm {
+    min-height: 36px;
+    min-width: 36px;
+    padding: 0 10px;
+  }
+}
+
+/* 작은 숫자 칩: Lv·코인·안 읽은 수·n/3 */
+.px-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 6px;
+  background: var(--kit-paper-2);
+  color: var(--kit-ink);
+  font-family: var(--font-pixel);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  -webkit-font-smoothing: none;
+}
+.px-chip[data-tone="accent"] {
+  background: var(--accent);
+  color: #fbf1dc;
+}
+.px-chip[data-tone="sun"] {
+  background: var(--kit-sun);
+  color: #3b2a20;
+}
+.px-chip[data-tone="alert"] {
+  background: var(--danger);
+  color: #ffffff;
+}
+:root[data-theme="dark"] .px-chip[data-tone="accent"] {
+  color: #0c1f14;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .px-chip[data-tone="accent"] {
+    color: #0c1f14;
+  }
+}
+
+/* 진행 막대: 8px 마디로 끊어 보이는 도트 막대. <span class="px-bar" role="progressbar"><span style="width: 40%"></span></span> */
+.px-bar {
+  position: relative;
+  display: block;
+  height: 8px;
+  background: var(--kit-paper-2);
+  box-shadow:
+    0 -2px 0 0 var(--kit-ink),
+    0 2px 0 0 var(--kit-ink),
+    -2px 0 0 0 var(--kit-ink),
+    2px 0 0 0 var(--kit-ink);
+  overflow: hidden;
+}
+.px-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  background-image: repeating-linear-gradient(90deg, transparent 0 6px, var(--kit-paper-2) 6px 8px);
+}
+
+/* 칸 세기: 오늘 글 보상 ■■□ 같은 몇 칸 중 몇 칸 */
+.px-cells {
+  display: inline-flex;
+  gap: 2px;
+}
+.px-cells > span {
+  display: block;
+  width: 8px;
+  height: 8px;
+  box-shadow: inset 0 0 0 2px currentColor;
+}
+.px-cells > span[data-on] {
+  background: currentColor;
+}
+
+/* 말풍선: 아래 가운데 계단 꼬리 */
+.px-bubble {
+  position: relative;
+  background: var(--kit-paper);
+  color: var(--kit-ink);
+  box-shadow:
+    0 -2px 0 0 var(--kit-ink),
+    0 2px 0 0 var(--kit-ink),
+    -2px 0 0 0 var(--kit-ink),
+    2px 0 0 0 var(--kit-ink);
+}
+.px-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 12px;
+  height: 8px;
+  margin-left: -6px;
+  margin-top: 2px;
+  background: var(--kit-ink);
+  clip-path: polygon(0 0, 100% 0, 100% 25%, 83% 25%, 83% 50%, 67% 50%, 67% 75%, 50% 75%, 50% 100%, 33% 100%, 33% 75%, 17% 75%, 17% 50%, 0 50%);
+}
+
+/* 키 이름: Space, Esc */
+.px-key {
+  display: inline-block;
+  padding: 0 4px;
+  margin: 0 2px;
+  background: var(--kit-paper-2);
+  color: var(--kit-ink);
+  font-family: var(--font-pixel);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 16px;
+  box-shadow: inset 0 -2px 0 0 var(--kit-ink-soft);
+  -webkit-font-smoothing: none;
+}
+
+/* 종이 색인 탭: 고른 탭은 패널과 이어진다 */
+.px-tabs {
+  display: flex;
+  gap: 4px;
+}
+.px-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  background: var(--kit-paper-2);
+  color: var(--kit-ink-soft);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.px-tab[aria-selected="true"] {
+  background: var(--kit-paper);
+  color: var(--kit-ink);
+}
+
+/* 키트 위 초점: 먹색, 나무 위에서는 종이색 */
+:is(.px-btn, .px-tab, .px-box a, .px-box button):focus-visible {
+  outline: 3px solid var(--kit-ink);
+  outline-offset: 3px;
+}
+:is(.px-plank a, .px-plank button, a.px-plank, button.px-plank):focus-visible {
+  outline: 3px solid var(--kit-paper);
+  outline-offset: 3px;
+}

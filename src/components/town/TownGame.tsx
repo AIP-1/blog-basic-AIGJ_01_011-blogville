@@ -9,6 +9,7 @@ import { TOWN_CELL } from "@/lib/art/town";
 import { entranceDistance, HOUSE_LOTS, INTERACT_DISTANCE, lotFront, PLAYER_SIZE, shortName, SPEED, WORLD, nearestEntrance, normalize, step, type Point } from "@/lib/town/layout";
 import { createNpcs, NPC_TAG_DISTANCE, npcGraph, updateNpcs, type Npc } from "@/lib/town/npc";
 import { artSize, artVisibleHeight, entrancePrompt, lotChoice, mailboxLot, townLayout, type TownEntrance, type TownHouseInput } from "@/lib/town/structures";
+import type { Sky } from "@/lib/town/sky";
 import { onStairs, STAIR_SLOW, stairEnds, STAIRS } from "@/lib/town/terrain";
 import { bakeGround, GROUND_CELL } from "./ground";
 
@@ -114,6 +115,8 @@ export function TownGame({
   mailFlag = false,
   chooseLots = false,
   place = "마을",
+  sky = null,
+  board = { papers: 3, stamps: 3 },
 }: {
   houses: TownHouseInput[];
   member: boolean;
@@ -128,6 +131,10 @@ export function TownGame({
   chooseLots?: boolean;
   /** 화면 낭독기 지도 이름 (친구 마을이면 `{닉네임}님의 마을`, TOWN-15) */
   place?: string;
+  /** 하늘 고정 (`?sky=night`, 시험·미리보기). null이면 지금 한국 시각 (광장 개편, `skyAt`) */
+  sky?: Sky | null;
+  /** 살아 있는 게시판: 오늘 새 글 쪽지 수(0~5), 출석 도장 수(0~7). 기본 (3,3)은 예전 그림과 같다 */
+  board?: { papers: number; stamps: number };
 }) {
   const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -135,7 +142,7 @@ export function TownGame({
   const lastPos = useRef<{ from: string; pos: Point } | null>(null);
   const [prompt, setPrompt] = useState<string | null>(null);
   const [touch, setTouch] = useState(false);
-  const data = JSON.stringify({ houses, member, layers, name, start, startKey, mailFlag, chooseLots });
+  const data = JSON.stringify({ houses, member, layers, name, start, startKey, mailFlag, chooseLots, sky, board });
   // 창 폭이 휴대폰 조건을 넘나들면 게임을 끄고 다시 만든다
   const phone = useSyncExternalStore(
     subscribePhone,

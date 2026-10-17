@@ -29,9 +29,15 @@ export type TownHouse = {
   recentPosts: MailboxPost[];
   /** 집 주인의 입은 모습 (걸어 다니는 이웃, TOWN-19) */
   layers: string[];
+  /** 최근 24시간 안에 공개 글을 썼다: 광장에서 그 집 창에 불이 켜지고 굴뚝에 연기가 난다 (광장 개편) */
+  fresh: boolean;
 };
 
-export type MailboxPost = { id: number; title: string };
+/** `createdAt`은 ISO 문자열 (클라이언트 게임에 그대로 넘긴다) */
+export type MailboxPost = { id: number; title: string; createdAt: string };
+
+/** 이 시간 안에 쓴 글이 있으면 불 켜진 집 */
+export const FRESH_HOURS = 24;
 
 /** 우체통 새 글 수 */
 export const MAILBOX_POSTS = 3;
@@ -90,6 +96,7 @@ function toHouse(row: HouseRow, lot: number, mine: boolean): TownHouse & { blogI
     mine,
     recentPosts: [],
     layers: [],
+    fresh: false,
   };
 }
 
@@ -98,16 +105,23 @@ async function withRecentPosts(houses: (TownHouse & { blogId: number })[]): Prom
   if (houses.length === 0) return [];
   const ids = houses.map((h) => h.blogId);
   const avatars = await avatarLayersOf(houses.map((h) => h.userId));
-  const rows = await db.execute<{ blog_id: number; id: number; title: string }>(sql`
-    select blog_id, id, title from (
-      select p.blog_id, p.id, p.title, row_number() over (partition by p.blog_id order by p.created_at desc, p.id desc) as n
+  const rows = await db.execute<{ blog_id: number; id: number; title: string; created_at: Date | string }>(sql`
+    select blog_id, id, title, created_at from (
+      select p.blog_id, p.id, p.title, p.created_at, row_number() over (partition by p.blog_id order by p.created_at desc, p.id desc) as n
       from ${posts} p where p.is_public and p.blog_id in (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})
     ) t where n <= ${MAILBOX_POSTS} order by blog_id, n`);
-  return houses.map(({ blogId, ...house }) => ({
-    ...house,
-    recentPosts: rows.filter((r) => Number(r.blog_id) === blogId).map((r) => ({ id: Number(r.id), title: r.title })),
-    layers: avatars.get(house.userId) ?? [],
-  }));
+  const since = Date.now() - FRESH_HOURS * 3_600_000;
+  return houses.map(({ blogId, ...house }) => {
+    const recentPosts = rows
+      .filter((r) => Number(r.blog_id) === blogId)
+      .map((r) => ({ id: Number(r.id), title: r.title, createdAt: new Date(r.created_at).toISOString() }));
+    return {
+      ...house,
+      recentPosts,
+      layers: avatars.get(house.userId) ?? [],
+      fresh: recentPosts.length > 0 && Date.parse(recentPosts[0].createdAt) >= since,
+    };
+  });
 }
 
 function houseQuery(where: SQL | undefined) {

@@ -21,6 +21,8 @@
   --accent: #2a7348; /* 옅은 초록 바탕(accent 10%) 위 글씨도 대비 4.5:1 이상 (Lighthouse color-contrast) */
   --accent-ink: #ffffff;
   --danger: #c62828;
+  /* 맨 위 막대 높이 (h-14 + 아래 줄 1px): 붙는 결과 띠·목차로 건너뛴 소제목이 막대 밑에 숨지 않게 */
+  --header-h: calc(3.5rem + 1px);
 }
 
 @theme inline {

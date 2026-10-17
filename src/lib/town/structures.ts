@@ -37,6 +37,8 @@ export type TownHouseInput = {
   mine: boolean;
   /** 집 주인의 입은 모습 (걸어 다니는 이웃, TOWN-19). 없으면 회색 주민 */
   layers?: string[];
+  /** 최근 24시간 안에 공개 글을 썼다 (불 켜진 창·굴뚝 연기, 광장 개편) */
+  fresh?: boolean;
 };
 
 /** 마을에 서는 것 하나: 그림(발밑 기준), 부딪히는 몸체, 이름표 */
