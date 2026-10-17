@@ -26,7 +26,7 @@ test.describe("휴대폰 광장", () => {
     await expect(plaza.locator("[data-village-diorama]")).toHaveAttribute("data-village-diorama", "2");
     await expect(plaza.getByRole("img", { name: `${username}님의 마을` })).toBeAttached();
     // 이웃이 글을 써서 그 집에 불이 켜졌다
-    await expect(plaza.locator("[data-plaza-lit]")).toHaveText("🏮 불 켜진 집 1채");
+    await expect(plaza.locator("[data-plaza-lit]")).toHaveText("불 켜진 집 1채");
 
     const write = plaza.locator("[data-town-write]");
     await expect(write).toHaveAttribute("href", "/write");

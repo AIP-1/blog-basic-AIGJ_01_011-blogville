@@ -7,6 +7,7 @@ import { TownHud } from "@/components/town/TownHud";
 import { TownWelcome } from "@/components/town/TownWelcome";
 import { lotFront, START_POS } from "@/lib/town/layout";
 import { boardPapers } from "@/lib/town/plaza";
+import { parseSeason } from "@/lib/town/season";
 import { parseSky, skyAt } from "@/lib/town/sky";
 import { townSpots } from "@/lib/town/structures";
 import { parseReturnSpot } from "@/lib/town/zones";
@@ -29,7 +30,7 @@ const DEFAULT_STAMPS = 3;
  * 휴대폰은 게임 대신: 회원은 세로 광장(`PhonePlaza`, `PHONE_PLAZA`), 방문자는 간단 메뉴(`PhoneTown`), 아래 탭 ☰로 오면(`?menu=1`) 펼친 메뉴 화면.
  */
 export default async function TownPage({ searchParams }: PageProps<"/town">) {
-  const { at, welcome, menu, sky: skyParam, from } = await searchParams;
+  const { at, welcome, menu, sky: skyParam, from, season: seasonParam } = await searchParams;
   const member = await getSession();
   // 헤더가 없는 마을에서도 그날 첫 화면이면 자동 출석이 ☰ 내 프로필 코인에 들어가게 먼저 한다 (GAME-04). 레이아웃과 한 요청에 한 번
   const attendance = member
@@ -77,7 +78,7 @@ export default async function TownPage({ searchParams }: PageProps<"/town">) {
         {hud && menu === "1" ? (
           <TownHud phone hud={hud} admin={member?.role === "admin"} userId={member?.userId ?? null} spots={townSpots(houses, true)} />
         ) : hud && PHONE_PLAZA ? (
-          <PhonePlaza hud={hud} houses={houses} news={news} sky={sky ?? skyAt()} />
+          <PhonePlaza hud={hud} houses={houses} news={news} sky={sky ?? skyAt()} season={parseSeason(seasonParam)} />
         ) : (
           <PhoneTown mySlug={hud?.blog.slug ?? null} />
         )}
