@@ -7,7 +7,7 @@ import { REWARD_RULES } from "@/lib/game";
 /** 처음 몇 번 광장에 올 때는 설명을 저절로 잠깐 띄운다 (이 브라우저에 센다) */
 const TIP_KEY = "bv-write-tip";
 const TIP_AUTO_VISITS = 3;
-const TIP_AUTO_MS = 6000;
+const TIP_AUTO_MS = 4000;
 
 /** 글쓰기 버튼 설명 (plaza-upgrade-2): 보상 n/3과 한 편의 보상, 다 받았으면 초롱 안내 */
 export function writeTip(lit: number, total: number): string {
@@ -51,7 +51,10 @@ function MemberWriteButton({ rewards, className }: { rewards: number; className:
   const lit = Math.min(rewards, total);
   const tipId = useId();
   const [auto, setAuto] = useState(false);
+  // 휴대폰 광장(폭 가득 버튼)과 손가락 화면에서는 저절로 띄우지 않는다: 아래 목록 머리를 가린다 (D5)
+  const phoneWide = className.includes("w-full");
   useEffect(() => {
+    if (phoneWide || window.matchMedia("(pointer: coarse)").matches) return;
     let seen = TIP_AUTO_VISITS;
     try {
       seen = Number(localStorage.getItem(TIP_KEY)) || 0;
@@ -69,7 +72,7 @@ function MemberWriteButton({ rewards, className }: { rewards: number; className:
       window.clearTimeout(timer);
       window.removeEventListener("bv-panel", onPanel);
     };
-  }, []);
+  }, [phoneWide]);
   return (
     // 설명 쪽지를 버튼 바로 아래에 두는 틀: 버튼의 폭(휴대폰 광장의 w-full)과 클릭 받기(광장 간판 묶음)를 따른다
     <span

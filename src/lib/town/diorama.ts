@@ -23,7 +23,9 @@ export { LIT_GLASS, LIT_GLOW, SMOKE_FRAMES };
 const LAMP_ON = "#ffe28a";
 const LAMP_OFF = "#d5dde0";
 /** 가로등 빛 무리 (옅게 얹는 따뜻한 노랑) */
-const LAMP_HALO = "#ffd36b";
+const LAMP_HALO = "#ffc552";
+/** 빛 무리 바깥 고리 (주황빛이 돌아야 어두운 하늘 위에서 회색이 아니라 따뜻하게 보인다) */
+const LAMP_EMBER = "#ff9d3c";
 
 /** 하늘 띠 네 줄 (위 → 지평선). 노을·밤은 덧칠 색(SKY_TINT)과 같은 쪽 색이다 */
 const SKY_BANDS: Record<Sky, readonly [string, string, string, string]> = {
@@ -362,10 +364,13 @@ export function dioramaScene(input: readonly DioramaInput[], sky: Sky, opts: { s
   for (const lx of lampXs) {
     const top = baseY + 1 - lamp.rows.length;
     if (lamps) {
-      glows.push({ x: lx - 6, y: top + 2 - 6, art: discArt(6, LAMP_HALO), opacity: sky === "night" ? 0.2 : 0.14 });
-      glows.push({ x: lx - 3, y: top + 2 - 3, art: discArt(3, LAMP_HALO), opacity: sky === "night" ? 0.32 : 0.24 });
+      // 겹친 고리 셋 (밖은 옅은 주황, 가운데 #ffd56e, 안은 밝은 #ffe9a6). 바깥을 주황으로 해야 어두운 하늘 위에서 회갈색이 아니라 따뜻한 호박빛이다 (D6)
+      const k = sky === "night" ? 1 : 0.8;
+      glows.push({ x: lx - 6, y: top + 2 - 6, art: discArt(6, LAMP_EMBER), opacity: 0.1 * k });
+      glows.push({ x: lx - 4, y: top + 2 - 4, art: discArt(4, LAMP_HALO), opacity: 0.24 * k });
+      glows.push({ x: lx - 2, y: top + 2 - 2, art: discArt(2, LIT_GLOW), opacity: 0.75 * k });
       // 땅에 떨어진 빛 웅덩이 (납작한 원)
-      glows.push({ x: lx - 6, y: baseY + 1, art: discArt(6, LAMP_HALO, 0.4), opacity: sky === "night" ? 0.3 : 0.2 });
+      glows.push({ x: lx - 6, y: baseY + 1, art: discArt(6, LAMP_HALO, 0.4), opacity: 0.3 * k });
     }
     front.push({ x: lx - 3, y: top, art: lampArtLit });
   }

@@ -285,7 +285,7 @@ describe("집 앞 우체통 (TOWN-13)", () => {
     const boxes = entrances.filter((e) => mailboxLot(e.href) !== null);
     expect(boxes.map((e) => mailboxLot(e.href))).toEqual([0, 3]);
     expect(entrancePrompt(boxes[0])).toBe("📬 내 우체통 · Space 소식 보기");
-    expect(entrancePrompt(boxes[1])).toBe("📬 주민3의 우체통 · Space 소식 보기");
+    expect(entrancePrompt(boxes[1])).toBe("📬 주민3님의 우체통 · Space 소식 보기");
     expect(structures.filter((s) => s.id.startsWith("mailbox:"))).toHaveLength(2);
     const mine = structures.find((s) => s.id === "mailbox:0")!;
     expect(Object.values(mine.art.palette)).toContain("#3a6ea5");

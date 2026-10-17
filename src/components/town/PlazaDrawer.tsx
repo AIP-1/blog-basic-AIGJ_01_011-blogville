@@ -218,7 +218,7 @@ export function PlazaDrawer({
           id={`${id}-panel`}
           role={tasks ? "tabpanel" : undefined}
           aria-labelledby={tasks ? `${id}-${tab}` : undefined}
-          className="min-h-0 flex-1 overflow-y-auto py-1"
+          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto py-1"
           data-drawer-panel={tab}
         >
           {tab === "news" || !tasks ? <NewsList news={news} compact member={member} host={host} /> : <TaskList tasks={tasks} places={places} onTeleport={onTeleport} />}

@@ -573,7 +573,7 @@ export function townLayout(
         id: `mailbox:${i}`,
         x: box.x,
         y: box.y + 34,
-        label: house.mine ? "📬 내 우체통" : `📬 ${shortName(house.nickname)}의 우체통`,
+        label: house.mine ? "📬 내 우체통" : `📬 ${shortName(house.nickname)}님의 우체통`,
         href: `mailbox:${i}`,
       });
     } else if (i === 0 && !member) {

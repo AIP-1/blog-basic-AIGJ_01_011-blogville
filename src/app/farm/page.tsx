@@ -53,7 +53,7 @@ export default async function FarmPage({ searchParams }: PageProps<"/farm">) {
 async function FriendFarm({ host }: { host: { userId: string; nickname: string; slug: string } }) {
   const farm = await getFarmPen(host.userId);
   const grown = farm.grown;
-  const room = { key: "farm", emoji: "🐮", title: `${host.nickname}님의 농장 구경`, spot: "farm", width: "wide" } as const;
+  const room = { key: "farm", emoji: "🐮", title: `${host.nickname}님의 농장 구경`, spot: "farm", width: "narrow" } as const;
   return (
     <GamePageShell room={room} art={farmArt()} host={host.slug} description={`${host.nickname}님이 키우는 동물을 구경해요. 돌보기는 주인만 할 수 있어요.`}>
       <div className="space-y-6" data-farm-host={host.slug}>
@@ -64,7 +64,7 @@ async function FriendFarm({ host }: { host: { userId: string; nickname: string; 
           {farm.animals.length + farm.eggs.length === 0 ? (
             <p className="mt-2 text-ink-soft">지금은 키우는 동물이 없어요.</p>
           ) : (
-            <ul className="mt-3 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
+            <ul className="mt-3 grid grid-cols-2 gap-3.5 sm:grid-cols-3">
               {farm.eggs.map((egg) => (
                 <li key={egg.id} className="px-tile flex flex-col items-center p-4" data-egg={egg.id}>
                   <div className="flex h-24 items-end">
@@ -88,7 +88,7 @@ async function FriendFarm({ host }: { host: { userId: string; nickname: string; 
           {grown.length === 0 ? (
             <p className="mt-2 text-ink-soft">아직 다 키운 동물이 없어요.</p>
           ) : (
-            <ul className="mt-3 grid grid-cols-2 gap-3.5 sm:grid-cols-4">
+            <ul className="mt-3 grid grid-cols-2 gap-3.5 sm:grid-cols-3">
               {grown.map((a) => (
                 <GrownCard key={a.id} animal={a} />
               ))}

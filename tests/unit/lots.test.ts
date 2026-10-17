@@ -51,11 +51,13 @@ describe("이웃 집 자리 (TOWN-18)", () => {
 
 describe("이사 올 이웃 (plaza-upgrade-2 B1)", () => {
   it("빈 자리 뒤쪽 번호부터 3곳, 4번은 늘 비워 둔다", () => {
-    expect(suggestionLots([])).toEqual([10, 9, 8]);
-    expect(suggestionLots([10, 8])).toEqual([9, 7, 6]);
+    // 절벽 아래 9·10번은 빼고
+    expect(suggestionLots([])).toEqual([8, 7, 6]);
+    expect(suggestionLots([10, 8])).toEqual([7, 6, 5]);
     expect(suggestionLots([5, 6, 7, 8, 9, 10])).toEqual([3, 2, 1]);
     expect(suggestionLots([1, 2, 3, 5, 6, 7, 8, 9, 10])).toEqual([]);
-    expect(suggestionLots([1, 2, 3, 5, 6, 7, 8, 9])).toEqual([10]);
+    expect(suggestionLots([1, 2, 3, 5, 6, 7, 8])).toEqual([]);
+    expect(suggestionLots([1, 2, 5, 6, 7, 8])).toEqual([3]);
   });
 
   it("앞 묶음 후보가 먼저, 겹치거나 뺄 후보는 빼고 n명까지", () => {

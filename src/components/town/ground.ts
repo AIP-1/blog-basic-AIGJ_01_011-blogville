@@ -16,6 +16,7 @@ const GRASS: Record<Season, { bands: [string, string, string]; dots: string[]; g
 };
 /** 가을 낙엽 도트 (길·잔디) */
 const LEAVES = ["#d9692e", "#e9b341", "#b04a22", "#c98f24"];
+const GRASS_LEAVES = ["#a2552a", "#a8822f", "#8a4022"];
 
 export function bakeGround(season: Season = "summer"): HTMLCanvasElement {
   const look = GRASS[season];
@@ -71,8 +72,9 @@ export function bakeGround(season: Season = "summer"): HTMLCanvasElement {
       ctx.fillStyle = LEAVES[i % LEAVES.length];
       ctx.fillRect(c(r.x) + Math.floor(random() * c(r.width)), c(r.y) + Math.floor(random() * c(r.height)), 1, 1);
     }
-    for (let i = 0; i < 700; i++) {
-      ctx.fillStyle = LEAVES[i % LEAVES.length];
+    // 잔디 위는 적게, 진한 색으로 (밝은 빨강 점은 밤 덧칠 아래에서 잡티처럼 보였다)
+    for (let i = 0; i < 260; i++) {
+      ctx.fillStyle = GRASS_LEAVES[i % GRASS_LEAVES.length];
       ctx.fillRect(Math.floor(random() * w), Math.floor(random() * h), 1, 1);
     }
   }

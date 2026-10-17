@@ -44,7 +44,7 @@ test.describe("TOWN-13 집 앞 우체통", () => {
     await openTown(page);
     // 1번 자리(300, 380) 오른쪽 앞 우체통
     await teleport(page, 418, 420);
-    await expect(prompt(page)).toHaveText(`📬 ${short(writer)}의 우체통 · Space 소식 보기`);
+    await expect(prompt(page)).toHaveText(`📬 ${short(writer)}님의 우체통 · Space 소식 보기`);
     await page.keyboard.press("Space");
     await expect(panel(page)).toBeVisible();
     await expect(panel(page).getByRole("heading")).toHaveText(`📮 ${writer}님의 우체통`);
@@ -119,7 +119,7 @@ test.describe("B3 우체통 쪽지", () => {
 
     await openTown(page);
     await teleport(page, 418, 420);
-    await expect(prompt(page)).toHaveText(`📬 ${short(friend)}의 우체통 · Space 소식 보기`);
+    await expect(prompt(page)).toHaveText(`📬 ${short(friend)}님의 우체통 · Space 소식 보기`);
     await page.keyboard.press("Space");
     await expect(panel(page)).toContainText("오늘 1명 · 어제 2명이 다녀갔어요");
     await panel(page).getByRole("button", { name: "✉️ 쪽지 넣기" }).click();

@@ -290,7 +290,7 @@ test.describe("광장 HUD", () => {
     await teleport(page, 1818, 420);
     const short = [...neighbor].length > 12 ? `${[...neighbor].slice(0, 12).join("")}…` : neighbor;
     // 글(textContent)은 그대로, 키 모양 Space는 없다
-    await expect(prompt(page)).toHaveText(`📬 ${short}의 우체통 · Space 소식 보기`);
+    await expect(prompt(page)).toHaveText(`📬 ${short}님의 우체통 · Space 소식 보기`);
     await expect(prompt(page).locator("kbd")).toHaveCount(0);
     const enter = town(page).locator("[data-town-enter]");
     await expect(enter).toHaveText("소식 보기");

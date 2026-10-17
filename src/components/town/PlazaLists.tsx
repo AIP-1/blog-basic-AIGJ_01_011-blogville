@@ -163,7 +163,8 @@ export function TaskList({
   const attendance = tasks.find((t) => t.id === "attendance");
   const prompt = currentPrompt(new Date());
   return (
-    <div className="grid gap-1">
+    // grid-cols-1(minmax(0, 1fr)): 줄 안 긴 글감 제목이 칸 폭을 서랍보다 넓히지 않게 (D1)
+    <div className="grid grid-cols-1 gap-1">
       {attendance && (
         <Link
           href={attendance.href}
@@ -178,7 +179,7 @@ export function TaskList({
           <span aria-hidden="true">›</span>
         </Link>
       )}
-      <ul className="grid gap-1" aria-label="오늘 할 일">
+      <ul className="grid grid-cols-1 gap-1" aria-label="오늘 할 일">
         {countedTasks(tasks).map((task) => {
           const spot = onTeleport && task.spot ? places.find((p) => p.id === task.spot) : undefined;
           return (
@@ -197,11 +198,12 @@ export function TaskList({
                   <span aria-hidden="true">{task.icon} </span>
                   {task.label}
                 </span>
-                <span className="mt-0.5 flex items-center gap-2 text-xs text-(--kit-ink-soft)">
+                {/* 280px 서랍에서도 넘치지 않게 보상은 자리가 모자라면 다음 줄로 (D1) */}
+                <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-(--kit-ink-soft)">
                   <TaskMeter task={task} />
-                  <span className="min-w-0 truncate">{taskProgressText(task)}</span>
+                  <span className="min-w-0">{taskProgressText(task)}</span>
                   {task.reward && (
-                    <span className="ml-auto shrink-0 font-bold" data-task-reward>
+                    <span className="shrink-0 font-bold" data-task-reward>
                       <span className="sr-only">보상 </span>
                       {task.reward}
                     </span>

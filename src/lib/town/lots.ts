@@ -56,14 +56,20 @@ export const SUGGESTED_HOUSES = 3;
 export const KEEP_EMPTY_LOT = 4;
 
 /**
- * 추천 이웃을 세울 자리: 빈 자리 중 뒤쪽 번호부터 `n`개, 4번은 늘 비워 둔다.
+ * 남쪽 절벽 아래 자리(9·10번): 집 지붕이 절벽 앞면에 걸려, 흐린(반투명) 추천 집은 절벽 돌이 비쳐 보이고 안내도 절벽 위에 뜬다 (D8).
+ * 그래서 추천 집은 세우지 않는다 (이웃 집은 그대로 선다)
+ */
+export const NO_SUGGEST_LOTS: readonly number[] = [9, 10];
+
+/**
+ * 추천 이웃을 세울 자리: 빈 자리 중 뒤쪽 번호부터 `n`개, 4번은 늘 비워 두고 절벽 아래 9·10번(`NO_SUGGEST_LOTS`)은 뺀다.
  * 안 고른 이웃은 앞 번호부터 채우므로 뒤에서 채워야 이웃이 늘 때 추천 집과 덜 부딪힌다.
  */
 export function suggestionLots(taken: Iterable<number>, n = SUGGESTED_HOUSES): number[] {
   const used = new Set(taken);
   return [...NEIGHBOR_LOTS]
     .reverse()
-    .filter((lot) => lot !== KEEP_EMPTY_LOT && !used.has(lot))
+    .filter((lot) => lot !== KEEP_EMPTY_LOT && !NO_SUGGEST_LOTS.includes(lot) && !used.has(lot))
     .slice(0, Math.max(0, n));
 }
 

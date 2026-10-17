@@ -99,14 +99,17 @@ const LIGHT: Record<Sky, number> = { dawn: 0.6, day: 0, dusk: 0.8, night: 1 };
 const WARM = [255, 164, 72] as const;
 /** 초롱 빛 무리 (RGB, #ffe9a6) */
 const LANTERN_LIGHT = [255, 233, 166] as const;
-/** 클릭한 길을 땅에 보이는 시간 (ms) */
 /** 세계 밖 숲 띠 폭 (px) */
 const EDGE_FOREST = 480;
-const ROUTE_MS = 600;
+/** 클릭한 길을 땅에 보이는 시간 (ms): 마지막 `ROUTE_FADE_MS` 동안 흐려진다 */
+const ROUTE_MS = 1200;
+const ROUTE_FADE_MS = 400;
 /** 게시판(`BOARD_POS`)에서 이만큼 안에 서면 위 가운데 장소 간판을 접는다 (게시판 이름표를 가리지 않게) */
 const BOARD_COMPACT = 220;
 /** 이웃이 자기 집 문 앞 이만큼 안에 서 있으면 입구 안내와 새 글 말풍선을 한 줄로 합친다 */
 const DOORSTEP = 70;
+/** 초롱 아래 선 자리에서 이만큼 안에 멈춰 서야 초롱 안내가 뜬다 (px, D3) */
+const LANTERN_REACH = 44;
 /** 줄등 초롱이 흔들리는 간격 (ms, 두 장) */
 const SWAY_MS = 700;
 /** 글 쓰고 돌아온 순간 (C2): 창이 하나씩 켜지는 간격, 처음 쉬는 시간, 쪽지가 떠 있는 시간 (ms) */
@@ -788,11 +791,21 @@ export function TownGame({
     let hudRects: { left: number; top: number; right: number; bottom: number }[] = [];
     // 펼친 광장 소식 서랍이 덮는 오른쪽 폭 (A2): 카메라 가운데를 그만큼 왼쪽으로 옮긴다 (접힌 탭은 치지 않는다)
     let drawerCover = 0;
+    // 열린 창(☰·우체통·자리 고르기, 왼쪽 위)이 덮는 왼쪽 폭 (D4): 카메라 가운데를 그만큼 오른쪽으로, 창이 열린 동안 입구 안내는 쉰다
+    let panelCover = 0;
+    let panelOpen = false;
     const measureHud = () => {
       const c = canvas.getBoundingClientRect();
       promptTop = PROMPT_TOP;
       hudRects = [];
       drawerCover = 0;
+      panelCover = 0;
+      const panelEl = document.querySelector<HTMLElement>("[data-town-panel]");
+      panelOpen = panelEl !== null;
+      if (panelEl) {
+        const r = panelEl.getBoundingClientRect();
+        if (r.width > 0 && r.width < c.width / 2) panelCover = Math.max(0, Math.round(r.right - c.left + 12));
+      }
       for (const el of document.querySelectorAll<HTMLElement>("[data-town-hud-row], [data-town-drawer]")) {
         const r = el.getBoundingClientRect();
         if (r.height === 0) continue;
@@ -971,6 +984,11 @@ export function TownGame({
     // 걸어가는 사이에 창(☰·지갑·우체통)을 열면 문 앞에 닿아도 들어가지 않는다 (걷기는 그대로)
     const offPanel = onTown("bv-panel", ({ open }) => {
       if (open) pending = null;
+      panelOpen = open;
+      // 창이 그려진 뒤에 그 폭을 잰다
+      requestAnimationFrame(() => {
+        if (!disposed) measureHud();
+      });
     });
     // 헤더 🏘 마을 링크에 포커스가 남아 있으면 Space·Enter가 그 링크로 가므로 놓아 준다
     if (document.activeElement instanceof HTMLElement && !document.activeElement.closest("[data-town]")) document.activeElement.blur();
@@ -1162,7 +1180,11 @@ export function TownGame({
 
       // 입구 안내, 그리고 Space·Enter·[들어가기] (멀리서 누른 것은 버린다).
       // 이웃이 자기 집 문 앞에 서 있으면 집 안내와 새 글 말풍선을 한 줄로 합친다 (그 이웃 이름표·말풍선은 쉰다, A2)
-      const near = nearestEntrance(pos, entrances);
+      // 초롱은 그 바로 아래에 멈춰 섰을 때만 (분수 둘레를 걸어 지나가는 동안 말풍선이 튀어나와 나를 가리지 않게, D3)
+      const near = nearestEntrance(
+        pos,
+        entrances.filter((e) => !e.id.startsWith("lantern:") || (!walking && target === null && entranceDistance(pos, e) <= LANTERN_REACH)),
+      );
       let text = near ? entrancePrompt(near) : null;
       let doorNpc: Npc | null = null;
       if (near && text && near.id.startsWith("house:")) {
@@ -1174,6 +1196,9 @@ export function TownGame({
           text = `${near.label} · ✉ 새 글 「${shortName(news.title, 12)}」${text.slice(text.indexOf(PROMPT_SPLIT))}`;
         }
       }
+      // 창이 열려 있으면 입구 안내는 쉰다 (창 뒤에 반쯤 걸쳐 보이지 않게, D4). Space는 창이 받는다.
+      // 축하 쪽지가 떠 있는 동안도 쉰다 (내 집 지붕 위에 상자 둘이 겹치지 않게, D7)
+      if (panelOpen || noteShown) text = null;
       if (text !== shown) {
         shown = text;
         setPrompt(text);
@@ -1187,8 +1212,11 @@ export function TownGame({
       // 카메라: 펼친 서랍이 덮는 오른쪽은 빼고 가운데를 맞춘다. 세계 오른쪽 끝에서는 동쪽 집이 서랍 왼쪽에 오게 (A2)
       const vw = canvas.clientWidth;
       const vh = canvas.clientHeight;
-      const usable = Math.max(vw / 2, vw - drawerCover);
-      camera.x = vw >= WORLD.width ? (WORLD.width - vw) / 2 : Math.min(Math.max(pos.x - usable / 2, 0), WORLD.width - usable);
+      // 열린 창이 덮는 왼쪽도 빼고 (D4): 창 오른쪽에 내 자리가 오게. 세계 서쪽 끝이면 창 아래는 숲
+      const usable = Math.max(vw / 2, vw - drawerCover - panelCover);
+      const leftCover = Math.min(panelCover, vw - usable);
+      camera.x =
+        vw >= WORLD.width ? (WORLD.width - vw) / 2 : Math.min(Math.max(pos.x - leftCover - usable / 2, -leftCover), WORLD.width - usable - leftCover);
       camera.y = vh >= WORLD.height ? (WORLD.height - vh) / 2 : Math.min(Math.max(pos.y - vh / 2, 0), WORLD.height - vh);
       camera.x = Math.round(camera.x);
       camera.y = Math.round(camera.y);
@@ -1207,7 +1235,7 @@ export function TownGame({
         const onBoard = owner === boardStructure && boardStructure !== undefined;
         const anchorX = near.anchor ? near.anchor.x : owner && !onBoard ? owner.x : near.x;
         const anchorY = near.anchor
-          ? near.anchor.y
+          ? Math.min(near.anchor.y, pos.y - PROMPT_LIFT)
           : onBoard
             ? Math.min(BOARD_POS.y - BOARD_PLANK_LIFT - 6, pos.y - PROMPT_LIFT)
             : owner
@@ -1233,35 +1261,37 @@ export function TownGame({
       const skyShown = Math.min(vh, SKY_HEIGHT - camera.y);
       if (band && skyShown > 0) ctx.drawImage(band, camera.x / GROUND_CELL, camera.y / GROUND_CELL, vw / GROUND_CELL, skyShown / GROUND_CELL, 0, 0, vw, skyShown);
 
-      // 클릭한 길 (A1): 땅에 옅은 점선과 도착 X를 0.6초 (움직임 줄이기면 X만)
+      // 클릭한 길 (A1): 땅에 먹색 점선(종이색 테두리)과 도착 X를 1.2초, 끝에서 흐려진다 (움직임 줄이기면 X만)
       if (routeShown) {
         const age = now - routeShown.at;
         if (age > ROUTE_MS) routeShown = null;
         else {
-          ctx.globalAlpha = still ? 0.85 : 0.85 * (1 - age / ROUTE_MS);
-          ctx.fillStyle = "#fbf1dc";
+          const fade = still ? 1 : Math.min(1, (ROUTE_MS - age) / ROUTE_FADE_MS);
+          // 테두리를 먼저 모두 그리고 먹색 점을 위에 (점끼리 테두리가 겹쳐도 점이 가려지지 않게)
+          const dots: [number, number][] = [];
           if (!still) {
             let at = routeShown.from;
-            let carry = 0;
+            let next = 12;
             for (const p of routeShown.points) {
               const d = Math.hypot(p.x - at.x, p.y - at.y);
-              for (let t = carry; t < d; t += 12) {
-                const x = at.x + ((p.x - at.x) * t) / d - camera.x;
-                const y = at.y + ((p.y - at.y) * t) / d - camera.y;
-                ctx.fillRect(Math.round(x) - 2, Math.round(y) - 2, 4, 4);
-              }
-              carry = (carry - d) % 12;
-              if (carry < 0) carry += 12;
+              for (; next < d; next += 12) dots.push([at.x + ((p.x - at.x) * next) / d - camera.x, at.y + ((p.y - at.y) * next) / d - camera.y]);
+              next -= d;
               at = p;
             }
           }
           const gx = Math.round(routeShown.goal.x - camera.x);
           const gy = Math.round(routeShown.goal.y - camera.y);
+          const cross: [number, number][] = [];
+          for (let i = -2; i <= 2; i++) cross.push([gx + i * 3, gy + i * 3], [gx + i * 3, gy - i * 3]);
+          ctx.globalAlpha = 0.8 * fade;
+          ctx.fillStyle = "#fbf1dc";
+          for (const [x, y] of dots) ctx.fillRect(Math.round(x) - 3, Math.round(y) - 3, 6, 6);
+          for (const [x, y] of cross) ctx.fillRect(x - 3, y - 3, 6, 6);
           ctx.fillStyle = LANTERN.ink;
-          for (let i = -2; i <= 2; i++) {
-            ctx.fillRect(gx + i * 3 - 2, gy + i * 3 - 2, 4, 4);
-            ctx.fillRect(gx + i * 3 - 2, gy - i * 3 - 2, 4, 4);
-          }
+          ctx.globalAlpha = 0.55 * fade;
+          for (const [x, y] of dots) ctx.fillRect(Math.round(x) - 2, Math.round(y) - 2, 4, 4);
+          ctx.globalAlpha = 0.85 * fade;
+          for (const [x, y] of cross) ctx.fillRect(x - 2, y - 2, 4, 4);
           ctx.globalAlpha = 1;
         }
       }

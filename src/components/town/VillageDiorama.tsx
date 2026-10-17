@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { PixelArtSvg } from "@/components/game/PixelArtSvg";
 import { artCells, pixelPaths } from "@/lib/art/paths";
-import { lanternArt, LIT_GLASS } from "@/lib/art/town";
+import { lanternArt } from "@/lib/art/town";
 import { DIORAMA_PAD, dioramaScene, discArt, LANTERN_SIZE, type DioramaLantern, type Placed } from "@/lib/town/diorama";
 import { seasonAt, type Season } from "@/lib/town/season";
 import { lampsOn, type Sky } from "@/lib/town/sky";
@@ -53,7 +53,12 @@ function Lantern({ lantern, glow }: { lantern: DioramaLantern; glow: boolean }) 
   return (
     <g data-lantern data-lit={lantern.lit ? "1" : "0"}>
       <line x1={cx} y1={lantern.y - 1} x2={cx} y2={lantern.y} stroke={STRING_INK} strokeWidth={1} vectorEffect="non-scaling-stroke" />
-      {lantern.lit && glow && <GlowLayer x={cx - 5} y={lantern.y + LANTERN_SIZE.height / 2 - 5} art={discArt(5, LIT_GLASS)} opacity={0.3} />}
+      {lantern.lit && glow && (
+        <>
+          <GlowLayer x={cx - 5} y={lantern.y + LANTERN_SIZE.height / 2 - 5} art={discArt(5, "#ff9d3c")} opacity={0.1} />
+          <GlowLayer x={cx - 3} y={lantern.y + LANTERN_SIZE.height / 2 - 3} art={discArt(3, "#ffe9a6")} opacity={0.32} />
+        </>
+      )}
       <svg x={lantern.x} y={lantern.y} width={LANTERN_SIZE.width} height={LANTERN_SIZE.height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMin meet" overflow="visible">
         {pixelPaths([art]).map((p, i) => (
           <path key={i} d={p.d} fill={p.fill} />
