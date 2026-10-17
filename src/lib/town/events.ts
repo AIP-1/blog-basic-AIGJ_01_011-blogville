@@ -15,7 +15,7 @@ export type TownEvents = {
   "bv-mail": { flag: boolean };
   /** 게임 → window: 내가 선 구역이 바뀌었다 (HUD 장소 간판) */
   "bv-zone": { zone: Zone };
-  /** HUD → window: 창(패널)이 열리거나 닫혔다. 열려 있는 동안 게임은 캔버스 첫 클릭을 걷기로 쓰지 않는다 */
+  /** HUD → window: 창(패널)이 열리거나 닫혔다. 열리면 게임은 멀리서 누른 건물에 걸어가 들어가기를 그만둔다 (창을 읽는 동안 화면이 넘어가지 않게) */
   "bv-panel": { open: boolean };
   /** HUD·터치 [들어가기] 버튼 → window: 지금 가까운 입구로 들어간다 (Space와 같음) */
   "bv-enter": Record<string, never>;

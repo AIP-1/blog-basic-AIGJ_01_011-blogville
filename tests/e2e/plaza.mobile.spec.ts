@@ -56,6 +56,15 @@ test.describe("휴대폰 광장", () => {
     await expect(tabs.getByRole("link", { name: "메뉴" })).not.toHaveAttribute("aria-current", "page");
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
 
+    // 숨은 PC HUD는 휴대폰에서 안 읽은 알림 수를 다시 읽지 않는다 (탭으로 돌아와도. 헤더 🔔은 주소가 바뀔 때만 읽는다)
+    const polls: string[] = [];
+    page.on("request", (r) => {
+      if (r.url().includes("/api/notifications/unread")) polls.push(r.url());
+    });
+    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+    await page.waitForTimeout(500);
+    expect(polls).toEqual([]);
+
     // 장소를 누르면 그 화면
     await places.filter({ hasText: "낚시터" }).click();
     await expect(page).toHaveURL("/fishing");

@@ -6,6 +6,10 @@ export const CENTER = { x: 1000, y: 800 } as const;
 export const PLAZA_RADIUS = 230;
 /** 초당 이동 거리 */
 export const SPEED = 230;
+/** 한 번에 옮기는 시간은 이만큼까지 (초): 화면이 느려 프레임 사이가 길어도 걸음을 잘게 나눠 같은 빠르기로 걷는다 */
+export const MAX_STEP_SECONDS = 1 / 30;
+/** 한 프레임에 걷는 시간은 이만큼까지 (초): 탭을 오래 비웠다 돌아와도 순간 이동하지 않게 */
+export const MAX_FRAME_SECONDS = 0.25;
 /** 입구에서 이만큼 안이면 들어갈 수 있다 */
 export const INTERACT_DISTANCE = 90;
 /** 캐릭터 그림 크기 (도트 16칸 × 4, 정수배라 칸이 고르다) */
@@ -135,6 +139,21 @@ export function step(from: Point, delta: Point, bodies: readonly Rect[]): Point 
   const ny = { x: p.x, y: p.y + delta.y };
   if (delta.y !== 0 && !blocked(ny)) p = ny;
   return p;
+}
+
+/**
+ * 프레임 사이 시간(초)을 걸음 시간들로 나눈다: 모두 `MAX_STEP_SECONDS` 이하이고 합은 `MAX_FRAME_SECONDS`까지.
+ * 프레임이 느려도(20fps 아래) 걷는 거리는 지난 시간만큼이라 빠르기가 프레임 수에 따르지 않는다.
+ */
+export function subSteps(seconds: number): number[] {
+  let left = Math.min(Math.max(seconds, 0), MAX_FRAME_SECONDS);
+  const out: number[] = [];
+  while (left > 1e-9) {
+    const dt = Math.min(MAX_STEP_SECONDS, left);
+    out.push(dt);
+    left -= dt;
+  }
+  return out;
 }
 
 /** `around`: 이 상자(건물 둘레) 안에 서 있어도 입구 가까이로 본다 (집 옆·뒤에서도 들어가기) */

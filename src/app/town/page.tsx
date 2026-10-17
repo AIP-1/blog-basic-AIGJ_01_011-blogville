@@ -38,7 +38,7 @@ export default async function TownPage({ searchParams }: PageProps<"/town">) {
         return null;
       })
     : null;
-  // 마을 전체 새 글(서랍에 이웃 글이 없을 때)은 1분 기억이라 집과 같이 읽어 둔다. 공지는 레이아웃이 이미 읽었다(한 요청 한 번)
+  // 마을 전체 새 글(서랍에 이웃 글이 없을 때)은 가벼운 8편 쿼리라 기다리지 않게 집과 같이 읽어 둔다. 공지는 레이아웃이 이미 읽었다(한 요청 한 번)
   const [houses, hud, village, notice] = member
     ? await Promise.all([getMemberHouses(member.userId), getHudMember(member.userId), getVillageNews(), getActiveNotice()])
     : await Promise.all([getGuestHouses(), null, getVillageNews(), getActiveNotice()]);
