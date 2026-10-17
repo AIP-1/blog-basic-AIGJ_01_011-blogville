@@ -97,7 +97,7 @@ export default async function TownPage({ searchParams }: PageProps<"/town">) {
           <TownHud phone hud={hud} admin={member?.role === "admin"} userId={member?.userId ?? null} spots={townSpots(houses, true)} />
         ) : hud && PHONE_PLAZA ? (
           // 휴대폰 광장에는 이사 올 이웃(흐린 집)을 세우지 않는다: 디오라마·불 켜진 집 수는 내 이웃만
-          <PhonePlaza hud={hud} houses={houses.filter((h) => !h.suggested)} news={news} sky={sky ?? skyAt()} />
+          <PhonePlaza hud={hud} houses={houses.filter((h) => !h.suggested)} news={news} sky={sky ?? skyAt()} season={parseSeason(seasonParam)} />
         ) : (
           <PhoneTown mySlug={hud?.blog.slug ?? null} />
         )}

@@ -4,6 +4,7 @@
 
 import type { PixelArt } from "@/lib/art/characters";
 import { chimneyTop, HOUSE_ART_WIDTH, houseArt, lampArt, LIT_GLASS, LIT_GLOW, mailboxArt, smokeArt, SMOKE_FRAMES, treeArt } from "@/lib/art/town";
+import type { Season } from "./season";
 import { lampsOn, SKY_TINT, type Sky } from "./sky";
 
 /** 집 한 채 자리 (집 그림 40칸 + 양옆 2칸) */
@@ -51,6 +52,48 @@ const LAND = {
   pathEdge: "#b8925f",
   pebble: "#cfae7d",
 } as const;
+
+type Land = { -readonly [K in keyof typeof LAND]: string };
+
+/**
+ * 계절 팔레트 (plaza-upgrade-2 C5, 광장 캔버스와 같은 seasonAt): 여름은 기본 땅 색 그대로,
+ * 봄은 연두와 분홍 꽃 나무, 가을은 누런 잔디·단풍 언덕·단풍 나무, 겨울은 눈 덮인 땅과 앙상한 나무.
+ */
+const SEASON_LAND: Record<Season, Partial<Land>> = {
+  spring: { hill: "#86b46e", grass: "#92d07a", grassHi: "#a6dc8c", grassLo: "#7dbd66" },
+  summer: {},
+  autumn: { hill: "#b9783a", grass: "#a9bd5e", grassHi: "#c2c96a", grassLo: "#92a24c", far: "#b3a6c4" },
+  winter: { far: "#c3cfdd", hill: "#dbe4ea", grass: "#eef3f6", grassHi: "#ffffff", grassLo: "#d3dee5", path: "#d8cbb4", pathEdge: "#b5a58a", pebble: "#c8b99e" },
+};
+
+/** 계절 나무 잎 색 (treeArt의 L 잎·D 그늘·H 밝은 잎). 두 그루가 조금 다르다 */
+const SEASON_TREE: Record<Season, readonly [Record<string, string>, Record<string, string>]> = {
+  spring: [
+    { L: "#f4a7c0", D: "#e0819f", H: "#ffd3e1" },
+    { L: "#7cc46a", D: "#5ea64e", H: "#a6dc8c" },
+  ],
+  summer: [{}, {}],
+  autumn: [
+    { L: "#e07b2e", D: "#b85a1e", H: "#f4b04a" },
+    { L: "#c8452c", D: "#9a3320", H: "#e9b341" },
+  ],
+  winter: [
+    { L: "#e6edf2", D: "#b9c6cf", H: "#ffffff" },
+    { L: "#d5dfe6", D: "#a9b7c1", H: "#ffffff" },
+  ],
+};
+
+/** 계절 땅 색 */
+export function seasonLand(season: Season | undefined): Land {
+  return { ...LAND, ...(season ? SEASON_LAND[season] : {}) };
+}
+
+/** 계절 나무 (variant 0·1) */
+export function seasonTreeArt(variant: number, season: Season | undefined): PixelArt {
+  const tree = treeArt(variant);
+  if (!season) return tree;
+  return { rows: tree.rows, palette: { ...tree.palette, ...SEASON_TREE[season][variant % 2] } };
+}
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
@@ -118,9 +161,22 @@ export type DioramaHousePlaced = Placed & {
   smoke: Placed[] | null;
 };
 
+/** 집 위 줄등에 매단 소형 초롱 한 개 (칸 좌표, 왼쪽 위). 글 쓴 집이면 켜진다 */
+export type DioramaLantern = { x: number; y: number; lit: boolean };
+
+/** 소형 초롱 칸 크기 (lanternArt 's') */
+export const LANTERN_SIZE = { width: 5, height: 8 } as const;
+/** 줄등 처짐 (칸, 칸 3px이면 6px) */
+export const LANTERN_SAG = 2;
+/** 줄등을 걸 때 하늘을 이만큼 더 둔다 (칸) */
+const LANTERN_HEAD = 11;
+
 export type DioramaScene = {
   width: number;
   height: number;
+  season: Season | null;
+  /** 줄등 (켰을 때만): 양끝 높이·가운데 처짐 줄과 집마다 초롱 */
+  string: { y: number; sag: number; lanterns: DioramaLantern[] } | null;
   /** 집 밑변이 닿는 줄 */
   baseY: number;
   /** 하늘·언덕·땅 한 장 */
@@ -166,7 +222,8 @@ function hash(x: number, y: number): number {
 }
 
 /** 하늘(띠 넷, 띠 사이 바둑 무늬 한 줄)·해나 달·먼 산·언덕·잔디·흙길 */
-function backdropArt(sky: Sky, width: number, height: number, baseY: number, sunX: number): PixelArt {
+function backdropArt(sky: Sky, width: number, height: number, baseY: number, sunX: number, season?: Season): PixelArt {
+  const land = seasonLand(season);
   const g = Array.from({ length: height }, () => Array.from({ length: width }, () => "."));
   const set = (x: number, y: number, ch: string) => {
     if (y >= 0 && y < height && x >= 0 && x < width) g[y][x] = ch;
@@ -251,14 +308,14 @@ function backdropArt(sky: Sky, width: number, height: number, baseY: number, sun
       "*": "#fff3c4",
       "+": "#aab4e8",
       c: "#ffffff",
-      m: t(LAND.far),
-      h: t(LAND.hill),
-      G: t(LAND.grass),
-      g: t(LAND.grassLo),
-      l: t(LAND.grassHi),
-      P: t(LAND.path),
-      p: t(LAND.pebble),
-      e: t(LAND.pathEdge),
+      m: t(land.far),
+      h: t(land.hill),
+      G: t(land.grass),
+      g: t(land.grassLo),
+      l: t(land.grassHi),
+      P: t(land.path),
+      p: t(land.pebble),
+      e: t(land.pathEdge),
     },
   };
 }
@@ -267,12 +324,13 @@ function backdropArt(sky: Sky, width: number, height: number, baseY: number, sun
  * 그림 한 장의 배치. 집은 왼쪽부터 자리마다 한 채(최대 `DIORAMA_MAX_HOUSES`), 밑변을 한 줄에 맞춘다.
  * 글 쓴 집(`fresh`)은 창에 불이 켜지고 굴뚝 연기·우체통 깃발이 오른다. 가로등은 집 사이에 서고 낮이 아니면 켜진다.
  */
-export function dioramaScene(input: readonly DioramaInput[], sky: Sky): DioramaScene {
+export function dioramaScene(input: readonly DioramaInput[], sky: Sky, opts: { season?: Season | null; lanterns?: boolean } = {}): DioramaScene {
+  const season = opts.season ?? undefined;
   const list = input.slice(0, DIORAMA_MAX_HOUSES);
   const width = dioramaWidth(list.length);
   const arts = list.map((h) => houseArt(h.stage, h.roof));
   const tallest = Math.max(30, ...arts.map((a) => a.rows.length));
-  const baseY = HEAD + tallest;
+  const baseY = HEAD + (opts.lanterns ? LANTERN_HEAD : 0) + tallest;
   const height = baseY + GROUND;
   const night = sky !== "day";
   const lamps = lampsOn(sky);
@@ -314,12 +372,28 @@ export function dioramaScene(input: readonly DioramaInput[], sky: Sky): DioramaS
 
   // 양끝 나무 (집 뒤, 그림 끝에 반쯤 걸친다)
   const back: Placed[] = [
-    { x: -5, y: baseY - 16, art: tintArt(treeArt(1), sky) },
-    { x: width - 7, y: baseY - 16, art: tintArt(treeArt(0), sky) },
+    { x: -5, y: baseY - 16, art: tintArt(seasonTreeArt(1, season), sky) },
+    { x: width - 7, y: baseY - 16, art: tintArt(seasonTreeArt(0, season), sky) },
   ];
+
+  // 줄등: 그림 양끝(2칸 높이)에서 가운데로 LANTERN_SAG칸 처지는 줄, 집 가운데마다 초롱 하나 (줄에서 한 칸 내려 단다)
+  const lineY = 2;
+  const string = opts.lanterns
+    ? {
+        y: lineY,
+        sag: LANTERN_SAG,
+        lanterns: houses.map((h) => ({ x: h.center - LANTERN_SIZE.width / 2, y: Math.round(stringY(h.center, width, lineY, LANTERN_SAG)) + 1, lit: h.lit })),
+      }
+    : null;
 
   // 해·달은 가장 낮은 두 집 사이 하늘에 (집 뒤로 숨지 않게)
   const gaps = list.length > 1 ? list.slice(1).map((_, i) => ({ x: lampXs[i], h: Math.max(arts[i].rows.length, arts[i + 1].rows.length) })) : [{ x: width - DIORAMA_PAD - 6, h: 0 }];
   const sunX = gaps.reduce((a, b) => (b.h < a.h ? b : a)).x;
-  return { width, height, baseY, backdrop: backdropArt(sky, width, height, baseY, sunX), back, houses, glows, front };
+  return { width, height, season: season ?? null, string, baseY, backdrop: backdropArt(sky, width, height, baseY, sunX, season), back, houses, glows, front };
+}
+
+/** 줄등 줄의 높이 (양끝 `y`, 가운데 `y + sag`의 포물선) */
+export function stringY(x: number, width: number, y: number, sag: number): number {
+  const t = (x - width / 2) / (width / 2);
+  return y + sag * (1 - t * t);
 }

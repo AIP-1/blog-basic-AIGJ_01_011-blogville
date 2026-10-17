@@ -121,4 +121,56 @@ test.describe("TOWN-15 친구 마을 구경", () => {
     await expect(page.locator("[data-friend-town]")).toBeHidden();
     await ctx.close();
   });
+
+  test("친구 농장 구경 (plaza-upgrade-2 C4): /farm?host=는 읽기 전용, [광장으로]는 그 친구 마을 외양간, 내 주소는 내 농장, 상점도 돌아가는 길만 이어 받는다", async ({ page, browser }) => {
+    const me = await signUpOk(page);
+    const other = await browser.newPage();
+    const host = await signUpOk(other);
+    await other.close();
+    const hostId = await userId(host);
+    await sql`insert into animals (user_id, species, source, growth, hatched_at) values (${hostId}, 'chick', 'first', 3, now())`;
+    await sql`insert into animals (user_id, species, source, growth, hatched_at, grown_at) values (${hostId}, 'rabbit', 'buy', 40, now() - interval '2 days', now() - interval '1 day')`;
+
+    await page.goto(`/farm?host=${host}`);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(`🐮 ${host}님의 농장 구경`);
+    await expect(page).toHaveTitle(`${host}님의 농장 구경 | Blogville`);
+    await expect(page.locator('[data-animal="chick"]')).toHaveCount(1);
+    await expect(page.locator('[data-grown="rabbit"]')).toHaveCount(1);
+    await expect(page.locator("[data-room]").getByRole("button")).toHaveCount(0);
+    await expect(page.locator("[data-farm-wallet]")).toHaveCount(0);
+    await expect(page.locator("[data-room-exit]")).toHaveAttribute("href", `/town/${host}?from=farm`);
+
+    // 내 주소면 내 농장, 모르는 주소는 404
+    await page.goto(`/farm?host=${me}`);
+    await expect(page).toHaveURL(/\/farm$/);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("🐮 동물 농장");
+    await expect(page.locator("[data-room-exit]")).toHaveAttribute("href", "/town?from=farm");
+    expect((await page.goto("/farm?host=no_such_blog_zz"))?.status()).toBe(404);
+
+    // 상점은 내 것 그대로, [광장으로]만 친구 마을 상점 앞으로
+    await page.goto(`/shop?host=${host}`);
+    await expect(page.locator("[data-room-exit]")).toHaveAttribute("href", `/town/${host}?from=shop`);
+    await page.goto("/shop?host=../evil");
+    await expect(page.locator("[data-room-exit]")).toHaveAttribute("href", "/town?from=shop");
+  });
+
+  // A6(외양간 입구 href ?host=)·B([slug]의 from=)와 합친 뒤 켠다
+  test.fixme("합친 뒤: 친구 마을 외양간 Space → /farm?host=, [광장으로] → 친구 마을 외양간 문 앞", async ({ page, browser }) => {
+    await signUpOk(page);
+    const other = await browser.newPage();
+    const host = await signUpOk(other);
+    await other.close();
+    await page.goto(`/town/${host}`);
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+    await menu(page).click();
+    await panel(page).getByRole("button", { name: /✨ 텔레포트/ }).click();
+    await panel(page).locator("[data-spot]").filter({ hasText: "농장" }).click();
+    await page.keyboard.press("Space");
+    await expect(page).toHaveURL(`/farm?host=${host}`);
+    await page.locator("[data-room-exit]").click();
+    await expect(page).toHaveURL(`/town/${host}?from=farm`);
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+    const door = await feet(page);
+    expect(door).not.toEqual([1000, 1290]);
+  });
 });
