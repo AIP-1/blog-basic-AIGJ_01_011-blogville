@@ -693,6 +693,14 @@ export function townLayout(
   return { structures, entrances, walls: [...TERRAIN_WALLS, ...FOUNTAIN_BODIES] };
 }
 
+/** 가을에 잎이 지는 나무인지 (단풍·은행·감나무, 위 `treeArts`·`persimmon` 고르기와 같은 규칙). 바닥 낙엽을 그 아래에 모은다 */
+export function shedsLeaves(s: Pick<Structure, "id">): boolean {
+  const m = /^tree:(\d+)$/.exec(s.id);
+  if (!m) return false;
+  const n = Number(m[1]);
+  return n % 7 === 3 || n % 4 === 1 || n % 4 === 2;
+}
+
 /** 장대 꼭대기 (내 초롱을 얹는 점, 그림의 맨 윗줄 가운데) */
 export function mastTop(): Point {
   return { x: MAST_POS.x, y: MAST_POS.y - artSize(mastArt()).height };

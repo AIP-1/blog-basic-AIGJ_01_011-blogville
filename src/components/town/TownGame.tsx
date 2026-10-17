@@ -44,6 +44,7 @@ import {
   mailboxLot,
   mastTop,
   ropePoint,
+  shedsLeaves,
   structureAt as structureAtPoint,
   townLayout,
   type BoardState,
@@ -732,7 +733,7 @@ export function TownGame({
       structureAtPoint(structures, p) ?? tagAt(p) ?? (boardStructure && onBoardPlank(p) ? boardStructure : undefined);
     // 입구마다 안내 말풍선을 띄울 이름표 자리 (건물·집). 없으면 입구 위
     const promptOwner = new Map(entrances.map((e) => [e, entranceOwner(e, structures)]));
-    const ground = bakeGround(seasonNow);
+    const ground = bakeGround(seasonNow, structures.filter(shedsLeaves));
     // 세계 밖 (넓은 화면에서 서랍을 비켜 카메라가 동쪽 끝을 넘을 때): 빽빽한 숲으로 채운다
     const edgeForest = (() => {
       const c = document.createElement("canvas");
@@ -817,6 +818,28 @@ export function TownGame({
     };
     const underHud = (x: number, bottom: number, size: { width: number; height: number }) =>
       hudRects.some((r) => x + size.width / 2 > r.left && x - size.width / 2 < r.right && bottom > r.top && bottom - size.height < r.bottom);
+    // 축하 쪽지 자리 (가운데 x, 밑변 y, 화면 좌표): 내 집 오른쪽 옆 처마 높이, 모자라면 왼쪽 옆, 그래도 모자라면 지붕 위로 띄운다.
+    // 화면(서랍이 덮는 오른쪽 뺀 `right`) 안으로 당기고, 위 간판 줄(promptTop) 아래에 둔다
+    const celebrateNoteSpot = (size: { width: number; height: number }, right: number) => {
+      const house = mineStructure!;
+      const { width } = artSize(house.art);
+      const roof = house.y - artVisibleHeight(house.art) - camera.y;
+      const left = house.x - width / 2 - camera.x;
+      const end = house.x + width / 2 - camera.x;
+      const gap = 30; // 처마 초롱과 불꽃 자리
+      const edge = 8;
+      let x: number;
+      let y = roof + Math.round(artVisibleHeight(house.art) * 0.4);
+      if (end + gap + size.width + edge <= right) x = end + gap + size.width / 2;
+      else if (left - gap - size.width - edge >= 0) x = left - gap - size.width / 2;
+      else {
+        x = house.x - camera.x;
+        y = roof - 14;
+      }
+      x = Math.min(Math.max(x, size.width / 2 + edge), Math.max(size.width / 2 + edge, right - size.width / 2 - edge));
+      y = Math.max(y, promptTop + size.height);
+      return { x, y };
+    };
     const resize = () => {
       dpr = window.devicePixelRatio || 1;
       canvas.width = Math.round(canvas.clientWidth * dpr);
@@ -1489,7 +1512,7 @@ export function TownGame({
           bubbleHit = { lot: n.lot, href: news.href, x: x - size.width / 2, y: bottom - size.height, width: size.width, height: size.height };
         }
       }
-      // 글 쓰고 돌아온 순간의 쪽지 (C2): 창이 다 켜지면 내 집 오른쪽 위에 잠깐
+      // 글 쓰고 돌아온 순간의 쪽지 (C2): 창이 다 켜지면 내 집 오른쪽 옆에 잠깐 (지붕·창·처마 초롱을 가리지 않게)
       if (celebrateNote && celebrateLitAt !== null && mineStructure) {
         const age = now - (still ? celebrateStart! : celebrateLitAt);
         if (age >= 0 && age < CELEBRATE.note) {
@@ -1497,10 +1520,9 @@ export function TownGame({
             noteShown = true;
             setNote(celebrateNote);
           }
-          const x = mineStructure.x + 150 - camera.x;
-          const y = mineStructure.y - artVisibleHeight(mineStructure.art) + 34 - camera.y;
+          const at = celebrateNoteSpot(tags.size(celebrateNote, "bubble"), vw - drawerCover);
           ctx.globalAlpha = still ? 1 : Math.min(1, age / 200, (CELEBRATE.note - age) / 400);
-          if (!underHud(x, y, tags.size(celebrateNote, "bubble"))) tags.draw(ctx, celebrateNote, "bubble", x, y);
+          tags.draw(ctx, celebrateNote, "bubble", at.x, at.y);
           ctx.globalAlpha = 1;
         } else if (noteShown && age >= CELEBRATE.note) {
           noteShown = false;

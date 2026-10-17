@@ -22,10 +22,16 @@ const GROUND = 9;
 export { LIT_GLASS, LIT_GLOW, SMOKE_FRAMES };
 const LAMP_ON = "#ffe28a";
 const LAMP_OFF = "#d5dde0";
-/** 가로등 빛 무리 (옅게 얹는 따뜻한 노랑) */
-const LAMP_HALO = "#ffc552";
-/** 빛 무리 바깥 고리 (주황빛이 돌아야 어두운 하늘 위에서 회색이 아니라 따뜻하게 보인다) */
-const LAMP_EMBER = "#ff9d3c";
+/**
+ * 따뜻한 빛 무리 고리 색과 진하기 (안쪽부터, 밤 기준; 노을은 0.8배). 옅은 노랑(#ffd56e .35 같은)을 남색 하늘 위에 얹으면
+ * 회갈색으로 탁해져서, 채도 높은 호박빛을 더 진하게 얹고 맨 바깥은 한 칸 걸러 찍어(디더) 어두운 테 없이 흩어지게 한다.
+ */
+export const GLOW_RINGS = {
+  core: { color: "#fff0b8", alpha: 0.95 },
+  inner: { color: "#ffc54a", alpha: 0.78 },
+  mid: { color: "#ffa526", alpha: 0.55 },
+  outer: { color: "#ffb347", alpha: 0.6 },
+} as const;
 
 /** 하늘 띠 네 줄 (위 → 지평선). 노을·밤은 덧칠 색(SKY_TINT)과 같은 쪽 색이다 */
 const SKY_BANDS: Record<Sky, readonly [string, string, string, string]> = {
@@ -143,6 +149,35 @@ export function discArt(r: number, color: string, squash = 1): PixelArt {
     }).join(""),
   );
   return { rows, palette: { g: color } };
+}
+
+/** 계단 모양 고리 (반지름 `inner` 바깥 ~ `outer` 안쪽 칸만). 고리마다 한 색·한 진하기라 겹쳐 진해지지 않는다. `dither`면 한 칸 걸러 */
+export function ringArt(inner: number, outer: number, color: string, opts: { squash?: number; dither?: boolean } = {}): PixelArt {
+  const { squash = 1, dither = false } = opts;
+  const disc = discArt(outer, color, squash);
+  const hole = inner > 0 ? discArt(inner, color, squash) : null;
+  const dy = hole ? Math.round((disc.rows.length - hole.rows.length) / 2) : 0;
+  const dx = outer - inner;
+  const rows = disc.rows.map((row, y) =>
+    Array.from(row, (ch, x) => (hole?.rows[y - dy]?.[x - dx] === "g" || (dither && (x + y) % 2 === 1) ? "." : ch)).join(""),
+  );
+  return { rows, palette: disc.palette };
+}
+
+/**
+ * (cx, cy)를 가운데로 한 따뜻한 빛 무리: 바깥부터 디더 고리 · 호박빛 고리 · 노란 고리 · 흰 가운데 (`radii` 안쪽부터 core·inner·mid·outer 칸).
+ * core가 0이면 가운데는 비운다 (초롱처럼 그림이 덮는 자리). `k`는 진하기 배율
+ */
+export function warmGlow(cx: number, cy: number, radii: readonly [number, number, number, number], k = 1): Glow[] {
+  const [core, inner, mid, outer] = radii;
+  const R = GLOW_RINGS;
+  const glows: Glow[] = [
+    { x: cx - outer, y: cy - outer, art: ringArt(mid, outer, R.outer.color, { dither: true }), opacity: R.outer.alpha * k },
+    { x: cx - mid, y: cy - mid, art: ringArt(inner, mid, R.mid.color), opacity: R.mid.alpha * k },
+    { x: cx - inner, y: cy - inner, art: ringArt(core, inner, R.inner.color), opacity: R.inner.alpha * k },
+  ];
+  if (core > 0) glows.push({ x: cx - core, y: cy - core, art: discArt(core, R.core.color), opacity: R.core.alpha * k });
+  return glows;
 }
 
 /** 굴뚝 연기 한 장 (광장 캔버스의 `smokeArt`와 같다). CSS steps()로 장을 넘긴다 */
@@ -364,13 +399,12 @@ export function dioramaScene(input: readonly DioramaInput[], sky: Sky, opts: { s
   for (const lx of lampXs) {
     const top = baseY + 1 - lamp.rows.length;
     if (lamps) {
-      // 겹친 고리 셋 (밖은 옅은 주황, 가운데 #ffd56e, 안은 밝은 #ffe9a6). 바깥을 주황으로 해야 어두운 하늘 위에서 회갈색이 아니라 따뜻한 호박빛이다 (D6)
+      // 계단 고리 넷 (바깥은 디더). 남색 하늘 위에서도 회갈색이 아니라 호박빛으로 읽힌다 (D6)
       const k = sky === "night" ? 1 : 0.8;
-      glows.push({ x: lx - 6, y: top + 2 - 6, art: discArt(6, LAMP_EMBER), opacity: 0.1 * k });
-      glows.push({ x: lx - 4, y: top + 2 - 4, art: discArt(4, LAMP_HALO), opacity: 0.24 * k });
-      glows.push({ x: lx - 2, y: top + 2 - 2, art: discArt(2, LIT_GLOW), opacity: 0.75 * k });
-      // 땅에 떨어진 빛 웅덩이 (납작한 원)
-      glows.push({ x: lx - 6, y: baseY + 1, art: discArt(6, LAMP_HALO, 0.4), opacity: 0.3 * k });
+      glows.push(...warmGlow(lx, top + 2, [1, 3, 5, 7], k));
+      // 땅에 떨어진 빛 웅덩이 (납작한 고리 둘)
+      glows.push({ x: lx - 7, y: baseY + 1, art: ringArt(4, 7, GLOW_RINGS.mid.color, { squash: 0.35 }), opacity: 0.35 * k });
+      glows.push({ x: lx - 4, y: baseY + 2, art: discArt(4, GLOW_RINGS.inner.color, 0.35), opacity: 0.5 * k });
     }
     front.push({ x: lx - 3, y: top, art: lampArtLit });
   }

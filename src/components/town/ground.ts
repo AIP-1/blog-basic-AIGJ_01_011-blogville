@@ -1,6 +1,6 @@
 // 마을 바닥 (TOWN-02·05): 잔디·흙길·돌광장·절벽 앞면·계단·먼 하늘을 도트(칸 4px)로 한 번만 굽는다. 브라우저에서만 부른다.
 // 광장 개편: 하늘 시각(새벽·노을·밤)마다 먼 하늘 띠, 밤하늘 별, 가로등·창 불빛 무리도 여기서 굽는다.
-import { CENTER, GARDEN, PLAZA_RADIUS, ROADS, WORLD } from "@/lib/town/layout";
+import { CENTER, GARDEN, PLAZA_RADIUS, ROADS, WORLD, type Point } from "@/lib/town/layout";
 import type { Season } from "@/lib/town/season";
 import type { Sky } from "@/lib/town/sky";
 import { CLIFF_FACE, CLIFF_LINES, RAIL, SKY_HEIGHT, STAIRS } from "@/lib/town/terrain";
@@ -11,14 +11,18 @@ export const GROUND_CELL = 4;
 const GRASS: Record<Season, { bands: [string, string, string]; dots: string[]; garden: [string, string]; flowers: string[]; flowerCount: number }> = {
   spring: { bands: ["#8ad074", "#80c86c", "#76bd63"], dots: ["#70b65e", "#94d67f", "#70b65e", "#62a651"], garden: ["#8ed87c", "#83cd70"], flowers: ["#ffffff", "#ffd166", "#ff8fab", "#ffc2d4"], flowerCount: 420 },
   summer: { bands: ["#86cc72", "#7cc46a", "#72b961"], dots: ["#6db35c", "#8fd27c", "#6db35c", "#5fa34f"], garden: ["#8ad67a", "#7fcb6e"], flowers: ["#ffffff", "#ffd166", "#ff8fab", "#b39ddb"], flowerCount: 260 },
-  autumn: { bands: ["#93c46a", "#89bb62", "#7fb15a"], dots: ["#7aa956", "#a3cb74", "#7aa956", "#6c9a4c"], garden: ["#95cc72", "#8ac168"], flowers: ["#ffffff", "#e9b341", "#d9692e", "#b39ddb"], flowerCount: 140 },
+  autumn: { bands: ["#93c46a", "#89bb62", "#7fb15a"], dots: ["#7aa956", "#a3cb74", "#7aa956", "#6c9a4c"], garden: ["#95cc72", "#8ac168"], flowers: ["#ffffff", "#e9b341", "#c98a3a", "#b39ddb"], flowerCount: 100 },
   winter: { bands: ["#a9c99a", "#a0c191", "#97b888"], dots: ["#8fb07f", "#bcd6af", "#e9f0f2", "#86a777"], garden: ["#aecda0", "#a5c597"], flowers: ["#f4f7fb", "#e9f0f2"], flowerCount: 520 },
 };
-/** 가을 낙엽 도트 (길·잔디) */
-const LEAVES = ["#d9692e", "#e9b341", "#b04a22", "#c98f24"];
-const GRASS_LEAVES = ["#a2552a", "#a8822f", "#8a4022"];
+/** 가을 낙엽 무더기 색 (두 잎). 잔디와 밝기가 비슷한 흐린 황토·녹빛이라 밤 덧칠 아래에서 함께 어두워진다 */
+const LEAF_PILES: readonly (readonly [string, string])[] = [
+  ["#b4782f", "#a36a2c"],
+  ["#9a5a2a", "#b4782f"],
+  ["#a8702c", "#9a5a2a"],
+];
 
-export function bakeGround(season: Season = "summer"): HTMLCanvasElement {
+/** 바닥을 굽는다. 가을이면 잎 지는 나무(`leafTrees`, 줄기 밑 점) 아래와 길 가장자리에 낙엽 무더기를 놓는다 */
+export function bakeGround(season: Season = "summer", leafTrees: readonly Point[] = []): HTMLCanvasElement {
   const look = GRASS[season];
   const w = WORLD.width / GROUND_CELL;
   const h = WORLD.height / GROUND_CELL;
@@ -65,17 +69,36 @@ export function bakeGround(season: Season = "summer"): HTMLCanvasElement {
     const r = ROADS[i % ROADS.length];
     ctx.fillRect(c(r.x) + Math.floor(random() * c(r.width)), c(r.y) + Math.floor(random() * c(r.height)), 1, 1);
   }
-  // 가을 낙엽: 길 위에 많이, 잔디에 조금 (광장 개편 2, A5)
+  // 가을 낙엽 (광장 개편 2, A5): 고르게 뿌리면 잡티처럼 보여서, 잎 지는 나무 밑과 길 가장자리에만 2~3칸 무더기로
   if (season === "autumn") {
-    for (let i = 0; i < 900; i++) {
-      const r = ROADS[i % ROADS.length];
-      ctx.fillStyle = LEAVES[i % LEAVES.length];
-      ctx.fillRect(c(r.x) + Math.floor(random() * c(r.width)), c(r.y) + Math.floor(random() * c(r.height)), 1, 1);
+    const pile = (x: number, y: number, i: number) => {
+      const [light, shade] = LEAF_PILES[i % LEAF_PILES.length];
+      ctx.fillStyle = light;
+      ctx.fillRect(x, y, 1, 1);
+      ctx.fillStyle = i % 2 === 0 ? light : shade;
+      ctx.fillRect(x + 1, y, 1, 1);
+      if (i % 3 !== 0) {
+        ctx.fillStyle = shade;
+        ctx.fillRect(x + (i % 2), y + 1, 1, 1);
+      }
+    };
+    let n = 0;
+    // 나무 밑: 줄기 둘레 타원(가로 10칸 · 세로 5칸) 안, 가운데일수록 많이
+    for (const t of leafTrees) {
+      for (let k = 0; k < 7; k++) {
+        const a = random() * Math.PI * 2;
+        const r = Math.sqrt(random()) * (0.35 + 0.65 * random());
+        pile(c(t.x) + Math.round(Math.cos(a) * r * 10) - 1, c(t.y) + Math.round(Math.sin(a) * r * 5), n++);
+      }
     }
-    // 잔디 위는 적게, 진한 색으로 (밝은 빨강 점은 밤 덧칠 아래에서 잡티처럼 보였다)
-    for (let i = 0; i < 260; i++) {
-      ctx.fillStyle = GRASS_LEAVES[i % GRASS_LEAVES.length];
-      ctx.fillRect(Math.floor(random() * w), Math.floor(random() * h), 1, 1);
+    // 길 가장자리: 테두리 바로 안팎 한두 칸에 띄엄띄엄
+    for (let i = 0; i < 220; i++) {
+      const r = ROADS[i % ROADS.length];
+      const along = r.width >= r.height;
+      const side = random() < 0.5 ? -2 + Math.floor(random() * 2) : 1 + Math.floor(random() * 2);
+      const x = along ? c(r.x) + Math.floor(random() * c(r.width)) : side < 0 ? c(r.x) + side : c(r.x + r.width) - side;
+      const y = along ? (side < 0 ? c(r.y) + side : c(r.y + r.height) - side) : c(r.y) + Math.floor(random() * c(r.height));
+      pile(x, y, n++);
     }
   }
   // 돌광장: 원 안을 돌 타일로
