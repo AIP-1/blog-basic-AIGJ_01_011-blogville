@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Pagination } from "@/components/blog/Pagination";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { parsePage } from "@/lib/ids";
 import { hasNewRelease, RELEASES_PAGE_SIZE, RELEASES_REPO, releaseSummary, releaseTitle } from "@/lib/releases";
 import { Time } from "@/components/common/Time";
@@ -19,10 +20,7 @@ export default async function UpdatesPage({ searchParams }: PageProps<"/updates"
   const latestIsNew = hasNewRelease(releases);
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <header className="space-y-1 rounded-2xl border border-line bg-surface p-5">
-        <h1 className="text-2xl font-extrabold">🆕 업데이트 소식</h1>
-        <p className="text-sm text-ink-soft">Blogville에 새로 생긴 것들을 버전마다 모았어요{total > 0 ? ` · ${total}개` : ""}.</p>
-      </header>
+      <PageHeader emoji="🆕" title="업데이트 소식" mark="sprout" description={`Blogville에 새로 생긴 것들을 버전마다 모았어요${total > 0 ? ` · ${total}개` : ""}.`} />
       {releases === null ? (
         <p className="rounded-2xl border border-line bg-surface p-5 text-sm" data-updates-error>
           업데이트 소식을 불러오지 못했어요. 잠시 뒤 다시 열거나{" "}

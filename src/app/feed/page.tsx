@@ -14,7 +14,9 @@ export default async function FeedPage({ searchParams }: PageProps<"/feed">) {
   const [member, feed, tags, blogs] = await Promise.all([getSession(), listFeed({ page }), getPopularTags(), page === 1 ? listActiveBlogs() : []]);
   return (
     <FeedView
-      title="📋 마을 소식"
+      emoji="📋"
+      title="마을 소식"
+      mark="board"
       tab="all"
       showFollowingTab={member !== null}
       feed={feed}

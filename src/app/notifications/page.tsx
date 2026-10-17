@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Pagination } from "@/components/blog/Pagination";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { parsePage } from "@/lib/ids";
 import { feedbackNotificationText, guestbookNotificationText, levelUpText, NOTIFICATION_EMPTY, NOTIFICATIONS_PAGE_SIZE, notificationText, notificationTime } from "@/lib/notifications";
 import { fullDateTime } from "@/lib/time";
@@ -18,16 +19,20 @@ export default async function NotificationsPage({ searchParams }: PageProps<"/no
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-extrabold">🔔 알림함</h1>
-        {unread > 0 && (
-          <form action={markAllNotificationsRead}>
-            <button type="submit" className="btn">
-              모두 읽음
-            </button>
-          </form>
-        )}
-      </div>
+      <PageHeader
+        emoji="🔔"
+        title="알림함"
+        mark="mailbox"
+        actions={
+          unread > 0 && (
+            <form action={markAllNotificationsRead}>
+              <button type="submit" className="btn">
+                모두 읽음
+              </button>
+            </form>
+          )
+        }
+      />
 
       {/* 마지막보다 큰 쪽도 빈 문구 (POST-05) */}
       {items.length === 0 ? (

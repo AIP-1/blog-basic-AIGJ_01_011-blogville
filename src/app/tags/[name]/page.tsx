@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Pagination } from "@/components/blog/Pagination";
 import { PopularTags } from "@/components/blog/PopularTags";
 import { PostCard } from "@/components/blog/PostCard";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { tagHref } from "@/components/post/TagList";
 import { parsePage } from "@/lib/ids";
 import { PAGE_SIZE } from "@/server/post";
@@ -36,9 +37,7 @@ export default async function TagPage({ params, searchParams }: PageProps<"/tags
   return (
     <div className="grid gap-6 md:grid-cols-[1fr_260px]">
       <section aria-labelledby="tag-title" className="min-w-0">
-        <h1 id="tag-title" className="text-2xl font-extrabold [overflow-wrap:anywhere]">
-          🏷 #{name}
-        </h1>
+        <PageHeader id="tag-title" emoji="🏷" title={`#${name}`} mark="signpost" titleClassName="[overflow-wrap:anywhere]" />
         {items.length === 0 ? (
           <p className="mt-4 rounded-xl border border-dashed border-line p-8 text-center text-ink-soft">이 태그가 달린 글이 없어요.</p>
         ) : (

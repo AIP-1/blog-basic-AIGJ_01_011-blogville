@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { deleteBookmark } from "@/app/bookmarks/actions";
 import { Pagination } from "@/components/blog/Pagination";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { PostCard } from "@/components/blog/PostCard";
 import { parsePage } from "@/lib/ids";
 import { BOOKMARK_PAGE_SIZE } from "@/lib/report-rules";
@@ -18,7 +19,7 @@ export default async function BookmarksPage({ searchParams }: PageProps<"/bookma
   if (!member) {
     return (
       <div className="mx-auto max-w-3xl space-y-4">
-        <h1 className="text-2xl font-extrabold">🔖 내 스크랩</h1>
+        <PageHeader emoji="🔖" title="내 스크랩" mark="bench" />
         <p className="rounded-2xl border border-line bg-surface p-5 text-ink-soft">
           <Link href={loginHref("/bookmarks")} className="inline-flex min-h-11 items-center font-semibold text-accent underline">
             로그인
@@ -33,10 +34,16 @@ export default async function BookmarksPage({ searchParams }: PageProps<"/bookma
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <h1 className="text-2xl font-extrabold">🔖 내 스크랩</h1>
-      <p className="text-sm text-ink-soft">
-        나중에 읽을 글 <span data-bookmark-total={total}>{total.toLocaleString("ko-KR")}개</span>
-      </p>
+      <PageHeader
+        emoji="🔖"
+        title="내 스크랩"
+        mark="bench"
+        description={
+          <>
+            나중에 읽을 글 <span data-bookmark-total={total}>{total.toLocaleString("ko-KR")}개</span>
+          </>
+        }
+      />
       {items.length === 0 ? (
         <p className="rounded-2xl border border-line bg-surface p-5 text-ink-soft">아직 스크랩한 글이 없어요. 글 아래 [🔖 스크랩]을 눌러 모아 보세요</p>
       ) : (

@@ -14,6 +14,8 @@ import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import { UpdatesNewBadge } from "@/components/layout/UpdatesNewBadge";
 import { PixelLayers } from "@/components/game/PixelLayers";
+import { PixelArtSvg } from "@/components/game/PixelArtSvg";
+import { houseMarkArt } from "@/lib/art/site";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { getMyBlog, getNickname, getSession } from "@/server/dal";
 import { formatNumber } from "@/lib/game";
@@ -63,7 +65,15 @@ async function attendToday(userId: string, sessionId: string) {
 }
 
 const HEADER = "sticky top-0 z-40 border-b border-line bg-surface/90 backdrop-blur supports-[backdrop-filter]:bg-surface/75";
-const LOGO = "flex min-h-11 shrink-0 items-center whitespace-nowrap text-xl font-extrabold tracking-tight text-accent";
+const LOGO = "flex min-h-11 shrink-0 items-center gap-1 whitespace-nowrap sm:gap-1.5 text-xl font-extrabold tracking-tight text-accent";
+
+/**
+ * 로고 앞 도트 집 (파비콘·홈 화면 아이콘과 같은 그림, 칸 하나 2px). 먹선은 글자색이라 어두운 화면에서 밝아진다. 읽는 이름은 'Blogville' 그대로.
+ * 집 마크 자리(28px + 사이)만큼 휴대폰 헤더의 사이·메뉴 여백을 조금씩 줄였다 (375px 방문자 헤더가 웹 글꼴을 받기 전에도 넘치지 않게)
+ */
+function LogoMark() {
+  return <PixelArtSvg art={houseMarkArt()} cell={2} className="text-ink" />;
+}
 
 /** 헤더를 그리는 동안 자리를 지키는 막대 (로고만). 본문은 헤더를 기다리지 않고 먼저 그린다 */
 function HeaderFallback() {
@@ -71,6 +81,7 @@ function HeaderFallback() {
     <header className={HEADER} aria-busy="true">
       <div className="mx-auto flex h-14 max-w-5xl items-center px-4">
         <Link href="/" className={LOGO}>
+          <LogoMark />
           Blogville
         </Link>
       </div>
@@ -100,8 +111,9 @@ async function Header() {
   return (
     <>
     <header className={HEADER}>
-      <div className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-4 sm:gap-4">
+      <div className="mx-auto flex h-14 max-w-5xl items-center gap-1.5 px-4 sm:gap-4">
         <Link href={blog ? `/@${blog.slug}` : "/"} className={LOGO}>
+          <LogoMark />
           Blogville
         </Link>
         <nav className="flex min-w-0 flex-1 items-center" aria-label="메뉴">

@@ -1,13 +1,18 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Pagination } from "@/components/blog/Pagination";
+import { PageHeader } from "@/components/layout/PageHeader";
+import type { PageMark } from "@/lib/art/site";
 import { PopularTags } from "@/components/blog/PopularTags";
 import { PostCard } from "@/components/blog/PostCard";
 import { PAGE_SIZE } from "@/server/post";
 import type { listFeed } from "@/server/feed";
 
 type Props = {
+  /** 제목 앞 이모지는 화면에서 숨기고 마을 그림(`mark`)으로 보인다. 읽는 이름은 `📋 마을 소식` 그대로 */
+  emoji: string;
   title: string;
+  mark: PageMark;
   tab: "all" | "following";
   /** 회원에게만 [💛 이웃 새 글] 탭이 보인다 */
   showFollowingTab: boolean;
@@ -25,14 +30,12 @@ const TABS = [
 ] as const;
 
 /** 마을 소식(SOC-05)과 이웃 새 글(SOC-04)이 같이 쓰는 화면: 탭 + 글 카드 + 인기 태그 */
-export function FeedView({ title, tab, showFollowingTab, feed, page, tags, empty, top }: Props) {
+export function FeedView({ emoji, title, mark, tab, showFollowingTab, feed, page, tags, empty, top }: Props) {
   const basePath = tab === "all" ? "/feed" : "/feed/following";
   return (
     <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_260px]">
       <section aria-labelledby="feed-title" className="min-w-0">
-        <h1 id="feed-title" className="text-2xl font-extrabold">
-          {title}
-        </h1>
+        <PageHeader id="feed-title" emoji={emoji} title={title} mark={mark} />
         <nav aria-label="소식 탭" className="mt-3 flex flex-wrap gap-2">
           {TABS.filter((t) => t.key === "all" || showFollowingTab).map((t) => (
             <Link
