@@ -1,4 +1,5 @@
 // 걸어 다니는 이웃 (TOWN-19, specs/050-town-npc): 마을에 집이 선 이웃이 흙길을 따라 걷는다. 게임 화면과 단위 시험이 같이 쓴다.
+import { CHARACTER_ART, type PixelArt } from "@/lib/art/characters";
 import { walkDir, type WalkDir } from "@/lib/art/walk";
 import { feetRect, inGarden, lotFront, overlaps, ROAD, ROADS, WORLD, type Point, type Rect } from "./layout";
 
@@ -187,4 +188,31 @@ export function updateNpcs(npcs: Npc[], graph: NpcGraph, dt: number, random: () 
       }
     }
   }
+}
+
+/** 기본 모습 이웃의 머리·윗옷 색 여섯 가지 (광장 개편 2): 마을 팔레트에서 고른 짝 */
+export const NEIGHBOR_LOOKS: readonly { hair: string; top: string; pants: string }[] = [
+  { hair: "#5a3d26", top: "#c8542c", pants: "#3d4a6b" },
+  { hair: "#2b2b2b", top: "#2f4a8f", pants: "#5a3d26" },
+  { hair: "#8a5a34", top: "#3f8a4e", pants: "#3b3a4a" },
+  { hair: "#c98f24", top: "#9b59b6", pants: "#3d4a6b" },
+  { hair: "#3b2a20", top: "#e9b341", pants: "#4e3522" },
+  { hair: "#b04a22", top: "#3a6ea5", pants: "#3b3a4a" },
+];
+
+/** 블로그 주소로 고르는 기본 모습 번호 (늘 같은 이웃은 같은 색) */
+export function neighborLookIndex(slug: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < slug.length; i++) h = Math.imul(h ^ slug.charCodeAt(i), 16777619);
+  return (h >>> 0) % NEIGHBOR_LOOKS.length;
+}
+
+/**
+ * 입은 것이 없는 이웃(TOWN-19 회색 주민)의 걷는 모습: 회색 주민 모양에 살빛과 머리·윗옷 색을 입힌다 (광장 개편 2, A2).
+ * 이웃 일곱이 모두 똑같은 회색 복제처럼 보이지 않게 블로그 주소로 여섯 가지 중 하나를 고른다.
+ */
+export function neighborArt(slug: string): PixelArt {
+  const base = CHARACTER_ART["char.visitor"];
+  const look = NEIGHBOR_LOOKS[neighborLookIndex(slug)];
+  return { rows: base.rows, palette: { K: "#3b2a20", H: look.hair, S: "#ffd7b0", E: "#2b2b2b", C: "#ff9aa2", B: look.top, P: look.pants } };
 }

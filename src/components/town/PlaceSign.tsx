@@ -31,13 +31,23 @@ function useClock(sky: Sky | null): string | null {
   return minute === null ? null : clockText(new Date(minute * 60_000), sky);
 }
 
+/** 게시판 가까이 서면 게임이 보내는 창 밖 이벤트 (`{ compact }`): 위 가운데 간판이 게시판 이름표를 가리지 않게 접는다 (광장 개편 2) */
+export const COMPACT_EVENT = "bv-compact";
+
 /**
  * 장소 간판 (광장 개편): 화면 위 가운데 작은 나무 간판에 지금 선 구역(게임이 보내는 `bv-zone`)과 한국 시각.
+ * 게시판 가까이(`COMPACT_EVENT`)에서는 간판을 접는다(`data-compact`, 내 마을만).
  * 친구 마을(TOWN-15)이면 구역 대신 `🏘 {닉네임}님의 마을`과 [🏠 내 마을로] (시험 훅 `data-town-host`). 1280px 미만은 왼쪽 간판 묶음 아래 둘째 줄(TownHud).
  */
 export function PlaceSign({ start, sky, host = null }: { start: Point; sky: Sky | null; host?: { nickname: string; slug: string } | null }) {
   const [zone, setZone] = useState<Zone>(() => zoneAt(start));
+  const [compact, setCompact] = useState(false);
   useEffect(() => onTown("bv-zone", (detail) => setZone(detail.zone)), []);
+  useEffect(() => {
+    const on = (event: Event) => setCompact((event as CustomEvent<{ compact: boolean }>).detail.compact);
+    window.addEventListener(COMPACT_EVENT, on);
+    return () => window.removeEventListener(COMPACT_EVENT, on);
+  }, []);
   const clock = useClock(sky);
   // 시계를 채우기 전에도 자리를 잡아 두어 간판 폭이 흔들리지 않게
   const time = clock ? (
@@ -65,7 +75,7 @@ export function PlaceSign({ start, sky, host = null }: { start: Point; sky: Sky 
     );
   }
   return (
-    <div className="px-plank px-float flex min-h-9 items-center gap-2 py-1 pl-3 pr-1.5" data-town-place={zone}>
+    <div className={`px-plank px-float flex min-h-9 items-center gap-2 py-1 pl-3 pr-1.5 ${compact ? "hidden" : ""}`} data-town-place={zone} data-compact={compact ? "1" : undefined}>
       <span className="px-font whitespace-nowrap">{ZONE_LABELS[zone]}</span>
       {time}
     </div>

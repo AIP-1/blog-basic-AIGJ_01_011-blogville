@@ -1,5 +1,6 @@
 // 마을 그림 (TOWN-03·04·11, specs/038-town). 캐릭터와 같은 도트 글자 그림을 코드로 만든다.
 // 칸 하나는 마을에서 `TOWN_CELL` px로 그린다. 기준점은 그림의 아랫변 가운데(발밑).
+import type { Season } from "@/lib/town/season";
 import type { PixelArt } from "./characters";
 
 /** 마을 그림 칸 하나의 크기 (px) */
@@ -46,7 +47,7 @@ const art = (g: Grid, palette: Record<string, string>): PixelArt => ({
   palette,
 });
 
-function darken(hex: string, amount = 0.25): string {
+export function darken(hex: string, amount = 0.25): string {
   const n = parseInt(hex.slice(1), 16);
   const ch = (shift: number) => Math.round(((n >> shift) & 255) * (1 - amount));
   return `#${[16, 8, 0].map((s) => ch(s).toString(16).padStart(2, "0")).join("")}`;
@@ -186,11 +187,11 @@ export function houseArt(stage: number, roof: string): PixelArt {
     L: "#ffe28a",
     N: "#b07a4a",
     S: "#ff6b6b",
-    B: "#4caf50",
+    B: "#3f8a4e",
     T: "#d8cfc0",
     t: "#b8ad9c",
     Y: "#f4c430",
-    H: "#2e7d32",
+    H: "#2a7348",
   });
 }
 
@@ -549,7 +550,7 @@ export function mailboxArt(mine: boolean, flag = false): PixelArt {
     fill(g, 8, 0, 1, 4, "K");
     fill(g, 7, 0, 1, 2, "F");
   } else fill(g, 8, 3, 1, 2, "F");
-  return art(g, { K: "#2b2b2b", B: mine ? "#4a90d9" : "#d9534f", P: "#6b4a2f", F: "#ffd23f" });
+  return art(g, { K: "#2b2b2b", B: mine ? "#3a6ea5" : "#b8452f", P: "#6b4a2f", F: "#ffd23f" });
 }
 
 /** 전망대 나무 의자 (TOWN-05) */
@@ -564,23 +565,109 @@ export function benchArt(): PixelArt {
   return art(g, { W: "#b07a4a", w: "#8a5a34", N: "#5a3d26" });
 }
 
-/** 나무 (두 가지 초록) */
-export function treeArt(variant: number): PixelArt {
+/** 마을 초록 (광장 개편 2): 브랜드 초록 #2a7348을 그늘로 쓰는 잎 팔레트 두 가지 */
+const LEAF = [
+  { L: "#3f8a4e", D: "#2a7348", d: "#1f5537", H: "#7fbf6a" },
+  { L: "#5a9a3e", D: "#3d7a34", d: "#2b5c27", H: "#8cc46a" },
+] as const;
+/** 가을 잎: 단풍과 은행 */
+const MAPLE = { L: "#d9692e", D: "#b04a22", d: "#86361a", H: "#f0a050" } as const;
+const GINKGO = { L: "#e9b341", D: "#c98f24", d: "#9a6a1c", H: "#f7dc7a" } as const;
+const TRUNK = { N: "#6b4a2f", n: "#4e3522" } as const;
+/** 눈 (겨울 지붕·울타리·나무 위) */
+export const SNOW = { Z: "#f4f7fb", z: "#d5dfea" } as const;
+
+/** 나무 모양 (12×16칸): 둥근 잎 덩어리(L), 아래 왼쪽 그늘(D), 맨 아래 가장자리 깊은 그늘(d), 밝은 잎(H), 둥치(N·n) */
+function treeShape(): Grid {
   const g = grid(12, 16);
   fill(g, 5, 10, 2, 6, "N");
-  for (let y = 0; y < 11; y++) {
-    const t = (y - 5) / 5.5;
-    const half = Math.round(6 * Math.sqrt(Math.max(0, 1 - t * t)));
-    fill(g, 6 - half, y, half * 2, 1, "L");
-  }
-  for (let y = 6; y < 11; y++) {
-    const t = (y - 5) / 5.5;
-    const half = Math.round(6 * Math.sqrt(Math.max(0, 1 - t * t)));
-    fill(g, 6 - half, y, Math.max(1, half - 1), 1, "D");
-  }
+  fill(g, 6, 11, 1, 5, "n");
+  const half = (y: number) => Math.round(6 * Math.sqrt(Math.max(0, 1 - ((y - 5) / 5.5) ** 2)));
+  for (let y = 0; y < 11; y++) fill(g, 6 - half(y), y, half(y) * 2, 1, "L");
+  for (let y = 6; y < 11; y++) fill(g, 6 - half(y), y, Math.max(1, half(y) - 1), 1, "D");
+  // 깊은 그늘: 잎 덩어리 아랫줄과 왼쪽 끝 칸
+  for (let y = 7; y < 11; y++) g[y][6 - half(y)] = "d";
+  fill(g, 6 - half(10) + 1, 10, Math.max(1, half(10) * 2 - 3), 1, "d");
   g[3][4] = "H";
   g[4][7] = "H";
-  return art(g, variant % 2 === 0 ? { N: "#7a4a2a", L: "#4caf50", D: "#388e3c", H: "#81c784" } : { N: "#7a4a2a", L: "#2e7d32", D: "#1b5e20", H: "#66bb6a" });
+  g[2][6] = "H";
+  return g;
+}
+
+/**
+ * 숲 나무 (광장 개편 2, 계절): `variant` 0·1은 마을 초록 두 가지. 계절이 가을이면 4그루에 하나는 단풍, 하나는 은행,
+ * 겨울이면 잎 위에 눈이 얹힌다. 봄은 초록 잎에 연분홍 꽃 몇 점. 기본(`summer`)은 초록 그대로.
+ */
+export function treeArt(variant: number, season: Season = "summer"): PixelArt {
+  const g = treeShape();
+  const v = ((variant % 4) + 4) % 4;
+  if (season === "autumn" && (v === 1 || v === 2)) return art(g, { ...TRUNK, ...(v === 1 ? MAPLE : GINKGO) });
+  const leaf = LEAF[v % 2];
+  if (season === "winter") {
+    // 잎 덩어리 맨 위 두 줄과 밝은 잎 자리에 눈
+    for (let x = 0; x < 12; x++) {
+      const top = g.findIndex((row) => row[x] === "L" || row[x] === "H");
+      if (top < 0 || top > 9) continue;
+      g[top][x] = "Z";
+      if (x % 2 === 0 && g[top + 1]?.[x] === "L") g[top + 1][x] = "z";
+    }
+    return art(g, { ...TRUNK, ...leaf, L: darken(leaf.L, 0.12), ...SNOW });
+  }
+  if (season === "spring") {
+    for (const [x, y] of [
+      [3, 2],
+      [8, 3],
+      [5, 5],
+      [9, 7],
+    ])
+      g[y][x] = "P";
+    return art(g, { ...TRUNK, ...leaf, P: "#ffd0dc" });
+  }
+  return art(g, { ...TRUNK, ...leaf });
+}
+
+/** 감나무 (가을, 광장 개편 2): 누렇게 물든 성긴 잎에 주황 감이 주렁주렁 */
+export function persimmonTreeArt(): PixelArt {
+  const g = treeShape();
+  // 잎을 군데군데 비워 성기게
+  for (const [x, y] of [
+    [2, 4],
+    [9, 3],
+    [1, 7],
+    [10, 8],
+    [4, 1],
+  ])
+    g[y][x] = ".";
+  for (const [x, y] of [
+    [3, 3],
+    [8, 2],
+    [6, 5],
+    [2, 8],
+    [9, 6],
+    [5, 8],
+    [8, 9],
+  ]) {
+    g[y][x] = "O";
+    if (g[y - 1]?.[x] && g[y - 1][x] !== ".") g[y - 1][x] = "o";
+  }
+  return art(g, { ...TRUNK, L: "#a8923a", D: "#86742c", d: "#5f5320", H: "#c9b24e", O: "#e8762c", o: "#5a3d26" });
+}
+
+/**
+ * 그림 위에 눈을 얹는다 (겨울, 광장 개편 2): 칸마다 맨 위 칠한 칸을 눈으로, 짝수 칸은 그 아래 한 칸까지 눈 그늘.
+ * 칸 배치(크기)는 그대로라 몸체·이름표 자리가 같다. `only`를 주면 그 글자 칸에만 얹는다 (집은 지붕·굴뚝만).
+ */
+export function snowCap(source: PixelArt, only?: string): PixelArt {
+  const rows = source.rows.map((r) => [...r]);
+  const painted = (ch: string | undefined) => ch !== undefined && ch !== "." && Boolean(source.palette[ch]);
+  const width = rows[0]?.length ?? 0;
+  for (let x = 0; x < width; x++) {
+    const top = rows.findIndex((row) => painted(row[x]));
+    if (top < 0 || (only && !only.includes(rows[top][x]))) continue;
+    rows[top][x] = "Z";
+    if (x % 2 === 0 && painted(rows[top + 1]?.[x]) && (!only || only.includes(rows[top + 1][x]))) rows[top + 1][x] = "z";
+  }
+  return { rows: rows.map((r) => r.join("")), palette: { ...source.palette, ...SNOW } };
 }
 
 /** 광장 가로등. 켜면(`lit`, 노을·밤·새벽) 노란 등, 끄면(낮) 흐린 유리. 기본은 예전 그림(켠 등) */
@@ -669,12 +756,30 @@ export function flowerBedArt(variant: number): PixelArt {
   return art(g, { E: "#8a5a34", e: "#6b4426", G: "#3e8e41", R: "#e74c3c", Y: "#ffd23f", P: "#ff8fb1", V: "#b39ddb" });
 }
 
-/** 벚나무 (분홍 꽃 나무) */
-export function cherryTreeArt(): PixelArt {
+/**
+ * 정원 벚나무 (광장 개편 2, 계절): 봄에만 분홍 꽃, 여름은 초록 잎, 가을은 붉게 물들고, 겨울은 앙상한 가지에 눈.
+ * 기본(`spring`)은 예전 그림(분홍)과 같다.
+ */
+export function cherryTreeArt(season: Season = "spring"): PixelArt {
   const g = grid(14, 18);
   fill(g, 6, 11, 2, 7, "N");
   g[12][5] = "N";
   g[11][8] = "N";
+  if (season === "winter") {
+    // 앙상한 가지: 둥치에서 위로 갈라지는 가지와 잔가지, 가지 위에 눈
+    const branches: [number, number][] = [
+      [6, 10], [5, 9], [4, 8], [3, 7], [2, 6], [3, 5],
+      [7, 10], [8, 9], [9, 8], [10, 7], [11, 6], [10, 5],
+      [6, 9], [6, 8], [7, 7], [7, 6], [6, 5], [6, 4], [7, 3],
+      [4, 6], [5, 5], [9, 6], [8, 5], [8, 4],
+    ];
+    for (const [x, y] of branches) g[y][x] = "N";
+    for (const [x, y] of [
+      [2, 5], [3, 4], [10, 4], [11, 5], [6, 3], [7, 2], [8, 3], [5, 4], [4, 7], [9, 7],
+    ])
+      g[y][x] = "Z";
+    return art(g, { N: "#6b4226", ...SNOW });
+  }
   for (let y = 0; y < 13; y++) {
     const t = (y - 6) / 6.5;
     const half = Math.round(7 * Math.sqrt(Math.max(0, 1 - t * t)));
@@ -693,7 +798,12 @@ export function cherryTreeArt(): PixelArt {
     [3, 9],
   ])
     g[y][x] = "H";
-  return art(g, { N: "#6b4226", L: "#ffb7c5", D: "#f48fb1", H: "#fff0f5" });
+  const leaves: Record<Exclude<Season, "winter">, Record<string, string>> = {
+    spring: { L: "#ffb7c5", D: "#f48fb1", H: "#fff0f5" },
+    summer: { L: "#5a9a3e", D: "#3d7a34", H: "#8cc46a" },
+    autumn: { L: "#c8542c", D: "#9a3b22", H: "#e9b341" },
+  };
+  return art(g, { N: "#6b4226", ...leaves[season] });
 }
 
 // 광장 가게 건물 (SHOP-07·08, specs/053-garden)
@@ -757,22 +867,194 @@ export function salonArt(): PixelArt {
   return art(g, { W: "#e3fafc", w: "#b2f2bb", B: "#12b886", b: "#087f5b", S: "#fff9db", K: "#343a40", R: "#e03131", V: "#ffffff", F: "#7a4a2a", G: "#bfe6ff", L: "#ffffff", D: "#0ca678", Y: "#f4c430" });
 }
 
+// 청사초롱 줄등 (광장 개편 2 대표 장면): 붉은 윗단·푸른 아랫단, 금빛 테와 술, 먹 외곽
+/** 초롱 색: 켜면 속이 노랗게(`LIT_GLASS`) 빛나고, 끄면 붉은·푸른 비단이 회색으로 가라앉는다 */
+export const LANTERN = {
+  red: "#c8342c",
+  blue: "#2f4a8f",
+  gold: "#e9b341",
+  ink: "#3b2a20",
+  offRed: "#8c7f74",
+  offBlue: "#6f7690",
+} as const;
+
+/** 초롱 크기마다 칸 그림: `s` 처마 초롱 5×8, `m` 줄등 초롱 7×11, `l` 장대 꼭대기 내 초롱 9×13. `J`는 촛불 심지, `r`·`b`는 안에서 비치는 비단 */
+const LANTERN_ROWS: Record<"s" | "m" | "l", readonly string[]> = {
+  s: ["..K..", "KYYYK", "KRJRK", "KRJRK", "KBJBK", "KBBBK", ".KYK.", "..Y.."],
+  m: ["...K...", ".KYYYK.", "KRRRRRK", "KRrJrRK", "KRrJrRK", "KBbJbBK", "KBbJbBK", "KBBBBBK", ".KYYYK.", "...Y...", "..YYY.."],
+  l: [
+    "....K....",
+    "..KYYYK..",
+    ".KRRRRRK.",
+    "KRRrrrRRK",
+    "KRrrJrrRK",
+    "KRrrJrrRK",
+    "KBbbJbbBK",
+    "KBbbJbbBK",
+    "KBBbbbBBK",
+    ".KBBBBBK.",
+    "..KYYYK..",
+    "...YYY...",
+    "...Y.Y...",
+  ],
+};
+
 /**
- * 등불 (plaza-upgrade-2): 글 쓴 날 수에 따라 크기가 다르다(`s`·`m`·`l`), `lit`이면 불이 켜진다.
- * TODO(world): 지금은 빈 1칸 그림
+ * 청사초롱 (광장 개편 2): 즐겨찾는 이웃 한 명에 하나씩 광장 줄등에 달린다. `lit`이면 가운데 심지(`J`)가 노랗게(#ffd56e) 켜지고
+ * 붉은·푸른 비단이 안에서 밝게 비친다. 끄면 비단이 회색으로 가라앉는다.
+ * `s` 처마 초롱(5×8칸), `m` 줄등 초롱(7×11칸), `l` 장대 꼭대기 내 초롱(9×13칸). 매다는 곳은 맨 윗줄 가운데 칸.
  */
 export function lanternArt(lit: boolean, size: "s" | "m" | "l"): PixelArt {
-  void lit;
-  void size;
-  return art(grid(1, 1), {});
+  const g = LANTERN_ROWS[size].map((r) => [...r]);
+  return art(g, {
+    K: LANTERN.ink,
+    Y: lit ? LANTERN.gold : "#a8946a",
+    R: lit ? LANTERN.red : LANTERN.offRed,
+    B: lit ? LANTERN.blue : LANTERN.offBlue,
+    r: lit ? "#e8553f" : LANTERN.offRed,
+    b: lit ? "#4a6fc0" : LANTERN.offBlue,
+    J: lit ? LIT_GLASS : "#7a6e64",
+  });
+}
+
+/** 줄등 장대 (광장 개편 2): 분수 뒤에 선 나무 장대 4×28칸. 맨 위 가로대에 줄 네 가닥을 묶는다 */
+export function mastArt(): PixelArt {
+  const g = grid(4, 28);
+  fill(g, 1, 1, 2, 27, "N");
+  fill(g, 2, 1, 1, 27, "n");
+  // 가로대와 꼭지
+  fill(g, 0, 2, 4, 1, "n");
+  fill(g, 1, 0, 2, 1, "n");
+  // 밑동 받침
+  fill(g, 0, 26, 4, 2, "n");
+  fill(g, 0, 26, 2, 1, "N");
+  return art(g, { N: "#8a5a34", n: "#5a3d26" });
+}
+
+/** 오늘 할 일 표시 (광장 개편 2): 압정(붉은 점)으로 꽂은 종이 쪽지에 먹 '!' (7×10칸) */
+export function markerArt(): PixelArt {
+  const g = grid(7, 10);
+  fill(g, 1, 1, 5, 1, "K");
+  fill(g, 0, 2, 7, 7, "K");
+  fill(g, 1, 9, 5, 1, "K");
+  fill(g, 1, 2, 5, 7, "P");
+  fill(g, 3, 3, 1, 3, "K");
+  g[7][3] = "K";
+  // 쪽지 오른쪽 아래 그늘과 압정
+  fill(g, 5, 3, 1, 6, "p");
+  g[0][3] = "R";
+  g[1][3] = "R";
+  return art(g, { K: "#3b2a20", P: "#fbf1dc", p: "#eadbbd", R: "#c8342c" });
+}
+
+/** 불꽃 튀는 순간 (내 초롱 켜기·할 일 다 함) 장 수 */
+export const SPARK_FRAMES = 4;
+
+/** 초롱 불꽃 (11×11칸): 가운데에서 금빛 점이 열십자·대각으로 퍼졌다가 사라진다 */
+export function sparkArt(frame: number): PixelArt {
+  const g = grid(11, 11);
+  const f = Math.max(0, Math.min(SPARK_FRAMES - 1, Math.floor(frame)));
+  const r = f + 1;
+  const put = (x: number, y: number, ch: string) => {
+    if (y >= 0 && y < 11 && x >= 0 && x < 11) g[y][x] = ch;
+  };
+  if (f < 2) {
+    put(5, 5, "W");
+    put(4, 5, "Y");
+    put(6, 5, "Y");
+    put(5, 4, "Y");
+    put(5, 6, "Y");
+  }
+  for (const [dx, dy] of [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ]) {
+    put(5 + dx * (r + 1), 5 + dy * (r + 1), f < 3 ? "W" : "Y");
+    put(5 + dx * r, 5 + dy * r, "Y");
+  }
+  const d = Math.round(r * 0.8);
+  for (const [dx, dy] of [
+    [1, 1],
+    [-1, 1],
+    [1, -1],
+    [-1, -1],
+  ])
+    put(5 + dx * d, 5 + dy * d, f < 3 ? "O" : "Y");
+  return art(g, { W: "#fff8e0", Y: "#ffd56e", O: "#e9b341" });
+}
+
+/** 처마 초롱(5×8칸)을 매다는 칸: 집 그림 지붕 처마 오른쪽 끝 바로 아래 (매다는 칸 = 초롱 맨 윗줄 가운데) */
+export function eaveHook(house: PixelArt): { x: number; y: number } {
+  // 지붕 처마는 지붕 줄(`r`)이 가장 넓은 맨 아랫줄
+  let eave = 0;
+  let width = 0;
+  house.rows.forEach((row, y) => {
+    const n = [...row].filter((c) => c === "r").length;
+    if (n >= width) {
+      width = n;
+      eave = y;
+    }
+  });
+  return { x: house.rows[eave].lastIndexOf("r") + 1, y: eave + 1 };
 }
 
 /**
- * 추천 이웃의 흐린 집 (plaza-upgrade-2): 아직 이웃이 아닌 추천 블로그를 빈 집터에 흐리게 보인다.
- * TODO(world): 지금은 빈 1칸 그림
+ * 글 쓴 집 처마 끝에 소형 초롱을 매단 그림 (광장 개편 2). 칸 배치는 같은 크기 안에서 바꿔 몸체·이름표 자리가 같다.
+ * 초롱 속은 'J' 칸이라 밤에 창(`G`)처럼 다시 얹어 빛낸다.
  */
-export function ghostHouseArt(stage = 0, roof = "#c0c0c0"): PixelArt {
-  void stage;
-  void roof;
-  return art(grid(1, 1), {});
+export function withEaveLantern(house: PixelArt): PixelArt {
+  const hook = eaveHook(house);
+  const lantern = LANTERN_ROWS.s;
+  const rows = house.rows.map((r) => [...r]);
+  const left = hook.x - 2;
+  lantern.forEach((line, dy) =>
+    [...line].forEach((ch, dx) => {
+      const row = rows[hook.y + dy];
+      if (ch === "." || !row || left + dx < 0 || left + dx >= row.length) return;
+      row[left + dx] = { K: "k", Y: "y", R: "M", B: "U", J: "J" }[ch]!;
+    }),
+  );
+  return {
+    rows: rows.map((r) => r.join("")),
+    palette: { ...house.palette, k: LANTERN.ink, y: LANTERN.gold, M: LANTERN.red, U: LANTERN.blue, J: LIT_GLASS },
+  };
+}
+
+/**
+ * 이사 올 이웃의 흐린 집 (광장 개편 2): 그 단계 집 모양을 바랜 색으로, 꺼진 창, 둘레는 점선.
+ * 화면에서는 반투명(0.55)으로 그린다. `roof`는 지붕 색 (추천 이웃은 회색, 방문자의 내 집 자리는 그날의 지붕색).
+ */
+export function ghostHouseArt(stage = 0, roof = "#a9a49c"): PixelArt {
+  const house = houseArt(Math.max(1, stage), roof);
+  const rows = house.rows.map((r) => [...r]);
+  const h = rows.length;
+  const w = rows[0].length;
+  const painted = (x: number, y: number) => y >= 0 && y < h && x >= 0 && x < w && house.rows[y][x] !== ".";
+  // 점선 외곽: 칠한 칸에 붙은 빈 칸을 한 칸 걸러 하나씩
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      if (painted(x, y) || (x + y) % 3 === 0) continue;
+      if (painted(x - 1, y) || painted(x + 1, y) || painted(x, y - 1) || painted(x, y + 1)) rows[y][x] = "O";
+    }
+  return {
+    rows: rows.map((r) => r.join("")),
+    palette: {
+      ...house.palette,
+      W: "#f3ecdf",
+      w: "#ddd3c3",
+      G: "#8e98a3",
+      D: "#b9a68e",
+      d: "#a08c74",
+      K: "#cfc3ad",
+      p: "#c9b2ae",
+      q: "#d6c9a6",
+      L: "#cfc3ad",
+      S: "#c9b2ae",
+      B: "#8fae8f",
+      H: "#8fae8f",
+      O: "#6f665c",
+    },
+  };
 }

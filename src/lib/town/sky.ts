@@ -38,11 +38,14 @@ export function lampsOn(sky: Sky): boolean {
  * 밤에도 길과 집이 읽히게 남색을 너무 진하게 두지 않는다.
  */
 export const SKY_TINT: Record<Sky, { color: string; alpha: number } | null> = {
-  dawn: { color: "#c9b8e8", alpha: 0.35 },
+  dawn: { color: "#b9a6e0", alpha: 0.4 },
   day: null,
-  dusk: { color: "#f2a65a", alpha: 0.32 },
+  dusk: { color: "#e8875a", alpha: 0.44 },
   night: { color: "#2b3270", alpha: 0.62 },
 };
+
+/** 노을에 화면 위쪽(높이의 35%)에 더하는 빛 띠: 위에서 이 색·세기로 시작해 아래로 사라진다 (광장 개편 2) */
+export const DUSK_GLOW = { color: "#ff9e5e", alpha: 0.1, height: 0.35 } as const;
 
 /** 주소 값(`?sky=night`)을 하늘로. 모르는 값이면 null (지금 시각을 쓴다) */
 export function parseSky(value: unknown): Sky | null {
