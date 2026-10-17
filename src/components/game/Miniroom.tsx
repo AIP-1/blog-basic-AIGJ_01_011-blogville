@@ -20,7 +20,8 @@ export function Miniroom({ background, avatar, nickname, height = 160 }: { backg
         <div className="motion-safe:animate-[hop_1.6s_ease-in-out_infinite]">
           <PixelLayers arts={avatar} size={size} />
         </div>
-        {nickname && <span className="mt-1 rounded-full bg-white/85 px-2 text-xs font-bold text-ink">{nickname}</span>}
+        {/* 그림 속 이름표라 화면 밝기와 상관없이 흰 바탕에 짙은 글자 */}
+        {nickname && <span className="mt-1 rounded-full bg-white/85 px-2 text-xs font-bold text-[#23201b]">{nickname}</span>}
       </div>
     </div>
   );

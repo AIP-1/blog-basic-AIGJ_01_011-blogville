@@ -22,33 +22,35 @@ export function FarmView({ farm }: { farm: Farm }) {
   return (
     <div className="space-y-6">
       {state && (
-        <p
-          role={state.ok ? "status" : "alert"}
-          className={`sticky top-0 z-10 rounded-xl border px-4 py-3 font-semibold shadow-sm ${state.ok ? "border-green-300 bg-green-50 text-green-800" : "border-red-300 bg-red-50 text-red-700"}`}
-          data-farm-result={state.ok ? "ok" : "error"}
-        >
+        <p role={state.ok ? "status" : "alert"} className="px-note px-sticky" data-tone={state.ok ? "ok" : "error"} data-farm-result={state.ok ? "ok" : "error"}>
           {state.message}
         </p>
       )}
 
-      <section aria-labelledby="farm-eggs" className="rounded-2xl border border-line bg-surface p-4">
-        <h2 id="farm-eggs" className="font-bold">
+      <section aria-labelledby="farm-eggs" className="px-tile p-4">
+        <h2 id="farm-eggs" className="flex flex-wrap items-center gap-x-2 font-bold">
           🥚 알 받기 <span className="text-sm font-normal text-ink-soft">(키우는 중 {active}/{MAX_ACTIVE_ANIMALS})</span>
+          {/* 자리 다섯 칸 중 찬 칸 (글자가 같은 뜻을 말하므로 숨김) */}
+          <span className="px-cells text-accent" aria-hidden="true">
+            {Array.from({ length: MAX_ACTIVE_ANIMALS }, (_, i) => (
+              <span key={i} {...(i < active ? { "data-on": "" } : {})} />
+            ))}
+          </span>
         </h2>
         {full && <p className="mt-1 text-sm text-ink-soft">자리가 꽉 찼어요. 다 키운 뒤에 받을 수 있어요</p>}
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-3">
           {farm.freeEggs.map((egg) => (
             <form key={egg} action={action}>
               <input type="hidden" name="intent" value="claim" />
               <input type="hidden" name="egg" value={egg} />
-              <button type="submit" className="btn btn-primary" disabled={full || pending}>
+              <button type="submit" className="px-btn px-btn--primary" disabled={full || pending}>
                 {egg === "first" ? "🎁 농장 첫 알 (무료)" : `🎁 레벨 ${egg} 보상 알 (무료)`}
               </button>
             </form>
           ))}
           <form action={action}>
             <input type="hidden" name="intent" value="buy" />
-            <button type="submit" className="btn" disabled={full || farm.coins < EGG_PRICE || pending}>
+            <button type="submit" className="px-btn" disabled={full || farm.coins < EGG_PRICE || pending}>
               🪙 {EGG_PRICE}으로 알 사기
             </button>
           </form>
@@ -71,16 +73,16 @@ export function FarmView({ farm }: { farm: Farm }) {
         {active === 0 ? (
           <p className="mt-2 text-ink-soft">아직 키우는 동물이 없어요. 알을 받아 부화시켜 보세요.</p>
         ) : (
-          <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="mt-3 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
             {farm.eggs.map((egg) => (
-              <li key={egg.id} className="flex flex-col items-center rounded-2xl border border-line bg-surface p-4" data-egg={egg.id} aria-label="알">
+              <li key={egg.id} className="px-tile flex flex-col items-center p-4" data-egg={egg.id} aria-label="알">
                 <PixelLayers arts={["animal.egg"]} size={64} label="알" />
                 <h3 className="mt-2 font-bold">알</h3>
                 <p className="text-sm text-ink-soft">무엇이 나올까요?</p>
                 <form action={action} className="mt-3 w-full">
                   <input type="hidden" name="intent" value="hatch" />
                   <input type="hidden" name="id" value={egg.id} />
-                  <button type="submit" className="btn btn-primary w-full" disabled={pending}>
+                  <button type="submit" className="px-btn px-btn--primary w-full" disabled={pending}>
                     🐣 부화시키기
                   </button>
                 </form>
@@ -100,9 +102,9 @@ export function FarmView({ farm }: { farm: Farm }) {
         {farm.grown.length === 0 ? (
           <p className="mt-2 text-ink-soft">다 키운 동물이 카드로 여기에 모여요.</p>
         ) : (
-          <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <ul className="mt-3 grid grid-cols-2 gap-3.5 sm:grid-cols-4">
             {farm.grown.map((a) => (
-              <li key={a.id} className="flex flex-col items-center rounded-2xl border-2 border-amber-300 bg-amber-50 p-3 dark:bg-amber-950/30" data-grown={a.species}>
+              <li key={a.id} className="px-tile flex flex-col items-center p-3" data-tone="sun" data-grown={a.species}>
                 <PixelLayers arts={[`animal.${a.species}`]} size={64} label={SPECIES[a.species].name} />
                 <p className="mt-1 font-bold">🎀 {SPECIES[a.species].name}</p>
                 <p className="text-xs text-ink-soft">{dayFormat.format(a.grownAt)}</p>
@@ -129,20 +131,29 @@ function AnimalCard({
   const s = SPECIES[animal.species as Species];
   const stage = animalStage(animal.species, animal.growth);
   return (
-    <li className="flex flex-col items-center rounded-2xl border border-line bg-surface p-4" data-animal={animal.species} aria-label={s.name}>
+    <li className="px-tile flex flex-col items-center p-4" data-animal={animal.species} aria-label={s.name}>
       <div className="flex h-24 items-end">
         <PixelLayers arts={[`animal.${animal.species}`]} size={STAGE_SIZE[stage]} label={`${s.name} (${STAGE_LABEL[stage]})`} />
       </div>
       <h3 className="mt-2 font-bold">
-        {s.name} <span className="rounded-full bg-accent/10 px-1.5 text-sm text-accent">{STAGE_LABEL[stage]}</span>
+        {s.name} <span className="px-chip ml-1 align-[2px]">{STAGE_LABEL[stage]}</span>
       </h3>
-      <label className="mt-2 w-full text-sm">
+      <div className="mt-2 w-full text-sm">
         <span className="flex justify-between text-ink-soft">
           성장 <span data-growth>{animal.growth}/{s.growth}</span>
         </span>
-        <progress className="h-2 w-full accent-green-600" value={animal.growth} max={s.growth} />
-      </label>
-      <div className="mt-3 grid w-full grid-cols-3 gap-1">
+        <span
+          className="px-bar mt-1.5"
+          role="progressbar"
+          aria-label={`${s.name} 성장`}
+          aria-valuemin={0}
+          aria-valuemax={s.growth}
+          aria-valuenow={Math.min(animal.growth, s.growth)}
+        >
+          <span style={{ width: `${Math.min(100, Math.round((animal.growth / s.growth) * 100))}%` }} />
+        </span>
+      </div>
+      <div className="mt-4 grid w-full grid-cols-3 gap-2">
         {CARE_CODES.map((code) => {
           const cared = animal.cared.includes(code);
           return (
@@ -152,7 +163,7 @@ function AnimalCard({
               <input type="hidden" name="action" value={code} />
               <button
                 type="submit"
-                className="btn w-full px-1 text-sm"
+                className="px-btn px-btn--tight w-full"
                 disabled={cared || pending}
                 aria-label={cared ? `${CARE_ACTIONS[code].name} 완료` : CARE_ACTIONS[code].button}
               >
@@ -163,13 +174,13 @@ function AnimalCard({
         })}
       </div>
       {growthItems.length > 0 && (
-        <div className="mt-1 flex w-full flex-wrap gap-1" aria-label="성장 아이템" role="group">
+        <div className="mt-2 flex w-full flex-wrap gap-2" aria-label="성장 아이템" role="group">
           {growthItems.map((item) => (
             <form key={item.id} action={action} className="flex-1">
               <input type="hidden" name="intent" value="feed" />
               <input type="hidden" name="id" value={animal.id} />
               <input type="hidden" name="item" value={item.id} />
-              <button type="submit" className="btn w-full px-1 text-sm" disabled={pending} title={`성장 +${item.growth}`}>
+              <button type="submit" className="px-btn px-btn--tight w-full" disabled={pending} title={`성장 +${item.growth}`}>
                 🌱 {item.name} ×{item.quantity}
               </button>
             </form>

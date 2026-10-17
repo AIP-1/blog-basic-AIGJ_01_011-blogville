@@ -344,3 +344,295 @@
   outline: 3px solid var(--kit-paper);
   outline-offset: 3px;
 }
+
+/* ───────── 건물 안 화면 (GamePageShell: 상점·옷가게·미용실·꾸미기·농장·낚시터·출석·내역) ─────────
+   위는 그 건물의 나무 간판 한 줄, 아래는 차분한 종이 한 장. 대담함은 간판에만 쓰고 종이 안쪽은 읽기 쉽게 둔다.
+   종이 위 글자색은 모두 종이·흰 쪽지 바탕에서 4.5:1 이상 (라이트·다크) */
+:root {
+  --kit-line: #dcc69a; /* 쪽지 테두리 (꾸밈 선) */
+  --kit-exp: #2c5d8f; /* ✨ 경험치 숫자 */
+  --kit-loss: #a8321f; /* 🪙 쓴 코인·오류 글자 */
+  --kit-water: #dceef6; /* 연못·거울 유리 */
+  --kit-sun-paper: #fff0bf; /* 오늘·다 키운 동물 */
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --kit-line: #4a527f;
+    --kit-exp: #8cc8ff;
+    --kit-loss: #ff9b8f;
+    --kit-water: #1d3346;
+    --kit-sun-paper: #3d3418;
+  }
+}
+:root[data-theme="dark"] {
+  --kit-line: #4a527f;
+  --kit-exp: #8cc8ff;
+  --kit-loss: #ff9b8f;
+  --kit-water: #1d3346;
+  --kit-sun-paper: #3d3418;
+}
+
+/* 간판: 건물 외관이 판자 위로 솟고, 판자 양쪽 위에 못 두 개 */
+.px-sign {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 18px;
+  margin-top: 40px;
+  padding: 14px 18px 16px;
+}
+.px-sign::before,
+.px-sign::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  width: 4px;
+  height: 4px;
+  background: var(--kit-wood-edge);
+}
+.px-sign::before {
+  left: 6px;
+}
+.px-sign::after {
+  right: 6px;
+}
+.px-sign-art {
+  flex: none;
+  margin-top: -54px;
+  line-height: 0;
+}
+.px-sign-title {
+  flex: 1 1 10rem;
+  min-width: 0;
+  padding-bottom: 2px;
+}
+/* 판자에 새긴 글씨: 아래로 2px 짙은 결 (흐림 없음) */
+.px-sign-h1 {
+  text-shadow: 0 2px 0 var(--kit-wood-edge);
+}
+.px-sign-lead {
+  margin-top: 6px;
+  font-size: 15px;
+  line-height: 1.55;
+  font-weight: 500;
+}
+.px-sign-lead a {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.px-sign-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+@media (max-width: 639px) {
+  .px-sign {
+    margin-top: 28px;
+    padding: 12px 14px 14px;
+  }
+  .px-sign-art {
+    margin-top: -36px;
+  }
+  /* 칸당 3px → 2px (정수배라 도트가 그대로) */
+  .px-sign-art > svg {
+    width: auto;
+    height: calc(var(--art-rows) * 2px);
+  }
+  .px-sign-tools {
+    margin-left: 0;
+  }
+}
+
+/* 지갑 칩: 숫자는 도트 글씨 12px */
+.px-wallet {
+  font-family: var(--font-pixel);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: none;
+}
+
+/* 종이 한 장: 안쪽 화면의 사이트 색 토큰을 종이 색으로 바꾼다 (bg-surface·border-line·text-ink-soft가 그대로 어울리게) */
+.px-room {
+  --ink: var(--kit-ink);
+  --ink-soft: var(--kit-ink-soft);
+  --surface: var(--kit-paper-hover);
+  --bg: var(--kit-paper);
+  --line: var(--kit-line);
+  padding: 16px;
+}
+@media (min-width: 640px) {
+  .px-room {
+    padding: 24px;
+  }
+}
+/* 종이 안은 모서리를 둥글리지 않는다 (페이지 번호·고르기 칸·미니룸 그림 틀) */
+.px-room :is(.field, .btn, [data-miniroom]) {
+  border-radius: 0;
+}
+.px-room .px-tab {
+  min-height: 44px;
+}
+/* 종이 위에 바로 놓인 탭: 고른 탭은 아래 4px 초록 띠 */
+.px-room .px-tab[aria-selected="true"] {
+  background: var(--kit-paper-hover);
+  box-shadow: inset 0 -4px 0 0 var(--accent);
+}
+/* 눌러 둔 토글 (돌려 보기 방향·걷기) */
+.px-room .px-btn[aria-pressed="true"] {
+  background: var(--kit-ink);
+  color: var(--kit-paper);
+  box-shadow:
+    0 -2px 0 0 var(--kit-ink),
+    0 2px 0 0 var(--kit-ink),
+    -2px 0 0 0 var(--kit-ink),
+    2px 0 0 0 var(--kit-ink);
+}
+/* 좁은 칸(동물 카드의 돌보기 세 칸)에 들어가는 버튼 */
+.px-btn--tight {
+  padding: 0 4px;
+  font-size: 14px;
+}
+
+/* 종이 위 쪽지(아이템 카드·칸): 옅은 2px 노치 테두리. 고른 것은 초록 4px */
+.px-tile {
+  background: var(--kit-paper-hover);
+  color: var(--kit-ink);
+  border-radius: 0;
+  box-shadow:
+    0 -2px 0 0 var(--kit-line),
+    0 2px 0 0 var(--kit-line),
+    -2px 0 0 0 var(--kit-line),
+    2px 0 0 0 var(--kit-line);
+}
+.px-tile[data-tone="sun"] {
+  background: var(--kit-sun-paper);
+}
+.px-tile[data-tone="water"] {
+  background: var(--kit-water);
+}
+button.px-tile {
+  cursor: pointer;
+}
+button.px-tile:not([aria-pressed="true"]):hover:not(:disabled) {
+  box-shadow:
+    0 -2px 0 0 var(--kit-ink-soft),
+    0 2px 0 0 var(--kit-ink-soft),
+    -2px 0 0 0 var(--kit-ink-soft),
+    2px 0 0 0 var(--kit-ink-soft);
+}
+.px-tile[aria-pressed="true"],
+.px-tile[data-on] {
+  box-shadow:
+    0 -2px 0 0 var(--accent),
+    0 2px 0 0 var(--accent),
+    -2px 0 0 0 var(--accent),
+    2px 0 0 0 var(--accent),
+    inset 0 0 0 2px var(--accent);
+}
+.px-room .px-tile:focus-visible {
+  outline: 3px solid var(--kit-ink);
+  outline-offset: 4px;
+}
+
+/* 숫자 색 (종이·쪽지 바탕에서 4.5:1 이상) */
+.px-exp {
+  color: var(--kit-exp);
+}
+.px-gain {
+  color: var(--accent);
+}
+.px-loss {
+  color: var(--kit-loss);
+}
+
+/* 결과 쪽지 (산 것·돌본 것·입은 것): 왼쪽 6px 띠가 성공 초록·실패 빨강. 저절로 사라지지 않는다(꾸미기만 2초) */
+.px-note {
+  display: block;
+  padding: 12px 16px 12px 22px;
+  background: var(--kit-paper-hover);
+  color: var(--kit-ink);
+  font-weight: 600;
+  box-shadow:
+    0 -2px 0 0 var(--kit-ink),
+    0 2px 0 0 var(--kit-ink),
+    -2px 0 0 0 var(--kit-ink),
+    2px 0 0 0 var(--kit-ink),
+    inset 6px 0 0 0 var(--accent);
+}
+.px-note[data-tone="error"] {
+  color: var(--kit-loss);
+  box-shadow:
+    0 -2px 0 0 var(--kit-ink),
+    0 2px 0 0 var(--kit-ink),
+    -2px 0 0 0 var(--kit-ink),
+    2px 0 0 0 var(--kit-ink),
+    inset 6px 0 0 0 var(--danger);
+}
+.px-note a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* 붙는 결과 쪽지: 맨 위 막대 밑에 숨지 않게 */
+.px-sticky {
+  position: sticky;
+  top: calc(var(--header-h) + 8px);
+  z-index: 10;
+}
+
+/* 거울: 나무 틀 + 유리 */
+.px-mirror {
+  display: block;
+  width: fit-content;
+  margin-inline: auto;
+  padding: 6px;
+  background: var(--kit-wood);
+  box-shadow:
+    inset 0 2px 0 0 var(--kit-wood-hi),
+    0 -2px 0 0 var(--kit-wood-edge),
+    0 2px 0 0 var(--kit-wood-edge),
+    -2px 0 0 0 var(--kit-wood-edge),
+    2px 0 0 0 var(--kit-wood-edge);
+}
+.px-mirror > * {
+  display: block;
+  padding: 12px;
+  background: var(--kit-water);
+}
+
+/* 출석 달력 칸: 날짜는 칸 위쪽 도트 글씨(data-num), 칸 글자는 도장 🌟만 */
+.px-cal-day {
+  position: relative;
+  background: var(--kit-paper);
+}
+.px-cal-day::before {
+  content: attr(data-num);
+  position: absolute;
+  top: 3px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: var(--font-pixel);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--kit-ink-soft);
+  -webkit-font-smoothing: none;
+}
+.px-cal-day[data-attended="yes"] {
+  background: color-mix(in srgb, var(--accent) 12%, var(--kit-paper-hover));
+}
+.px-cal-day[data-attended="yes"]::before,
+.px-cal-day[aria-current="date"]::before {
+  color: var(--kit-ink);
+}
+.px-cal-day[aria-current="date"] {
+  box-shadow: inset 0 0 0 2px var(--kit-ink);
+}
