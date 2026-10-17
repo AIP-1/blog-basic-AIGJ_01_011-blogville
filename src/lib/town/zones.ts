@@ -46,6 +46,12 @@ export function townReturnHref(spot: ReturnSpot | null, host?: string): string {
   return spot ? `${base}?from=${spot}` : base;
 }
 
+/** 친구 마을 주소(`?host=`) 모양만 (블로그 주소 규칙 `^[a-z0-9_]{3,20}$`). 아니면 null */
+export function parseHostSlug(value: unknown): string | null {
+  const v = Array.isArray(value) ? value[0] : value;
+  return typeof v === "string" && /^[a-z0-9_]{3,20}$/.test(v) ? v : null;
+}
+
 export function parseReturnSpot(value: unknown): ReturnSpot | null {
   return typeof value === "string" && (RETURN_SPOTS as readonly string[]).includes(value) ? (value as ReturnSpot) : null;
 }
