@@ -1,5 +1,5 @@
 import "server-only";
-import { and, count, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { blogs, guestbookEntries, profiles } from "@/db/schema";
 import { GUESTBOOK_ERRORS, GUESTBOOK_PAGE_SIZE, isEntryHidden } from "@/lib/guestbook-rules";
@@ -98,12 +98,29 @@ export async function getGuestbook(
   return { items, total };
 }
 
+/** 한 회원이 1시간에 쓸 수 있는 방명록 글 수 (모든 블로그 합, plaza-upgrade-2: 광장 우체통 쪽지로 쓰는 길이 새로 생겨서) */
+export const GUESTBOOK_HOURLY_LIMIT = 10;
+export const GUESTBOOK_RATE_ERROR = "방명록은 1시간에 10개까지 쓸 수 있어요. 조금 뒤에 다시 남겨 주세요.";
+
+/** 지난 1시간에 쓴 수로 거절 문구 (`GUESTBOOK_HOURLY_LIMIT`개를 이미 썼으면) */
+export function guestbookRateRefusal(writtenLastHour: number): string | null {
+  return writtenLastHour >= GUESTBOOK_HOURLY_LIMIT ? GUESTBOOK_RATE_ERROR : null;
+}
+
 /**
  * 방명록 글 쓰기. 블로그 주인에게 알림 (남이 쓴 글만).
- * 알림을 받을 주인의 회원 행을 먼저 잠근다 (탈퇴와 엇갈리지 않게, 댓글과 같은 순서, GAME-08).
+ * 작성자별 잠금을 먼저 잡고 지난 1시간에 쓴 수를 센다(동시에 보내도 10개를 넘지 않는다, guestbook_entries_author_idx).
+ * 그다음 알림을 받을 주인의 회원 행을 잠근다 (탈퇴와 엇갈리지 않게, 댓글과 같은 순서, GAME-08). 작성자 잠금은 이 함수만 잡아 순서가 꼬이지 않는다.
  */
 export async function createEntry(userId: string, blogId: number, content: string, isSecret: boolean): Promise<Result> {
   return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"guestbook:" + userId}))`);
+    const [recent] = await tx
+      .select({ n: count() })
+      .from(guestbookEntries)
+      .where(and(eq(guestbookEntries.authorId, userId), gte(guestbookEntries.createdAt, sql`now() - interval '1 hour'`)));
+    const limited = guestbookRateRefusal(recent.n);
+    if (limited) return { ok: false, error: limited };
     const [blog] = await tx.select({ ownerId: blogs.ownerId }).from(blogs).where(eq(blogs.id, blogId));
     if (!blog) return { ok: false, error: GUESTBOOK_ERRORS.blogNotFound };
     if (blog.ownerId !== userId && !(await lockMemberRow(tx, blog.ownerId))) return { ok: false, error: GUESTBOOK_ERRORS.blogNotFound };

@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent } from "react";
-import type { PlazaNews, TodayTask } from "@/lib/town/plaza";
+import { allFreshRead, countedTasks, unreadFresh, type PlazaNews, type TodayTask } from "@/lib/town/plaza";
 import type { TownSpot } from "@/lib/town/structures";
-import { NewsList, TaskList } from "./PlazaLists";
+import { LanternIcon, NewsList, TaskList } from "./PlazaLists";
 
 // 펼침·접힘 고른 것은 이 브라우저에 남긴다. 저장소를 못 쓰면(사생활 보호 창) 이 화면에서만 기억한다
 const KEY = "bv-plaza-drawer";
@@ -39,7 +39,9 @@ function choose(value: "1" | "0") {
 type Tab = "news" | "tasks";
 
 /**
- * 광장 소식 서랍 (광장 개편): 화면 오른쪽 위 종이 쪽지. [이웃 새 글]과 [오늘 할 일] 두 탭, 공지 띠가 켜져 있으면 맨 위 한 줄.
+ * 광장 소식 서랍 (광장 개편): 화면 오른쪽 위 종이 쪽지. [불 켜진 집](이웃 새 글)과 [오늘 할 일] 두 탭, 공지 띠가 켜져 있으면 맨 위 한 줄.
+ * plaza-upgrade-2: 칩 숫자는 이 브라우저로 아직 안 읽은 24시간 새 글 수, 다 읽으면 ✓와 맨 위 '오늘 이웃 새 글을 다 읽었어요 🌙'.
+ * 접힌 탭은 '🏮 불 켜진 집 4 · 할 일 2/4'(출석은 세지 않는다).
  * 폭 280px. 고른 적이 없으면 1680px 이상에서만 펼쳐 두고(CSS가 정해 첫 그림부터 맞다), 그보다 좁으면 접힌 탭 하나라
  * 시작 화면의 상점과 동쪽 이웃 집(불 켜진 창)을 가리지 않는다. 고른 것은 기억한다. 시험 훅 `data-town-drawer`(`data-open`: auto|1|0).
  * 이웃 글이 없어 마을 전체 새 글을 보이면(`village`) 탭 이름도 '마을 소식'. 방문자는 할 일이 없어 마을 소식만.
@@ -84,10 +86,22 @@ export function PlazaDrawer({
     if (event.detail !== 0) event.currentTarget.blur();
     choose(value);
   };
-  const title = member && news.scope === "neighbors" ? "이웃 새 글" : "마을 소식";
-  // 접힌 탭의 숫자: 24시간 안에 쓴 글 (광장에서 불이 켜진 집). 이웃 글이 없어 마을 전체를 보일 때는 세지 않는다
-  const lit = member && news.scope === "village" ? 0 : news.posts.filter((p) => p.fresh).length;
-  const done = tasks?.filter((t) => t.done).length ?? 0;
+  const neighbors = member && news.scope === "neighbors";
+  const title = neighbors ? "불 켜진 집" : "마을 소식";
+  // 칩 숫자: 아직 안 읽은 24시간 새 글 (광장에서 불이 켜진 집). 이웃 글이 없어 마을 전체를 보일 때는 세지 않는다
+  const lit = member ? unreadFresh(news) : news.posts.filter((p) => p.fresh).length;
+  const allRead = member && allFreshRead(news);
+  const counted = tasks ? countedTasks(tasks) : [];
+  const done = counted.filter((t) => t.done).length;
+  const chip = lit > 0 ? (
+    <span className="px-chip" data-tone="sun" data-unread={lit}>
+      {lit}
+    </span>
+  ) : allRead ? (
+    <span className="px-chip" data-unread="0">
+      <span aria-hidden="true">✓</span>
+    </span>
+  ) : null;
   const tabs: Tab[] = tasks ? ["news", "tasks"] : ["news"];
 
   // ←·→로 탭을 옮긴다. 게임이 방향키로 걷지 않게 창 밖(window)으로 보내지 않는다
@@ -111,15 +125,16 @@ export function PlazaDrawer({
           aria-expanded="false"
           aria-controls={`${id}-body`}
           // 이름은 보이는 글자(제목·숫자)로 시작한다 (말로 누르기, WCAG 2.5.3)
-          aria-label={`${title}${lit > 0 ? ` ${lit}` : ""} 펼치기${lit > 0 ? `, 24시간 안에 쓴 글 ${lit}편` : ""}`}
+          aria-label={`${title}${lit > 0 ? ` ${lit}` : ""} 펼치기${lit > 0 ? `, 안 읽은 24시간 새 글 ${lit}편` : allRead ? ", 새 글을 다 읽었어요" : ""}${tasks ? `, 할 일 ${done}/${counted.length}` : ""}`}
           onClick={toggleTo("1")}
           data-drawer-toggle
         >
-          <span aria-hidden="true">📰</span>
-          <span className="max-md:hidden">{title}</span>{" "}
-          {lit > 0 && (
-            <span className="px-chip" data-tone="sun">
-              {lit}
+          {neighbors ? <LanternIcon lit={lit > 0} /> : <span aria-hidden="true">📋</span>}
+          <span className="max-md:hidden">{title}</span>
+          {chip}
+          {tasks && (
+            <span className="max-lg:hidden" data-drawer-tasks>
+              <span aria-hidden="true">· </span>할 일 {done}/{counted.length}
             </span>
           )}
         </button>
@@ -143,6 +158,11 @@ export function PlazaDrawer({
             )}
           </p>
         )}
+        {allRead && (
+          <p className="px-3 pt-2 text-sm font-semibold" data-town-all-read>
+            오늘 이웃 새 글을 다 읽었어요 🌙
+          </p>
+        )}
         <div className="px-box-head flex items-end gap-1 pl-2 pr-1 pt-2">
           {tasks ? (
             <div role="tablist" aria-label="광장 소식" className="px-tabs min-w-0 flex-1">
@@ -164,18 +184,15 @@ export function PlazaDrawer({
                 >
                   {t === "news" ? (
                     <>
+                      {neighbors && <LanternIcon lit={lit > 0} />}
                       {title}
-                      {lit > 0 && (
-                        <span className="px-chip" data-tone="sun">
-                          {lit}
-                        </span>
-                      )}
+                      {chip}
                     </>
                   ) : (
                     <>
                       오늘 할 일
                       <span className="px-chip">
-                        {done}/{tasks.length}
+                        {done}/{counted.length}
                       </span>
                     </>
                   )}

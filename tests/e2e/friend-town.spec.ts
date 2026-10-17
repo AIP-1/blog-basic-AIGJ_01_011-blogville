@@ -61,7 +61,7 @@ test.describe("TOWN-15 친구 마을 구경", () => {
     await page.reload();
     await expect(canvas(page)).toHaveAttribute("data-ready", "1");
     const news = drawer.locator('[data-town-news="neighbors"]');
-    await expect(drawer.getByRole("tab", { name: /이웃 새 글/ })).toHaveAttribute("aria-selected", "true");
+    await expect(drawer.getByRole("tab", { name: /불 켜진 집/ })).toHaveAttribute("aria-selected", "true");
     await expect(news).toContainText(`⭐ ${host}님이 즐겨찾는 이웃의 새 글이에요.`);
     await expect(news.locator("[data-news-post]")).toHaveAttribute("href", new RegExp(`^/@${friend}/\\d+$`));
     await expect(news.locator('a[href="/feed/following"]')).toHaveCount(0);

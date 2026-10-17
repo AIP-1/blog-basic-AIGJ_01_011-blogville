@@ -64,6 +64,16 @@ test.describe("광장 HUD", () => {
     const post = drawer(page).locator('[data-task="post"]');
     await expect(post).toHaveAttribute("data-done", "1");
     await expect(post).toContainText("글 보상 1/3");
+    // 오늘 댓글 보상 하나 (원장 reason='comment') → 💬 줄 1/10 (plaza-upgrade-2 B2)
+    await sql`insert into point_ledger (user_id, reason, exp_delta, coin_delta) values (${await userId(username)}, 'comment', 0, 1)`;
+    await openTown(page);
+    await drawer(page).getByRole("tab", { name: /오늘 할 일/ }).click();
+    await expect(drawer(page).locator('[data-task="comment"]')).toContainText("댓글 보상 1/10");
+    await expect(drawer(page).locator('[data-task="comment"]')).toHaveAttribute("data-done", "0");
+    // ✏️ 글쓰기 설명: 초점을 두면 보상 n/3과 한 편의 보상
+    await write.focus();
+    await expect(town(page).locator("[data-write-tip]")).toBeVisible();
+    await expect(town(page).locator("[data-write-tip]")).toHaveText("오늘 글 보상 1/3 · 한 편에 ✨30 🪙30");
 
     const guest = await browser.newPage({ viewport: WIDE });
     await openTown(guest);
@@ -99,7 +109,7 @@ test.describe("광장 HUD", () => {
       where u.username = ${neighbor} order by p.created_at desc, p.id desc limit 1`;
     await openTown(page);
     await expect(news).toHaveAttribute("data-town-news", "neighbors");
-    await expect(drawer(page).getByRole("tab", { name: /이웃 새 글/ })).toHaveAttribute("aria-selected", "true");
+    await expect(drawer(page).getByRole("tab", { name: /불 켜진 집/ })).toHaveAttribute("aria-selected", "true");
     const first = news.locator("[data-news-post]").first();
     await expect(first).toHaveAttribute("href", `/@${neighbor}/${latest.id}`);
     await expect(first).toContainText("글 2");
@@ -109,7 +119,7 @@ test.describe("광장 HUD", () => {
 
     // 탭은 ←·→로 옮기고 게임은 걷지 않는다 (누르고 있어도: 게임은 누른 동안만 걷는다)
     const before = await feet(page);
-    await drawer(page).getByRole("tab", { name: /이웃 새 글/ }).focus();
+    await drawer(page).getByRole("tab", { name: /불 켜진 집/ }).focus();
     await page.keyboard.down("ArrowRight");
     await page.waitForTimeout(400);
     await page.keyboard.up("ArrowRight");
@@ -120,7 +130,7 @@ test.describe("광장 HUD", () => {
 
     // 1440px·1280px: 처음에는 접힌 탭 하나 (펼친 서랍 몸통은 숨는다)
     const body = drawer(page).locator("[data-drawer-panel]");
-    const toggle = drawer(page).getByRole("button", { name: /^이웃 새 글 2 펼치기/ });
+    const toggle = drawer(page).getByRole("button", { name: /^불 켜진 집 2 펼치기/ });
     for (const size of [
       { width: 1440, height: 900 },
       { width: 1280, height: 800 },
@@ -128,6 +138,8 @@ test.describe("광장 HUD", () => {
       await page.setViewportSize(size);
       await expect(body).toBeHidden();
       await expect(toggle).toBeVisible();
+      // 접힌 탭에 할 일 진행 (출석은 세지 않는다, plaza-upgrade-2 B2)
+      await expect(toggle).toContainText("할 일 0/4");
     }
     // 키보드로 펼치면 초점이 고른 탭으로 (숨은 버튼에서 몸으로 떨어져 다음 Space가 게임으로 가지 않게)
     await toggle.focus();
@@ -146,28 +158,42 @@ test.describe("광장 HUD", () => {
     await page.setViewportSize(WIDE);
     await openTown(page);
     await expect(drawer(page).getByRole("tablist")).toBeHidden();
-    await expect(drawer(page).getByRole("button", { name: /^이웃 새 글 2 펼치기, 24시간 안에 쓴 글 2편$/ })).toBeVisible();
+    await expect(drawer(page).getByRole("button", { name: /^불 켜진 집 2 펼치기, 안 읽은 24시간 새 글 2편, 할 일 0\/4$/ })).toBeVisible();
     // 마우스로 펼치면 초점을 놓는다 (다음 Space는 게임으로)
-    await drawer(page).getByRole("button", { name: /^이웃 새 글 2 펼치기/ }).click();
+    await drawer(page).getByRole("button", { name: /^불 켜진 집 2 펼치기/ }).click();
     await expect(drawer(page).getByRole("tablist")).toBeVisible();
     expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
   });
 
-  test("오늘 할 일: 출석은 이미 했고(출석 화면 링크), [✨ 가기]는 그 장소 앞으로 텔레포트해 Space로 들어간다", async ({ page }) => {
+  test("오늘 할 일: 출석은 머리 도장(연속 날·출석 화면 링크), 줄마다 기존 보상, [✨ 가기]는 그 장소 앞으로 텔레포트해 Space로 들어간다", async ({ page }) => {
     await page.setViewportSize(WIDE);
-    await signUpOk(page);
+    const username = await signUpOk(page);
+    // 어제·그저께도 출석했다 (오늘 출석은 화면을 열면 저절로): 연속 3일
+    await sql`insert into attendances (user_id, date, cycle_day)
+      select ${await userId(username)}, (now() at time zone 'Asia/Seoul')::date - n, 1 from generate_series(1, 2) n`;
     await openTown(page);
     await drawer(page).getByRole("tab", { name: /오늘 할 일/ }).click();
     const tasks = drawer(page).getByRole("list", { name: "오늘 할 일" });
     await expect(tasks.locator("[data-task]")).toHaveCount(4);
-    await expect(tasks.locator('[data-task="attendance"]')).toHaveAttribute("data-done", "1");
-    await expect(tasks.locator('[data-task="attendance"]')).toContainText("한 일, 📮 출석 도장");
-    // 게시판 앞은 마을 소식 입구와 겹쳐 텔레포트하지 않고 출석 화면으로
-    await expect(tasks.locator('[data-task="attendance"]').getByRole("link", { name: "가기: 출석 도장" })).toHaveAttribute("href", "/attendance");
+    await expect(tasks.locator('[data-task="attendance"]')).toHaveCount(0);
+    // 출석은 줄이 아니라 머리 도장 (게시판 앞은 마을 소식 입구와 겹쳐 텔레포트하지 않고 출석 화면으로)
+    const stamp = drawer(page).locator("[data-attendance]");
+    await expect(stamp).toHaveAttribute("data-attendance", "1");
+    await expect(stamp).toHaveText(/📮\s*출석 완료 · 🔥 연속 3일/);
+    await expect(stamp).toHaveAttribute("href", "/attendance");
     await expect(tasks.locator('[data-task="fishing"]')).toHaveAttribute("data-done", "0");
+    await expect(tasks.locator('[data-task="fishing"]')).toContainText("최대 🪙100");
     await expect(tasks.locator('[data-task="farm"]')).toContainText("돌보기 보상 0/15");
+    await expect(tasks.locator('[data-task="post"]')).toContainText("✨30 🪙30");
     await expect(tasks.locator('[data-task="post"]').getByRole("link", { name: "쓰기: 공개 글 쓰기" })).toHaveAttribute("href", "/write");
-    await expect(drawer(page).getByRole("tab", { name: /오늘 할 일/ })).toContainText("1/4");
+    // 이번 주 글감 보조 줄
+    await expect(tasks.locator('[data-task="post"] [data-task-prompt]')).toHaveAttribute("href", "/prompt");
+    await expect(tasks.locator('[data-task="post"] [data-task-prompt]')).toContainText("이번 주 글감:");
+    await expect(tasks.locator('[data-task="comment"]')).toContainText("💬 이웃 글에 댓글");
+    await expect(tasks.locator('[data-task="comment"]')).toContainText("✨5 🪙5");
+    // 이웃 글이 없으면 💬은 마을 소식으로
+    await expect(tasks.locator('[data-task="comment"]').getByRole("link", { name: "가기: 이웃 글에 댓글" })).toHaveAttribute("href", "/feed");
+    await expect(drawer(page).getByRole("tab", { name: /오늘 할 일/ })).toContainText("0/4");
 
     await tasks.getByRole("button", { name: "가기: 낚시 한 번, 🎣 낚시터 앞으로 텔레포트" }).click();
     await expect(prompt(page)).toHaveText("🎣 낚시터 · Space 들어가기");
