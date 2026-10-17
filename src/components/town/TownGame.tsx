@@ -5,16 +5,45 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { findArt } from "@/lib/art";
 import { pixelRects, type PixelArt } from "@/lib/art/characters";
 import { walkDir, walkFrame, WALK_DIRS, WALK_FPS, WALK_FRAMES, type ColorGrid, type WalkDir } from "@/lib/art/walk";
-import { cellGroups, chimneyTop, glowCells, lampArt, LIT_GLOW, mailboxArt, smokeArt, SMOKE_FRAMES, TOWN_CELL } from "@/lib/art/town";
-import { BOARD_POS, entranceDistance, HOUSE_LOTS, INTERACT_DISTANCE, lotFront, PLAYER_SIZE, shortName, SPEED, subSteps, WORLD, nearestEntrance, normalize, step, type Point } from "@/lib/town/layout";
-import { createNpcs, NPC_TAG_DISTANCE, npcGraph, updateNpcs, type Npc } from "@/lib/town/npc";
+import {
+  cellGroups,
+  chimneyTop,
+  darken,
+  glowCells,
+  lampArt,
+  LANTERN,
+  lanternArt,
+  litHouseArt,
+  LIT_GLOW,
+  mailboxArt,
+  markerArt,
+  smokeArt,
+  SMOKE_FRAMES,
+  snowCap,
+  sparkArt,
+  SPARK_FRAMES,
+  TOWN_CELL,
+  treeArt,
+  withEaveLantern,
+} from "@/lib/art/town";
+import { BOARD_POS, entranceDistance, HOUSE_LOTS, INTERACT_DISTANCE, lotFront, PLAYER_SIZE, shortName, SPEED, subSteps, WORLD, nearestEntrance, normalize, type Point } from "@/lib/town/layout";
+import { createNpcs, neighborArt, NPC_TAG_DISTANCE, npcGraph, updateNpcs, type Npc } from "@/lib/town/npc";
+import { slideStep, WalkGrid } from "@/lib/town/path";
 import {
   artSize,
   artVisibleHeight,
+  BOARD_DOORS,
+  BOARD_PLANK_LIFT,
   entranceOwner,
   entrancePrompt,
+  hasNews,
+  lanternPlacements,
+  lanternRopes,
+  lanternSlots,
   lotChoice,
   mailboxLot,
+  mastTop,
+  ropePoint,
   structureAt as structureAtPoint,
   townLayout,
   type BoardState,
@@ -23,13 +52,15 @@ import {
   type TownHouseInput,
 } from "@/lib/town/structures";
 import { emitTown, onTown } from "@/lib/town/events";
-import { lampsOn, msUntilNextSky, skyAt, SKY_TINT, type Sky } from "@/lib/town/sky";
+import { DUSK_GLOW, lampsOn, msUntilNextSky, skyAt, SKY_TINT, type Sky } from "@/lib/town/sky";
 import { zoneAt, type Zone } from "@/lib/town/zones";
+import { todayKST } from "@/lib/kst";
 import type { TodayTask } from "@/lib/town/plaza";
-import type { Season } from "@/lib/town/season";
+import { seasonAt, type Season } from "@/lib/town/season";
 import { onStairs, SKY_HEIGHT, STAIR_SLOW, stairEnds, STAIRS } from "@/lib/town/terrain";
-import { bubbleText, PIXEL_FONT_PROBE, TagCache } from "./canvas-text";
+import { bubbleWithAge, PIXEL_FONT_PROBE, TagCache } from "./canvas-text";
 import { bakeGlow, bakeGround, bakeSkyBand, bakeStars, GROUND_CELL } from "./ground";
+import { COMPACT_EVENT } from "./PlaceSign";
 
 /** 휴대폰에는 마을이 없다 (TOWN-01): 폭 640px 미만 */
 export const PHONE_MEDIA = "(max-width: 639px)";
@@ -66,6 +97,94 @@ const ANIM_MS = 333;
 const LIGHT: Record<Sky, number> = { dawn: 0.6, day: 0, dusk: 0.8, night: 1 };
 /** 따뜻한 등불 빛 (RGB) */
 const WARM = [255, 164, 72] as const;
+/** 초롱 빛 무리 (RGB, #ffe9a6) */
+const LANTERN_LIGHT = [255, 233, 166] as const;
+/** 클릭한 길을 땅에 보이는 시간 (ms) */
+/** 세계 밖 숲 띠 폭 (px) */
+const EDGE_FOREST = 480;
+const ROUTE_MS = 600;
+/** 게시판(`BOARD_POS`)에서 이만큼 안에 서면 위 가운데 장소 간판을 접는다 (게시판 이름표를 가리지 않게) */
+const BOARD_COMPACT = 220;
+/** 이웃이 자기 집 문 앞 이만큼 안에 서 있으면 입구 안내와 새 글 말풍선을 한 줄로 합친다 */
+const DOORSTEP = 70;
+/** 줄등 초롱이 흔들리는 간격 (ms, 두 장) */
+const SWAY_MS = 700;
+/** 글 쓰고 돌아온 순간 (C2): 창이 하나씩 켜지는 간격, 처음 쉬는 시간, 쪽지가 떠 있는 시간 (ms) */
+const CELEBRATE = { first: 500, gap: 380, note: 7000 } as const;
+/** 불꽃 한 장 (ms) */
+const SPARK_MS = 110;
+
+/** 그림에서 고른 글자 칸만 남기고 글자마다 색을 준 덧칠 그림 (밤 지붕 다시 칠하기) */
+function cellsOnly(source: PixelArt, colors: Record<string, string>): PixelArt {
+  const keep = new Set(Object.keys(colors));
+  return { rows: source.rows.map((r) => [...r].map((c) => (keep.has(c) ? c : ".")).join("")), palette: colors };
+}
+
+/** 글자 `ch`가 이어진 덩어리마다 그 칸들 */
+function cellBlobs(source: PixelArt, ch: string): [number, number][][] {
+  const seen = new Set<string>();
+  const out: [number, number][][] = [];
+  source.rows.forEach((row, y) =>
+    [...row].forEach((c, x) => {
+      if (c !== ch || seen.has(`${x},${y}`)) return;
+      const blob: [number, number][] = [];
+      const stack: [number, number][] = [[x, y]];
+      seen.add(`${x},${y}`);
+      while (stack.length) {
+        const [cx, cy] = stack.pop()!;
+        blob.push([cx, cy]);
+        for (const [nx, ny] of [
+          [cx + 1, cy],
+          [cx - 1, cy],
+          [cx, cy + 1],
+          [cx, cy - 1],
+        ]) {
+          if (source.rows[ny]?.[nx] === ch && !seen.has(`${nx},${ny}`)) {
+            seen.add(`${nx},${ny}`);
+            stack.push([nx, ny]);
+          }
+        }
+      }
+      out.push(blob);
+    }),
+  );
+  return out;
+}
+
+/**
+ * 글 쓰고 돌아온 순간의 단계 그림 (C2): 0단계는 창과 처마 초롱이 모두 꺼진 집, k단계는 앞의 k개가 켜진 집.
+ * 창은 1층부터 왼쪽에서 오른쪽으로, 처마 초롱이 맨 끝이다. 칸 배치는 같아 몸체·이름표 자리가 같다.
+ */
+function celebrateStages(lit: PixelArt): PixelArt[] {
+  const mid = (b: [number, number][]) => b.reduce((a, [x, y]) => ({ x: a.x + x / b.length, y: a.y + y / b.length }), { x: 0, y: 0 });
+  const windows = cellBlobs(lit, "G").sort((a, b) => mid(b).y - mid(a).y || mid(a).x - mid(b).x);
+  const lanterns = cellBlobs(lit, "J");
+  const groups = [...windows, ...lanterns];
+  const lanternAt = lanterns.length > 0 ? windows.length : -1;
+  return Array.from({ length: groups.length + 1 }, (_, k) => {
+    const rows = lit.rows.map((r) => [...r]);
+    groups.forEach((cells, i) => {
+      if (i >= k) for (const [x, y] of cells) rows[y][x] = rows[y][x] === "J" ? "v" : "u";
+    });
+    const lanternOff = lanternAt >= 0 && k <= lanternAt;
+    return {
+      rows: rows.map((r) => r.join("")),
+      palette: { ...lit.palette, u: "#bfe6ff", v: LANTERN.offRed, ...(lanternOff ? { M: LANTERN.offRed, U: LANTERN.offBlue, y: "#a8946a" } : {}) },
+    };
+  });
+}
+
+/** 날짜 하나에 한 번만 (이 기기): 처음이면 true를 돌려주고 적어 둔다. 저장소를 못 쓰면 늘 true */
+function firstToday(key: string): boolean {
+  try {
+    const name = `${key}-${todayKST()}`;
+    if (localStorage.getItem(name)) return false;
+    localStorage.setItem(name, "1");
+  } catch {
+    // 저장소를 못 쓰면 매번 보인다
+  }
+  return true;
+}
 
 function subscribePhone(onChange: () => void) {
   const media = window.matchMedia(PHONE_MEDIA);
@@ -181,12 +300,15 @@ export function TownGame({
   place = "마을",
   sky = null,
   board = { papers: 3, stamps: 3 },
+  tasks,
+  season = null,
+  celebrate = null,
 }: {
-  /** 오늘 할 일 (plaza-upgrade-2). TODO(world): 아직 쓰지 않는다 */
+  /** 오늘 할 일 (광장 개편 2, A3): 안 끝낸 일의 장소(연못·외양간·내 집) 위에 '!' 쪽지. 없으면 표시도 없다 */
   tasks?: TodayTask[];
-  /** 계절 고정 (`?season=`). null이면 지금 한국 시각 (plaza-upgrade-2). TODO(world): 아직 쓰지 않는다 */
+  /** 계절 고정 (`?season=`). null이면 지금 한국 시각 (광장 개편 2, A5) */
   season?: Season | null;
-  /** 글을 쓰고 돌아왔을 때 축하 (내 집이 보이는 마을 수, plaza-upgrade-2). TODO(world): 아직 쓰지 않는다 */
+  /** 글을 쓰고 돌아왔을 때 내 집에 불이 켜지는 순간 (내 집이 보이는 이웃 마을 수, 광장 개편 2, C2). 같은 날 두 번째부터는 건너뛴다 */
   celebrate?: { villages: number } | null;
   houses: TownHouseInput[];
   member: boolean;
@@ -214,9 +336,13 @@ export function TownGame({
   const [prompt, setPrompt] = useState<string | null>(null);
   const [touch, setTouch] = useState(false);
   const [hintFolded, setHintFolded] = useState(false);
+  // 글 쓰고 돌아온 순간의 쪽지 (화면 낭독기에도 읽힌다)
+  const [note, setNote] = useState<string | null>(null);
+  // 이 화면에서 축하를 시작한 때 (게임을 다시 만들어도 이어 간다)
+  const celebrated = useRef<number | null>(null);
   // 이 화면을 연 횟수는 한 번만 센다 (집 목록이 바뀌어 게임을 다시 만들어도)
   const visited = useRef(false);
-  const data = JSON.stringify({ houses, member, layers, name, start, startKey, mailFlag, chooseLots, sky, board });
+  const data = JSON.stringify({ houses, member, layers, name, start, startKey, mailFlag, chooseLots, sky, board, tasks: tasks ?? null, season, celebrate });
   // 창 폭이 휴대폰 조건을 넘나들면 게임을 끄고 다시 만든다
   const phone = usePhoneWidth();
 
@@ -235,8 +361,11 @@ export function TownGame({
       startKey: string;
       sky: Sky | null;
       board: BoardState;
+      tasks: TodayTask[] | null;
+      season: Season | null;
+      celebrate: { villages: number } | null;
     };
-    const { houses, member, layers, name, start, startKey, mailFlag, chooseLots, board } = parsed;
+    const { houses, member, layers, name, start, startKey, mailFlag, chooseLots, board, tasks } = parsed;
     const fixedSky = parsed.sky;
     const touchScreen = window.matchMedia("(pointer: coarse)").matches;
     setTouch(touchScreen);
@@ -253,8 +382,22 @@ export function TownGame({
       }
     }
     const ctx = canvas.getContext("2d")!;
-    const { structures, entrances, walls } = townLayout(houses, member, mailFlag, chooseLots, board);
+    const seasonNow = parsed.season ?? seasonAt(new Date());
+    const postTask = tasks?.find((t) => t.id === "post");
+    const { structures, entrances, walls } = townLayout(houses, member, mailFlag, chooseLots, board, { season: seasonNow, homePosted: postTask?.done });
     const bodies = [...walls, ...structures.flatMap((s) => (s.body ? [s.body] : []))];
+    // 클릭 이동 길찾기 (A1): 걸을 수 있는 땅 지도는 한 번만
+    const walkGrid = new WalkGrid(bodies);
+    const mineHouse = houses.find((h) => h.mine);
+    const mineId = mineHouse ? `house:${mineHouse.lot}` : null;
+    const mineStructure = mineId ? structures.find((s) => s.id === mineId) : undefined;
+    // 친구 마을 (0번 자리가 남의 집): 외양간 돌보기는 내 일이 아니다
+    const hostTown = houses.some((h) => h.lot === 0 && !h.mine) && member;
+
+    // 글 쓰고 돌아온 순간 (C2): 오늘 처음이면 내 집 창이 하나씩 켜진다. 내 집이 아직 불 켜진 그림이 아니면 지금 켠다
+    const celebrateStart = celebrated.current ?? (parsed.celebrate && mineStructure && firstToday("bv-lit") ? performance.now() : null);
+    if (celebrateStart !== null) celebrated.current = celebrateStart;
+    canvas.dataset.celebrate = celebrateStart !== null ? "1" : "0";
     const sprites = new Map<object, HTMLCanvasElement>();
     const sprite = (art: PixelArt) => {
       let baked = sprites.get(art);
@@ -277,11 +420,17 @@ export function TownGame({
     // 이름표 자리 (그림 맨 위 빈 줄을 뺀 높이)와 문 (마우스를 올리면 손 모양, 누르면 그 문으로)
     const labeled = structures.filter((s) => s.label);
     const tagLift = new Map(labeled.map((s) => [s, artVisibleHeight(s.art) + 4]));
-    const doors = new Map(structures.map((s) => [s, entrances.filter((e) => e.id === s.id || (s.id === "board" && (e.id === "feed" || e.id === "attendance")))]));
-    const mineHouse = houses.find((h) => h.mine);
-    const mineId = mineHouse ? `house:${mineHouse.lot}` : null;
+    const boardDoorIds = new Set<string>(BOARD_DOORS.map((d) => d.id));
+    const doors = new Map(structures.map((s) => [s, entrances.filter((e) => e.id === s.id || (s.id === "board" && boardDoorIds.has(e.id)))]));
 
-    // 글 쓴 집 (fresh): 불 켜진 창 덧칠, 창마다 빛 무리 자리, 굴뚝 연기 자리 (세계 좌표)
+    // 글 쓰고 돌아온 순간 (C2): 내 집이 아직 불 켜진 그림이 아니면 지금 켠다 (글을 쓴 바로 뒤라 집 목록이 늦을 수 있다)
+    if (celebrateStart !== null && mineStructure && !mineStructure.lit) {
+      mineStructure.art = withEaveLantern(litHouseArt(mineStructure.art));
+      mineStructure.lit = true;
+    }
+    // 글 쓴 집 (fresh): 불 켜진 창·처마 초롱 덧칠, 창마다 빛 무리와 땅 빛 자국 자리, 굴뚝 연기 자리 (세계 좌표).
+    // 축하하는 내 집은 창이 하나씩 켜지는 단계 그림을 미리 굽는다 (`stages`, 마지막 단계가 다 켜진 그림)
+    const glassOf = (a: PixelArt) => bake([cellsOnly(a, { G: LIT_GLOW, J: LIT_GLOW })], TOWN_CELL);
     const litHouses = structures
       .filter((s) => s.lit)
       .map((s) => {
@@ -289,22 +438,67 @@ export function TownGame({
         const left = s.x - width / 2;
         const top = s.y - height;
         const chimney = chimneyTop(s.art);
+        const arts = s === mineStructure && celebrateStart !== null ? celebrateStages(s.art) : [s.art];
+        const stages = arts.map((a) => {
+          const windows = [...cellGroups(a, "G"), ...cellGroups(a, "J")].map((c) => ({ x: left + c.x * TOWN_CELL, y: top + c.y * TOWN_CELL }));
+          return {
+            art: a,
+            glass: glassOf(a),
+            windows,
+            // 땅 빛 자국: 1층 창 아래 (집 아랫변 바로 앞)
+            spills: cellGroups(a, "G")
+              .filter((c) => c.y > a.rows.length * 0.55)
+              .map((c) => ({ x: left + c.x * TOWN_CELL, y: s.y + 4 })),
+          };
+        });
+        for (const st of stages) sprite(st.art);
+        const lantern = cellGroups(s.art, "J")[0];
         return {
           s,
           left,
           top,
           width,
           height,
-          glass: bake([glowCells(s.art, "G", LIT_GLOW)], TOWN_CELL),
-          windows: cellGroups(s.art, "G").map((c) => ({ x: left + c.x * TOWN_CELL, y: top + c.y * TOWN_CELL })),
+          stages,
           smoke: chimney ? { x: left + chimney.x * TOWN_CELL, y: top + chimney.y * TOWN_CELL } : null,
+          lantern: lantern ? { x: left + lantern.x * TOWN_CELL, y: top + lantern.y * TOWN_CELL } : null,
         };
       });
-    const smokeAt = new Map(litHouses.map((l) => [l.s, l.smoke]));
+    const litOf = new Map(litHouses.map((l) => [l.s, l]));
+    // 축하 단계: 처음 쉬고 창이 하나씩 켜진다. 움직임 줄이기면 바로 다 켜진 그림
+    const stageOf = (l: (typeof litHouses)[number], now: number) => {
+      const n = l.stages.length - 1;
+      if (n === 0 || celebrateStart === null || still) return n;
+      return Math.max(0, Math.min(n, Math.floor((now - celebrateStart - CELEBRATE.first) / CELEBRATE.gap) + 1));
+    };
+    const mineLit = mineStructure ? litOf.get(mineStructure) : undefined;
+    /** 축하에서 다 켜진 때 (ms, performance.now 기준) */
+    const celebrateLitAt = celebrateStart !== null && mineLit ? celebrateStart + CELEBRATE.first + (mineLit.stages.length - 2) * CELEBRATE.gap : null;
+    // 밤 지붕 (A4): 덧칠 뒤에 집 지붕 칸을 원래 지붕색을 어둡게(0.35) 한 색으로 다시 칠해 빨강·파랑 지붕이 회보라로 뭉개지지 않게
+    const roofs = structures
+      .filter((s) => s.id.startsWith("house:") && !s.alpha && s.art.palette.R)
+      .map((s) => {
+        const { width, height } = artSize(s.art);
+        return { s, left: s.x - width / 2, top: s.y - height, width, height, img: bake([cellsOnly(s.art, { R: darken(s.art.palette.R, 0.35), r: darken(s.art.palette.r ?? s.art.palette.R, 0.35) })], TOWN_CELL) };
+      });
     const smokeSprites = Array.from({ length: SMOKE_FRAMES }, (_, f) => bake([smokeArt(f)], TOWN_CELL));
     const lampGlow = bakeGlow(64, 64, WARM, [0.34, 0.2, 0.09]);
     const poolGlow = bakeGlow(60, 22, WARM, [0.26, 0.12]);
     const windowGlow = bakeGlow(36, 30, WARM, [0.5, 0.26, 0.1]);
+    const lanternGlow = bakeGlow(64, 64, LANTERN_LIGHT, [0.35, 0.16, 0.06]);
+    // 켜진 창 아래 땅 빛 자국 (30×18 사다리꼴, #ffd56e 0.22): 4px 칸으로 끊어 아래로 넓어진다
+    const spillGlow = (() => {
+      const c = document.createElement("canvas");
+      c.width = 30;
+      c.height = 18;
+      const g = c.getContext("2d")!;
+      g.fillStyle = "rgba(255, 213, 110, 0.22)";
+      for (let y = 0; y < 18; y += 3) {
+        const half = 8 + Math.round((y / 18) * 7);
+        g.fillRect(15 - half, y, half * 2, 3);
+      }
+      return c;
+    })();
     const glowAt = (glow: HTMLCanvasElement, x: number, y: number, vw: number, vh: number) => {
       const w = glow.width * GROUND_CELL;
       const h = glow.height * GROUND_CELL;
@@ -315,15 +509,125 @@ export function TownGame({
     };
 
     // 시험 훅: 불 켜진 집 자리, 게시판 쪽지·도장, 내 우체통 깃발 (깃발은 `bv-mail`로 바뀌어도 React가 되돌리지 않게 여기서만 쓴다)
-    canvas.dataset.lit = houses
-      .filter((h) => h.fresh)
-      .map((h) => h.lot)
-      .sort((a, b) => a - b)
-      .join(" ");
+    const lots = (list: readonly TownHouseInput[]) =>
+      list
+        .map((h) => h.lot)
+        .sort((a, b) => a - b)
+        .join(" ");
+    canvas.dataset.lit = lots(houses.filter((h) => h.fresh && !h.suggested));
     canvas.dataset.board = `${board.papers},${board.stamps}`;
+    // 광장 개편 2 시험 훅: 계절, 이사 올 집 자리, 이웃 우체통 깃발(안 읽은 새 글), 줄등 초롱(`자리:켜짐`)
+    canvas.dataset.season = seasonNow;
+    canvas.dataset.suggested = lots(houses.filter((h) => h.suggested));
+    canvas.dataset.flags = lots(houses.filter((h) => !h.mine && !h.suggested && hasNews(h)));
     let mailFlagNow = mailFlag;
     canvas.dataset.mailFlag = mailFlag ? "1" : "0";
     const myMailbox = mineHouse ? structures.find((s) => s.id === `mailbox:${mineHouse.lot}`) : undefined;
+    const snowy = (a: PixelArt) => (seasonNow === "winter" ? snowCap(a) : a);
+
+    // 청사초롱 줄등 (A4): 가로등 네 꼭대기에서 장대까지 줄 네 가닥, 즐겨찾는 이웃 한 명에 초롱 하나. 장대 꼭대기는 0번 자리 주인의 초롱
+    const slots = lanternSlots(houses);
+    canvas.dataset.lanterns = slots.map((l) => `${l.lot}:${l.lit ? 1 : 0}`).join(" ");
+    const hooks = lanternPlacements(slots.length);
+    const lanternSprites = {
+      m: [bake([lanternArt(false, "m")], TOWN_CELL), bake([lanternArt(true, "m")], TOWN_CELL)],
+      l: [bake([lanternArt(false, "l")], TOWN_CELL), bake([lanternArt(true, "l")], TOWN_CELL)],
+    };
+    const owner = houses.find((h) => h.lot === 0 && !h.suggested);
+    const homeLit = owner ? (owner.mine ? (postTask?.done ?? owner.fresh === true) : owner.fresh === true) : false;
+    const top = mastTop();
+    const lanterns = [
+      ...slots.map((slot, i) => ({ size: "m" as const, lit: slot.lit, brightness: slot.brightness, hook: hooks[i].hook, phase: i % 2 })),
+      ...(owner ? [{ size: "l" as const, lit: homeLit, brightness: 1, hook: top, phase: -1 }] : []),
+    ];
+    // 줄 네 가닥은 한 번 굽는다 (2px 먹색, 가운데가 처진다)
+    const ropes = lanternRopes();
+    const ropeBox = {
+      left: Math.floor(Math.min(...ropes.flatMap((r) => [r.from.x, r.to.x]))) - 4,
+      top: Math.floor(Math.min(...ropes.flatMap((r) => [r.from.y, r.to.y]))) - 4,
+      right: Math.ceil(Math.max(...ropes.flatMap((r) => [r.from.x, r.to.x]))) + 4,
+      bottom: Math.ceil(Math.max(...ropes.flatMap((r) => [r.from.y, r.to.y]))) + 30,
+    };
+    const ropeLayer = document.createElement("canvas");
+    ropeLayer.width = ropeBox.right - ropeBox.left;
+    ropeLayer.height = ropeBox.bottom - ropeBox.top;
+    {
+      const g = ropeLayer.getContext("2d")!;
+      g.fillStyle = LANTERN.ink;
+      for (const r of ropes) {
+        const n = Math.ceil(Math.abs(r.to.x - r.from.x) * 2);
+        for (let i = 0; i <= n; i++) {
+          const p = ropePoint(r, i / n);
+          g.fillRect(Math.round(p.x) - ropeBox.left - 1, Math.round(p.y) - ropeBox.top - 1, 2, 2);
+        }
+      }
+    }
+    const lanternBox = (l: (typeof lanterns)[number], swayOn: boolean) => {
+      const img = lanternSprites[l.size][0];
+      // 두 장으로 한 칸 흔들린다 (이웃한 초롱은 엇갈려서)
+      const sway = swayOn && l.phase >= 0 ? ((Math.floor(performance.now() / SWAY_MS) + l.phase) % 2) * TOWN_CELL : 0;
+      // 장대 꼭대기 초롱은 꼭지 위에 얹고, 줄 초롱은 줄 점에서 한 칸 아래로 매단다
+      const y = l.size === "l" ? l.hook.y - img.height + TOWN_CELL : l.hook.y + 2;
+      return { x: Math.round(l.hook.x - img.width / 2 + sway), y: Math.round(y), width: img.width, height: img.height };
+    };
+
+    // 오늘 할 일 '!' 쪽지 (A3): 안 끝낸 일의 장소 위. 낚시는 연못, 돌보기는 외양간(내 마을만), 공개 글은 내 집
+    const markerSprites = [bake([markerArt()], TOWN_CELL)];
+    const taskEntrance = (id: string) => entrances.find((e) => e.id === id);
+    const markers = (tasks ?? [])
+      .filter((t) => !t.done)
+      .flatMap((t) => {
+        const spot = t.id === "fishing" ? "pond" : t.id === "farm" && !hostTown ? "farm" : t.id === "post" && mineStructure ? "home" : null;
+        if (!spot) return [];
+        const s = spot === "home" ? mineStructure : structures.find((x) => x.id === spot);
+        if (!s) return [];
+        const { width } = artSize(s.art);
+        const front = spot === "home" ? lotFront(mineHouse!.lot) : null;
+        const e: TownEntrance | undefined = spot === "home" ? { id: "marker:home", x: front!.x, y: front!.y, label: "✏️ 공개 글 쓰기", href: "/write" } : taskEntrance(spot);
+        if (!e) return [];
+        const x = spot === "home" ? s.x - 52 : s.x + width / 2 - 30;
+        const y = s.y - artVisibleHeight(s.art) + (spot === "home" ? 14 : -4);
+        return [{ spot, x, y, entrance: e }];
+      })
+      .sort((a, b) => ["pond", "farm", "home"].indexOf(a.spot) - ["pond", "farm", "home"].indexOf(b.spot));
+    canvas.dataset.markers = markers.map((m) => m.spot).join(" ");
+    const markerBox = (m: (typeof markers)[number], bob: number) => {
+      const img = markerSprites[0];
+      return { x: Math.round(m.x - img.width / 2), y: Math.round(m.y - img.height - bob), width: img.width, height: img.height };
+    };
+    // 불꽃 (넷을 다 한 날 처음, 글 쓰고 돌아온 순간): 그 자리와 시작 때
+    const sparkSprites = Array.from({ length: SPARK_FRAMES }, (_, f) => bake([sparkArt(f)], TOWN_CELL));
+    const sparks: { x: number; y: number; at: number }[] = [];
+    const four = (tasks ?? []).filter((t) => ["attendance", "post", "fishing", "farm"].includes(t.id));
+    if (four.length === 4 && four.every((t) => t.done) && mineStructure && firstToday("bv-done")) {
+      const l = litOf.get(mineStructure);
+      const at = l?.lantern ?? { x: mineStructure.x, y: mineStructure.y - artVisibleHeight(mineStructure.art) };
+      sparks.push({ x: at.x, y: at.y, at: performance.now() + 600 });
+    }
+    if (celebrateLitAt !== null && mineLit?.lantern) sparks.push({ x: mineLit.lantern.x, y: mineLit.lantern.y, at: celebrateLitAt + CELEBRATE.gap });
+    const celebrateNote = parsed.celebrate
+      ? parsed.celebrate.villages > 0
+        ? `🏮 이웃 마을 ${parsed.celebrate.villages}곳에 불이 켜졌어요`
+        : "🏮 내 초롱이 켜졌어요 · 이웃이 ⭐하면 그 마을에도 켜져요"
+      : null;
+    let noteShown = false;
+
+    // 우체통 쪽지 (B3 `bv-note {lot}`): 그 우체통 깃발을 0.8초 들었다 내린다
+    const noteTimers = new Set<number>();
+    const onNote = (event: Event) => {
+      const lot = (event as CustomEvent<{ lot: number }>).detail?.lot;
+      const box = structures.find((x) => x.id === `mailbox:${lot}`);
+      const house = houses.find((h) => h.lot === lot);
+      if (!box || !house || house.suggested) return;
+      const mine = house.mine;
+      box.art = snowy(mailboxArt(mine, true));
+      const timer = window.setTimeout(() => {
+        noteTimers.delete(timer);
+        box.art = snowy(mailboxArt(mine, mine ? mailFlagNow : hasNews(house)));
+      }, 800);
+      noteTimers.add(timer);
+    };
+    window.addEventListener("bv-note", onNote);
 
     // 하늘 (한국 시각): 고정하지 않았으면 다음 바뀌는 때에 다시 본다
     let currentSky: Sky = fixedSky ?? skyAt();
@@ -371,8 +675,8 @@ export function TownGame({
       .catch(() => {});
 
     // 걷는 그림 (TOWN-17): 방향마다 서 있기 + 걷기 4칸
-    const bakeSheet = (keys: readonly string[]) => {
-      const arts = keys.map(findArt).filter((a): a is PixelArt => a !== undefined);
+    const bakeSheet = (keys: readonly string[], given?: PixelArt) => {
+      const arts = given ? [given] : keys.map(findArt).filter((a): a is PixelArt => a !== undefined);
       const sheet = new Map<string, HTMLCanvasElement>();
       if (arts.length > 0) {
         for (const d of WALK_DIRS) for (let f = 0; f <= WALK_FRAMES; f++) sheet.set(`${d}:${f}`, bakeGrid(walkFrame(arts, d, f), PLAYER_SIZE / 16));
@@ -383,16 +687,26 @@ export function TownGame({
 
     // 걸어 다니는 이웃 (TOWN-19): 집이 선 이웃(1~10번)이 흙길을 걷는다. 내 집(0번) 앞에는 오지 않는다
     const graph = npcGraph(bodies, lotFront(0), HOUSE_LOTS.map((_, i) => lotFront(i)));
-    const npcs = createNpcs(
-      graph,
-      houses.filter((h) => h.lot > 0),
-      Math.random,
-    );
+    // 이사 올 이웃(흐린 집)은 걷지 않는다 (A6)
+    const walkers = houses.filter((h) => h.lot > 0 && !h.suggested);
+    const npcs = createNpcs(graph, walkers, Math.random);
     const npcSheets = new Map<number, Map<string, HTMLCanvasElement>>();
-    for (const h of houses) if (h.lot > 0) npcSheets.set(h.lot, bakeSheet(h.layers && h.layers.length > 0 ? h.layers : ["char.visitor"]));
+    // 입은 것이 없는 이웃은 블로그 주소로 고른 머리·윗옷 색 (A2)
+    for (const h of walkers) npcSheets.set(h.lot, h.layers && h.layers.length > 0 ? bakeSheet(h.layers) : bakeSheet([], neighborArt(h.slug)));
     const npcNames = new Map(houses.map((h) => [h.lot, shortName(h.nickname)]));
-    // 글 쓴 이웃의 새 글 제목 (말풍선)
-    const titles = new Map(houses.filter((h) => h.fresh && h.lot > 0 && h.latestTitle).map((h) => [h.lot, bubbleText(h.latestTitle!)]));
+    // 안 읽은 새 글이 있는 이웃의 말풍선 (`✎ 제목 · 2시간 전`)과 누르면 갈 글 (A2, B4)
+    const bubbleNow = new Date();
+    const titles = new Map(
+      walkers
+        .filter((h) => hasNews(h) && (h.recentPosts?.[0]?.title ?? h.latestTitle))
+        .map((h) => {
+          const latest = h.recentPosts?.[0];
+          const title = latest?.title ?? h.latestTitle!;
+          return [h.lot, { title, text: bubbleWithAge(title, latest?.createdAt, bubbleNow), href: latest ? `/@${h.slug}/${latest.id}` : `/@${h.slug}`, door: lotFront(h.lot) }];
+        }),
+    );
+    // 지금 그린 말풍선 자리 (화면 좌표): 누르면 그 글로
+    let bubbleHit: { lot: number; href: string; x: number; y: number; width: number; height: number } | null = null;
     const npcTime = new Map<number, number>();
     canvas.dataset.npcs = String(npcs.length);
     // 마우스가 올라간 곳 (이웃 이름표·집 문패)
@@ -407,20 +721,43 @@ export function TownGame({
       return Math.abs(p.x - x) <= size.width / 2 && p.y <= bottom && p.y >= bottom - size.height;
     };
     const tagAt = (p: Point): Structure | undefined => labeled.find((s) => inTag(p, s.label!, tagStyle(s), s.x, s.y - tagLift.get(s)!));
-    // 게시판 아래 두 팻말 (`소식`·`출석`)은 판 그림 밖 다리 사이에 매달려 있다
-    const onBoardPlank = (p: Point) =>
-      inTag(p, "소식", "sign", BOARD_POS.x - 60, BOARD_POS.y - 24) || inTag(p, "출석", "sign", BOARD_POS.x + 60, BOARD_POS.y - 24);
+    // 게시판 아래 세 팻말 (`소식`·`글감`·`출석`)은 판 그림 밖 다리 사이에 매달려 있다. 가운데 글감은 종이 쪽지
+    const plankStyle = (id: string) => (id === "prompt" ? "plate" : "sign");
+    const onBoardPlank = (p: Point) => BOARD_DOORS.some((d) => inTag(p, d.plank, plankStyle(d.id), BOARD_POS.x + d.dx, BOARD_POS.y - BOARD_PLANK_LIFT));
     // 그림의 칠한 칸만 (집 양옆 풀밭을 눌렀으면 집이 아니라 그 풀밭으로 걷는다), 그리고 이름표·팻말
     const structureAt = (p: Point): Structure | undefined =>
       structureAtPoint(structures, p) ?? tagAt(p) ?? (boardStructure && onBoardPlank(p) ? boardStructure : undefined);
     // 입구마다 안내 말풍선을 띄울 이름표 자리 (건물·집). 없으면 입구 위
     const promptOwner = new Map(entrances.map((e) => [e, entranceOwner(e, structures)]));
-    const ground = bakeGround();
+    const ground = bakeGround(seasonNow);
+    // 세계 밖 (넓은 화면에서 서랍을 비켜 카메라가 동쪽 끝을 넘을 때): 빽빽한 숲으로 채운다
+    const edgeForest = (() => {
+      const c = document.createElement("canvas");
+      c.width = EDGE_FOREST;
+      c.height = WORLD.height;
+      const g = c.getContext("2d")!;
+      g.fillStyle = "#2a7348";
+      g.fillRect(0, 0, c.width, c.height);
+      const trees = [0, 1, 2, 3].map((v) => bake([treeArt(v, seasonNow)], TOWN_CELL));
+      let row = 0;
+      for (let y = 0; y < WORLD.height + 80; y += 45, row++) {
+        for (let x = (row % 2) * 30 - 10; x < c.width + 40; x += 60) {
+          const t = trees[(row * 3 + Math.round(x / 60)) % trees.length];
+          g.drawImage(t, x - t.width / 2, y - t.height);
+        }
+      }
+      return c;
+    })();
 
     // 시작 자리(?at)가 바뀌었으면 새 자리에서. 환영(?welcome)을 주소에서 지운 뒤 다시 그려도 자리는 그대로
     const from = startKey;
     let pos: Point = lastPos.current?.from === from ? lastPos.current.pos : { ...start };
     let target: Point | null = null;
+    // 클릭 이동 길 (A1): 꺾이는 점 목록 (`target`은 그 맨 앞), 끝 점, 막혀서 다시 찾은 횟수, 땅에 보이는 길과 그린 때
+    let route: Point[] = [];
+    let routeGoal: Point | null = null;
+    let replans = 0;
+    let routeShown: { from: Point; points: Point[]; goal: Point; at: number } | null = null;
     // 멀리 있는 건물을 눌렀으면 그 문 앞에 닿는 순간 들어간다
     let pending: TownEntrance | null = null;
     let enterNext = false;
@@ -449,15 +786,19 @@ export function TownGame({
     let promptTop = PROMPT_TOP;
     // 화면 위 간판 묶음·광장 소식 서랍이 덮는 자리 (캔버스 안 좌표). 이름표가 반쯤 가려 삐져나오지 않게, 겹치는 이름표는 쉰다
     let hudRects: { left: number; top: number; right: number; bottom: number }[] = [];
+    // 펼친 광장 소식 서랍이 덮는 오른쪽 폭 (A2): 카메라 가운데를 그만큼 왼쪽으로 옮긴다 (접힌 탭은 치지 않는다)
+    let drawerCover = 0;
     const measureHud = () => {
       const c = canvas.getBoundingClientRect();
       promptTop = PROMPT_TOP;
       hudRects = [];
+      drawerCover = 0;
       for (const el of document.querySelectorAll<HTMLElement>("[data-town-hud-row], [data-town-drawer]")) {
         const r = el.getBoundingClientRect();
         if (r.height === 0) continue;
         hudRects.push({ left: r.left - c.left, top: r.top - c.top, right: r.right - c.left, bottom: r.bottom - c.top });
         if (el.hasAttribute("data-town-hud-row")) promptTop = Math.max(promptTop, Math.round(r.bottom - c.top) + 12);
+        else if (r.width > 200 && r.height > 160) drawerCover = Math.max(drawerCover, Math.round(c.right - r.left + 12));
       }
     };
     const underHud = (x: number, bottom: number, size: { width: number; height: number }) =>
@@ -488,12 +829,28 @@ export function TownGame({
     });
     if (promptBox) promptObserver.observe(promptBox);
 
+    /** 클릭한 곳까지 걷는 길을 찾는다 (A1): 길이 없으면 그쪽으로 곧게 가다 막히면 멈춘다 */
+    const walkTo = (goal: Point, now = performance.now()) => {
+      const path = walkGrid.find(pos, goal);
+      routeGoal = goal;
+      replans = 0;
+      route = path ?? [goal];
+      target = route[0] ?? null;
+      const end = route.at(-1) ?? goal;
+      routeShown = { from: { ...pos }, points: [...route], goal: end, at: now };
+    };
+    const stopRoute = () => {
+      route = [];
+      routeGoal = null;
+      target = null;
+    };
+
     const onKeyDown = (event: KeyboardEvent) => {
       // 게임이 보이지 않으면(휴대폰 폭으로 줄인 사이) 키를 가져가지 않는다
       if (canvas.clientWidth === 0 || yieldsKey(event)) return;
       if (MOVE_KEYS[event.code]) {
         held.add(event.code);
-        target = null;
+        stopRoute();
         pending = null;
         event.preventDefault();
       } else if (event.code === "Space" || event.code === "Enter") {
@@ -524,30 +881,71 @@ export function TownGame({
         const sy = p.y - camera.y;
         if (Math.abs(sx - promptX) <= promptHalf && sy <= promptY && sy >= promptY - promptHeight) return go(promptNear);
       }
+      // 이웃 새 글 말풍선을 누르면 그 글 (A2)
+      if (bubbleHit) {
+        const sx = p.x - camera.x;
+        const sy = p.y - camera.y;
+        if (sx >= bubbleHit.x && sx <= bubbleHit.x + bubbleHit.width && sy >= bubbleHit.y && sy <= bubbleHit.y + bubbleHit.height) {
+          router.push(bubbleHit.href);
+          return;
+        }
+      }
+      // 오늘 할 일 '!' 쪽지를 누르면 그 할 일 자리로 걸어가 들어간다 (A3)
+      const marker = markerAt(p);
+      if (marker) return approach(marker.entrance);
+      // 줄등 초롱을 누르면 그 초롱 아래로 걸어가 글을 연다 (A4)
+      const lantern = lanternAt(p);
+      if (lantern) return approach(lantern);
       // 걷는 이웃을 누르면 그 집 우체통 (TOWN-19)
       const npc = npcAt(p);
       if (npc) {
         fromNpc(npc.lot);
         return;
       }
-      // 건물·집을 눌렀으면 그 입구로 (가까우면 바로 들어가고, 멀면 걸어가서 닿으면 들어간다)
+      // 건물·집을 눌렀으면 그 입구로 (가까우면 바로 들어가고, 멀면 길을 찾아 걸어가서 닿으면 들어간다)
       const hit = structureAt(p);
       const door = hit && doors.get(hit);
       if (hit && door && door.length > 0) {
-        const e = door.length === 1 ? door[0] : p.x < hit.x ? door[0] : door[1];
-        if (entranceDistance(pos, e) <= INTERACT_DISTANCE) return go(e);
-        target = { x: e.x, y: e.y };
-        pending = e;
+        // 문이 여럿이면(게시판) 누른 자리에서 가장 가까운 문
+        const e = door.reduce((a, b) => (Math.abs(b.x - p.x) < Math.abs(a.x - p.x) ? b : a));
+        approach(e);
       } else {
-        target = p;
+        walkTo(p);
       }
+    };
+    /** 입구로: 가까우면 바로 들어가고, 멀면 걸어가서 닿으면 들어간다 */
+    const approach = (e: TownEntrance) => {
+      if (entranceDistance(pos, e) <= INTERACT_DISTANCE) return go(e);
+      walkTo({ x: e.x, y: e.y });
+      pending = e;
+    };
+    /** 그 점에 그린 '!' 쪽지 */
+    const markerAt = (p: Point) =>
+      markers.find((m) => {
+        const b = markerBox(m, 0);
+        return p.x >= b.x - 4 && p.x <= b.x + b.width + 4 && p.y >= b.y - 8 && p.y <= b.y + b.height + 4;
+      });
+    /** 그 점에 그린 켜진 초롱의 입구 (줄 초롱과 장대 꼭대기 초롱) */
+    const lanternAt = (p: Point): TownEntrance | undefined => {
+      for (let i = 0; i < lanterns.length; i++) {
+        const l = lanterns[i];
+        const b = lanternBox(l, false);
+        if (p.x < b.x - 4 || p.x > b.x + b.width + 4 || p.y < b.y - 4 || p.y > b.y + b.height + 4) continue;
+        const id = l.size === "l" ? "lantern:home" : `lantern:${slots[i].lot}`;
+        const e = entrances.find((x) => x.id === id);
+        if (e) return e;
+      }
+      return undefined;
     };
     const fromNpc = (lot: number) => window.dispatchEvent(new CustomEvent("bv-mailbox", { detail: { lot } }));
     const onHover = (event: PointerEvent) => {
       hover = toWorld(event);
       const npc = npcAt(hover);
       hoverStructure = npc ? null : (structureAt(hover) ?? null);
-      canvas.style.cursor = npc || (hoverStructure && (doors.get(hoverStructure)?.length ?? 0) > 0) ? "pointer" : "";
+      const sx = hover.x - camera.x;
+      const sy = hover.y - camera.y;
+      const onBubble = bubbleHit !== null && sx >= bubbleHit.x && sx <= bubbleHit.x + bubbleHit.width && sy >= bubbleHit.y && sy <= bubbleHit.y + bubbleHit.height;
+      canvas.style.cursor = onBubble || markerAt(hover) || lanternAt(hover) || npc || (hoverStructure && (doors.get(hoverStructure)?.length ?? 0) > 0) ? "pointer" : "";
     };
     const onLeave = () => {
       hover = null;
@@ -556,7 +954,8 @@ export function TownGame({
     const onTeleport = (event: Event) => {
       const { x, y } = (event as CustomEvent<Point>).detail;
       pos = { x, y };
-      target = null;
+      stopRoute();
+      routeShown = null;
       pending = null;
     };
     const offMail = onTown("bv-mail", ({ flag }) => {
@@ -564,7 +963,7 @@ export function TownGame({
       mailFlagNow = flag;
       canvas.dataset.mailFlag = flag ? "1" : "0";
       // 내 우체통 그림만 다시 굽는다 (게임은 그대로)
-      if (myMailbox) myMailbox.art = mailboxArt(true, flag);
+      if (myMailbox) myMailbox.art = snowy(mailboxArt(true, flag));
     });
     const offEnter = onTown("bv-enter", () => {
       enterNext = true;
@@ -604,9 +1003,12 @@ export function TownGame({
     const byY = (a: Item, b: Item) => a.y - b.y;
 
     let anim = 0;
+    let frameNow = performance.now();
     const artOf = (s: Structure): PixelArt => {
       if (lamps.has(s)) return lampOn ? lampLit : lampDark;
       if (s.frames) return s.frames[still ? 0 : anim % s.frames.length];
+      const l = s.lit ? litOf.get(s) : undefined;
+      if (l && l.stages.length > 1) return l.stages[stageOf(l, frameNow)].art;
       return s.art;
     };
     const drawStructure = (s: Structure) => {
@@ -614,23 +1016,27 @@ export function TownGame({
       const { width, height } = artSize(art);
       const left = s.x - width / 2 - camera.x;
       const top = s.y - height - camera.y;
-      ctx.fillStyle = "rgba(0,0,0,0.12)";
-      ctx.beginPath();
-      ctx.ellipse(left + width / 2, top + height - 2, width * 0.42, 8, 0, 0, Math.PI * 2);
-      ctx.fill();
+      if (s.alpha !== undefined) ctx.globalAlpha = s.alpha;
+      if (s.id !== "mast") {
+        ctx.fillStyle = "rgba(0,0,0,0.12)";
+        ctx.beginPath();
+        ctx.ellipse(left + width / 2, top + height - 2, width * 0.42, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.drawImage(sprite(art), Math.round(left), Math.round(top));
-      // 글 쓴 집의 굴뚝 연기 (아랫변 가운데 = 굴뚝 꼭대기 바로 위)
-      const smoke = s.lit ? smokeAt.get(s) : null;
+      ctx.globalAlpha = 1;
+      // 글 쓴 집의 굴뚝 연기 (아랫변 가운데 = 굴뚝 꼭대기 바로 위). 축하하는 집은 창이 다 켜진 뒤에
+      const lit = s.lit ? litOf.get(s) : undefined;
+      const smoke = lit && stageOf(lit, frameNow) === lit.stages.length - 1 ? lit.smoke : null;
       if (smoke) {
         const puff = smokeSprites[still ? 0 : anim % SMOKE_FRAMES];
         ctx.globalAlpha = 0.92;
         ctx.drawImage(puff, Math.round(smoke.x - 3.5 * TOWN_CELL - camera.x), Math.round(smoke.y - 11 * TOWN_CELL - camera.y));
         ctx.globalAlpha = 1;
       }
-      // 게시판 두 입구 위 나무 팻말 (판 아래에 매달려 있어 앞에 선 캐릭터에 가린다)
+      // 게시판 세 입구 위 팻말 (판 아래에 매달려 있어 앞에 선 캐릭터에 가린다). 가운데 글감은 종이 쪽지
       if (s === boardStructure) {
-        tags.draw(ctx, "소식", "sign", BOARD_POS.x - 60 - camera.x, BOARD_POS.y - 24 - camera.y);
-        tags.draw(ctx, "출석", "sign", BOARD_POS.x + 60 - camera.x, BOARD_POS.y - 24 - camera.y);
+        for (const d of BOARD_DOORS) tags.draw(ctx, d.plank, plankStyle(d.id), BOARD_POS.x + d.dx - camera.x, BOARD_POS.y - BOARD_PLANK_LIFT - camera.y);
       }
     };
     let walkStep = 0;
@@ -660,6 +1066,22 @@ export function TownGame({
 
     let last = performance.now();
     let frame = 0;
+    let compact = false;
+    // 노을 빛 띠 (A5): 화면 높이가 바뀌면 다시 굽는다
+    const bakeDuskBand = (vh: number) => {
+      const c = document.createElement("canvas");
+      c.width = 1;
+      c.height = Math.max(1, Math.round(vh * DUSK_GLOW.height));
+      const g = c.getContext("2d")!;
+      const grad = g.createLinearGradient(0, 0, 0, c.height);
+      const [r, gg, b] = [1, 3, 5].map((i) => parseInt(DUSK_GLOW.color.slice(i, i + 2), 16));
+      grad.addColorStop(0, `rgba(${r}, ${gg}, ${b}, ${DUSK_GLOW.alpha})`);
+      grad.addColorStop(1, `rgba(${r}, ${gg}, ${b}, 0)`);
+      g.fillStyle = grad;
+      g.fillRect(0, 0, 1, c.height);
+      return c;
+    };
+    let duskBand: HTMLCanvasElement | null = bakeDuskBand(canvas.clientHeight || 800);
     /** `dt`초만큼 걷는다 (한 걸음은 `MAX_STEP_SECONDS` 이하라 몸체를 뚫고 지나가지 않는다). 키보드가 클릭 목표보다 먼저 */
     const walkFor = (dt: number) => {
       let dx = 0;
@@ -669,7 +1091,12 @@ export function TownGame({
         dy += MOVE_KEYS[code].y;
       }
       if (dx === 0 && dy === 0 && target) {
-        if (Math.hypot(target.x - pos.x, target.y - pos.y) < 4) target = null;
+        // 길의 다음 점에 닿으면 그다음 점으로 (A1)
+        while (target && Math.hypot(target.x - pos.x, target.y - pos.y) < 4) {
+          route.shift();
+          target = route[0] ?? null;
+        }
+        if (!target) routeGoal = null;
         else {
           dx = target.x - pos.x;
           dy = target.y - pos.y;
@@ -684,10 +1111,20 @@ export function TownGame({
       // 계단에서는 조금 느리게 (TOWN-05). 목표를 지나치지 않게 남은 거리까지만
       const speed = onStairs(pos) ? SPEED * STAIR_SLOW : SPEED;
       const reach = held.size === 0 && target ? Math.min(speed * dt, Math.hypot(target.x - pos.x, target.y - pos.y)) : speed * dt;
-      const next = step(pos, { x: dir.x * reach, y: dir.y * reach }, bodies);
-      // 클릭 목표로 가다 막히면 멈춘다
+      // 키보드는 몸체 모서리에서 옆으로 미끄러진다 (A1: ↑를 누르고 있으면 분수를 돌아간다)
+      const next = slideStep(pos, { x: dir.x * reach, y: dir.y * reach }, bodies);
+      // 길을 따라가다 막히면 지금 자리에서 길을 다시 찾고(두 번까지), 그래도 막히면 멈춘다
       stuck = Math.hypot(next.x - pos.x, next.y - pos.y) < 0.5 ? stuck + dt : 0;
-      if (stuck > 0.25) target = null;
+      if (stuck > 0.25 && held.size === 0 && target) {
+        stuck = 0;
+        const goal = routeGoal;
+        const path = goal && replans < 2 ? walkGrid.find(next, goal) : null;
+        if (path && path.length > 0) {
+          replans++;
+          route = path;
+          target = route[0];
+        } else stopRoute();
+      }
       facing = walkDir(dir.x, dir.y, facing);
       // 벽에 막혀 제자리면 걷지 않는다
       walking = Math.hypot(next.x - pos.x, next.y - pos.y) > 0.01;
@@ -698,6 +1135,7 @@ export function TownGame({
       const frameSeconds = (now - last) / 1000;
       last = now;
       anim = Math.floor(now / ANIM_MS);
+      frameNow = now;
       // 하늘이 바뀔 때가 지났으면 바꾼다 (잠들었다 깨어나거나 탭으로 돌아온 첫 프레임에도)
       if (Date.now() >= skyDue) {
         currentSky = skyAt();
@@ -722,9 +1160,20 @@ export function TownGame({
       const pose = `${walking ? "walk" : "idle"}-${facing}`;
       if (canvas.dataset.walk !== pose) canvas.dataset.walk = pose;
 
-      // 입구 안내, 그리고 Space·Enter·[들어가기] (멀리서 누른 것은 버린다)
+      // 입구 안내, 그리고 Space·Enter·[들어가기] (멀리서 누른 것은 버린다).
+      // 이웃이 자기 집 문 앞에 서 있으면 집 안내와 새 글 말풍선을 한 줄로 합친다 (그 이웃 이름표·말풍선은 쉰다, A2)
       const near = nearestEntrance(pos, entrances);
-      const text = near ? entrancePrompt(near) : null;
+      let text = near ? entrancePrompt(near) : null;
+      let doorNpc: Npc | null = null;
+      if (near && text && near.id.startsWith("house:")) {
+        const lot = Number(near.id.slice(6));
+        const news = titles.get(lot);
+        const n = news ? npcs.find((x) => x.lot === lot) : undefined;
+        if (news && n && Math.hypot(n.pos.x - news.door.x, n.pos.y - news.door.y) <= DOORSTEP) {
+          doorNpc = n;
+          text = `${near.label} · ✉ 새 글 「${shortName(news.title, 12)}」${text.slice(text.indexOf(PROMPT_SPLIT))}`;
+        }
+      }
       if (text !== shown) {
         shown = text;
         setPrompt(text);
@@ -735,15 +1184,16 @@ export function TownGame({
         if (near) go(near);
       }
 
-      // 카메라
+      // 카메라: 펼친 서랍이 덮는 오른쪽은 빼고 가운데를 맞춘다. 세계 오른쪽 끝에서는 동쪽 집이 서랍 왼쪽에 오게 (A2)
       const vw = canvas.clientWidth;
       const vh = canvas.clientHeight;
-      camera.x = vw >= WORLD.width ? (WORLD.width - vw) / 2 : Math.min(Math.max(pos.x - vw / 2, 0), WORLD.width - vw);
+      const usable = Math.max(vw / 2, vw - drawerCover);
+      camera.x = vw >= WORLD.width ? (WORLD.width - vw) / 2 : Math.min(Math.max(pos.x - usable / 2, 0), WORLD.width - usable);
       camera.y = vh >= WORLD.height ? (WORLD.height - vh) / 2 : Math.min(Math.max(pos.y - vh / 2, 0), WORLD.height - vh);
       camera.x = Math.round(camera.x);
       camera.y = Math.round(camera.y);
 
-      // 입구 안내 말풍선: 건물·집이면 그 이름표 자리(지붕 위, 이름표는 쉰다), 아니면 입구 위. 내 이름표는 가리지 않는다.
+      // 입구 안내 말풍선: 건물·집이면 그 이름표 자리(지붕 위, 이름표는 쉰다), 공중의 초롱이면 그 초롱 위, 아니면 입구 위. 내 이름표는 가리지 않는다.
       // 화면 가장자리에서 잘리지 않게, 윗변은 화면 위 간판 묶음 아래에 (값이 바뀔 때만 옮긴다)
       const owner = near ? promptOwner.get(near) : undefined;
       if (near && promptBox) {
@@ -752,9 +1202,17 @@ export function TownGame({
         const left = promptHalf + 8;
         const right = left + (button ? button.offsetWidth + ENTER_GAP : 0);
         const top = promptTop + Math.max(promptHeight, button ? button.offsetHeight + PROMPT_TAIL : 0);
-        // 문이 둘인 게시판은 그 문 쪽 위에
-        const anchorX = owner && (doors.get(owner)?.length ?? 0) < 2 ? owner.x : near.x;
-        const anchorY = owner ? Math.min(owner.y - tagLift.get(owner)!, pos.y - PROMPT_LIFT) : Math.min(near.y, pos.y) - PROMPT_LIFT;
+        // 문이 여럿인 게시판은 그 문 쪽 위에
+        // 게시판 세 문은 그 문 위 판 아랫부분에 (게시판 간판 이름표는 그대로 보인다)
+        const onBoard = owner === boardStructure && boardStructure !== undefined;
+        const anchorX = near.anchor ? near.anchor.x : owner && !onBoard ? owner.x : near.x;
+        const anchorY = near.anchor
+          ? near.anchor.y
+          : onBoard
+            ? Math.min(BOARD_POS.y - BOARD_PLANK_LIFT - 6, pos.y - PROMPT_LIFT)
+            : owner
+              ? Math.min(owner.y - tagLift.get(owner)!, pos.y - PROMPT_LIFT)
+              : Math.min(near.y, pos.y) - PROMPT_LIFT;
         const ax = Math.round(Math.min(Math.max(anchorX - camera.x, left), Math.max(left, vw - right)));
         const ay = Math.round(Math.min(Math.max(anchorY - camera.y, top), vh - 8));
         if (ax !== promptX || ay !== promptY) {
@@ -769,9 +1227,44 @@ export function TownGame({
       ctx.fillStyle = "#5fa34f";
       ctx.fillRect(0, 0, vw, vh);
       ctx.drawImage(ground, camera.x / GROUND_CELL, camera.y / GROUND_CELL, vw / GROUND_CELL, vh / GROUND_CELL, 0, 0, vw, vh);
+      if (camera.x + vw > WORLD.width) ctx.drawImage(edgeForest, WORLD.width - camera.x, -camera.y);
+      if (camera.x < 0) ctx.drawImage(edgeForest, -EDGE_FOREST - camera.x, -camera.y);
       // 새벽·노을·밤의 먼 하늘 띠
       const skyShown = Math.min(vh, SKY_HEIGHT - camera.y);
       if (band && skyShown > 0) ctx.drawImage(band, camera.x / GROUND_CELL, camera.y / GROUND_CELL, vw / GROUND_CELL, skyShown / GROUND_CELL, 0, 0, vw, skyShown);
+
+      // 클릭한 길 (A1): 땅에 옅은 점선과 도착 X를 0.6초 (움직임 줄이기면 X만)
+      if (routeShown) {
+        const age = now - routeShown.at;
+        if (age > ROUTE_MS) routeShown = null;
+        else {
+          ctx.globalAlpha = still ? 0.85 : 0.85 * (1 - age / ROUTE_MS);
+          ctx.fillStyle = "#fbf1dc";
+          if (!still) {
+            let at = routeShown.from;
+            let carry = 0;
+            for (const p of routeShown.points) {
+              const d = Math.hypot(p.x - at.x, p.y - at.y);
+              for (let t = carry; t < d; t += 12) {
+                const x = at.x + ((p.x - at.x) * t) / d - camera.x;
+                const y = at.y + ((p.y - at.y) * t) / d - camera.y;
+                ctx.fillRect(Math.round(x) - 2, Math.round(y) - 2, 4, 4);
+              }
+              carry = (carry - d) % 12;
+              if (carry < 0) carry += 12;
+              at = p;
+            }
+          }
+          const gx = Math.round(routeShown.goal.x - camera.x);
+          const gy = Math.round(routeShown.goal.y - camera.y);
+          ctx.fillStyle = LANTERN.ink;
+          for (let i = -2; i <= 2; i++) {
+            ctx.fillRect(gx + i * 3 - 2, gy + i * 3 - 2, 4, 4);
+            ctx.fillRect(gx + i * 3 - 2, gy - i * 3 - 2, 4, 4);
+          }
+          ctx.globalAlpha = 1;
+        }
+      }
 
       // 아랫변 y 순서로 그린다 (앞에 있는 것이 위에)
       items.length = 0;
@@ -798,6 +1291,23 @@ export function TownGame({
         else drawPlayer();
       }
 
+      // 줄등 (A4): 줄과 초롱은 머리 위 높이라 모든 것 위에 (덧칠은 받는다)
+      const ropesOnScreen = ropeBox.right - camera.x > 0 && ropeBox.left - camera.x < vw && ropeBox.bottom - camera.y > 0 && ropeBox.top - camera.y - 80 < vh;
+      const boxes = lanterns.map((l) => lanternBox(l, !still));
+      if (ropesOnScreen) {
+        ctx.drawImage(ropeLayer, ropeBox.left - camera.x, ropeBox.top - camera.y);
+        lanterns.forEach((l, i) => {
+          const b = boxes[i];
+          // 매단 끈: 줄 점에서 초롱 꼭지까지 (흔들려 비켜 있어도 이어진다)
+          if (l.size === "m") {
+            ctx.fillStyle = LANTERN.ink;
+            const kx = b.x + b.width / 2;
+            ctx.fillRect(Math.round(Math.min(kx, l.hook.x) - 1 - camera.x), Math.round(l.hook.y - camera.y), Math.max(2, Math.round(Math.abs(kx - l.hook.x)) + 2), 2);
+          }
+          ctx.drawImage(lanternSprites[l.size][l.lit ? 1 : 0], b.x - camera.x, b.y - camera.y);
+        });
+      }
+
       // 하늘 덧칠 (낮은 건너뛴다): 세계 전체에 한 번
       if (tint) {
         ctx.globalCompositeOperation = "multiply";
@@ -807,30 +1317,37 @@ export function TownGame({
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = "source-over";
       }
+      // 노을 빛 띠 (A5): 화면 위 35%에 주황빛이 아래로 사라진다
+      if (currentSky === "dusk" && duskBand) {
+        if (duskBand.height !== Math.round(vh * DUSK_GLOW.height)) duskBand = bakeDuskBand(vh);
+        ctx.drawImage(duskBand, 0, 0, vw, duskBand.height);
+      }
       if (stars && currentSky === "night" && skyShown > 0) ctx.drawImage(stars, camera.x / GROUND_CELL, camera.y / GROUND_CELL, vw / GROUND_CELL, skyShown / GROUND_CELL, 0, 0, vw, skyShown);
 
-      // 불빛: 덧칠 위에 불 켜진 창·등을 다시 얹고(앞에 선 캐릭터 자리는 비운다), 빛 무리를 더한다. 화면 밖은 건너뛴다
+      // 덧칠 위에 다시 얹는 것 (앞에 선 캐릭터 자리는 비운다): 밤 지붕색, 불 켜진 창·처마 초롱
+      const px = pos.x - camera.x;
+      const py = pos.y - camera.y;
+      const overlay = (img: HTMLCanvasElement, s: Structure, wx: number, wy: number, width: number, height: number) => {
+        const x = wx - camera.x;
+        const y = wy - camera.y;
+        if (x > vw || y > vh || x + width < 0 || y + height < 0) return;
+        let hidden = pos.y > s.y && covers(px, py, x, y, width, height);
+        for (const n of npcs) if (!hidden && n.pos.y > s.y && covers(n.pos.x - camera.x, n.pos.y - camera.y, x, y, width, height)) hidden = true;
+        if (hidden) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(x, y, width, height);
+          if (pos.y > s.y) ctx.rect(px - 18, py - 60, 36, 60);
+          for (const n of npcs) if (n.pos.y > s.y) ctx.rect(n.pos.x - camera.x - 18, n.pos.y - camera.y - 60, 36, 60);
+          ctx.clip("evenodd");
+          ctx.drawImage(img, Math.round(x), Math.round(y));
+          ctx.restore();
+        } else ctx.drawImage(img, Math.round(x), Math.round(y));
+      };
+      if (currentSky === "night") for (const r of roofs) overlay(r.img, r.s, r.left, r.top, r.width, r.height);
       if (strength > 0) {
         ctx.globalAlpha = strength;
-        for (const l of litHouses) {
-          const x = l.left - camera.x;
-          const y = l.top - camera.y;
-          if (x > vw || y > vh || x + l.width < 0 || y + l.height < 0) continue;
-          const px = pos.x - camera.x;
-          const py = pos.y - camera.y;
-          let hidden = pos.y > l.s.y && covers(px, py, x, y, l.width, l.height);
-          for (const n of npcs) if (!hidden && n.pos.y > l.s.y && covers(n.pos.x - camera.x, n.pos.y - camera.y, x, y, l.width, l.height)) hidden = true;
-          if (hidden) {
-            ctx.save();
-            ctx.beginPath();
-            ctx.rect(x, y, l.width, l.height);
-            if (pos.y > l.s.y) ctx.rect(px - 18, py - 60, 36, 60);
-            for (const n of npcs) if (n.pos.y > l.s.y) ctx.rect(n.pos.x - camera.x - 18, n.pos.y - camera.y - 60, 36, 60);
-            ctx.clip("evenodd");
-            ctx.drawImage(l.glass, Math.round(x), Math.round(y));
-            ctx.restore();
-          } else ctx.drawImage(l.glass, Math.round(x), Math.round(y));
-        }
+        for (const l of litHouses) overlay(l.stages[stageOf(l, now)].glass, l.s, l.left, l.top, l.width, l.height);
         if (lampOn) {
           for (const s of lamps) {
             const { width, height } = artSize(lampLit);
@@ -841,7 +1358,15 @@ export function TownGame({
           }
         }
         ctx.globalCompositeOperation = "lighter";
-        for (const l of litHouses) for (const w of l.windows) glowAt(windowGlow, w.x - camera.x, w.y - camera.y, vw, vh);
+        for (const l of litHouses) {
+          const st = l.stages[stageOf(l, now)];
+          for (const w of st.windows) glowAt(windowGlow, w.x - camera.x, w.y - camera.y, vw, vh);
+          for (const sp of st.spills) {
+            const x = Math.round(sp.x - 15 - camera.x);
+            const y = Math.round(sp.y - camera.y);
+            if (x < vw && y < vh && x + 30 > 0 && y + 18 > 0) ctx.drawImage(spillGlow, x, y);
+          }
+        }
         if (lampOn) {
           for (const s of lamps) {
             const head = s.y - artSize(lampLit).height + 2 * TOWN_CELL;
@@ -849,14 +1374,43 @@ export function TownGame({
             glowAt(poolGlow, s.x - camera.x, s.y - camera.y, vw, vh);
           }
         }
+        // 켜진 초롱 빛 무리: 글이 최근일수록 밝다 (0~8시간 1, 8~16시간 0.7, 16~24시간 0.4)
+        if (ropesOnScreen)
+          lanterns.forEach((l, i) => {
+            if (!l.lit) return;
+            ctx.globalAlpha = strength * l.brightness;
+            glowAt(lanternGlow, boxes[i].x + boxes[i].width / 2 - camera.x, boxes[i].y + boxes[i].height / 2 - camera.y, vw, vh);
+          });
         ctx.globalCompositeOperation = "source-over";
+        // 켜진 초롱은 안에서 빛나 비단 색 그대로 빛 무리 위에 다시 얹는다 (밤에도 붉은·푸른 청사초롱으로 읽힌다)
+        ctx.globalAlpha = strength;
+        if (ropesOnScreen)
+          lanterns.forEach((l, i) => {
+            if (l.lit) ctx.drawImage(lanternSprites[l.size][1], boxes[i].x - camera.x, boxes[i].y - camera.y);
+          });
         ctx.globalAlpha = 1;
       }
 
+      // 오늘 할 일 '!' 쪽지 (A3): 두 장으로 위아래 흔들린다 (움직임 줄이기면 멈춘다)
+      for (const m of markers) {
+        const b = markerBox(m, still ? 0 : (Math.floor(now / 500) % 2) * TOWN_CELL);
+        const x = b.x - camera.x;
+        const y = b.y - camera.y;
+        if (x > vw || y > vh || x + b.width < 0 || y + b.height < 0) continue;
+        ctx.drawImage(markerSprites[0], x, y);
+      }
+      // 불꽃 (A3 할 일 다 함, C2 내 초롱 켜기): 네 장 한 번. 움직임 줄이기면 건너뛴다
+      for (const sp of sparks) {
+        const f = Math.floor((now - sp.at) / SPARK_MS);
+        if (still || f < 0 || f >= SPARK_FRAMES) continue;
+        const img = sparkSprites[f];
+        ctx.drawImage(img, Math.round(sp.x - img.width / 2 - camera.x), Math.round(sp.y - img.height / 2 - camera.y));
+      }
       // 이름표는 맨 위에: 건물 간판은 늘, 집 문패와 빈 집터 팻말은 가까이 가거나 마우스를 올렸을 때만 (내 집은 늘)
+      const drawn: string[] = [];
       for (const s of labeled) {
-        // 입구 안내 말풍선이 이 이름표 자리에 떠 있다
-        if (s === owner) continue;
+        // 입구 안내 말풍선이 이 이름표 자리에 떠 있다 (게시판은 문 위에 떠서 간판은 그대로)
+        if (s === owner && s !== boardStructure) continue;
         const kind = s.tag ?? "sign";
         if (kind !== "sign" && s.id !== mineId && s !== hoverStructure) {
           const limit = kind === "lot" ? LOT_DISTANCE : PLATE_DISTANCE;
@@ -868,20 +1422,24 @@ export function TownGame({
         const style = kind === "sign" ? "sign" : s.id === mineId ? "mine" : "plate";
         if (underHud(x, y, tags.size(s.label!, style))) continue;
         tags.draw(ctx, s.label!, style, x, y);
+        drawn.push(s.label!);
       }
-      // 이웃 이름표: 가까이 가거나 마우스를 올렸을 때만. 가장 가까운 글 쓴 이웃 한 명은 새 글 제목 말풍선
+      // 이웃 이름표: 가까이 가거나 마우스를 올렸을 때만. 가장 가까운 새 글 이웃 한 명은 새 글 제목 말풍선 (누르면 그 글)
       const hovered = hover ? npcAt(hover) : undefined;
       let speaker: Npc | null = null;
       let speakerDistance = BUBBLE_DISTANCE;
       for (const n of npcs) {
-        if (!titles.has(n.lot)) continue;
+        if (!titles.has(n.lot) || n === doorNpc) continue;
         const d = Math.hypot(n.pos.x - pos.x, n.pos.y - pos.y);
         if (d <= speakerDistance) {
           speaker = n;
           speakerDistance = d;
         }
       }
+      bubbleHit = null;
       for (const n of npcs) {
+        // 문 앞 이웃은 입구 안내에 합쳤다
+        if (n === doorNpc) continue;
         if (n !== hovered && n !== speaker && Math.hypot(n.pos.x - pos.x, n.pos.y - pos.y) > NPC_TAG_DISTANCE) continue;
         const x = n.pos.x - camera.x;
         const y = n.pos.y - camera.y - PLAYER_SIZE;
@@ -891,16 +1449,47 @@ export function TownGame({
         const height = tags.draw(ctx, plate, "plate", x, y);
         if (n !== speaker) continue;
         // 입구 안내 말풍선과 겹치면 안내가 먼저 (제목 말풍선은 쉰다)
-        const bubble = titles.get(n.lot)!;
-        const size = tags.size(bubble, "bubble");
+        const news = titles.get(n.lot)!;
+        const size = tags.size(news.text, "bubble");
         const bottom = y - height - 2;
         const underPrompt = shown !== null && Math.abs(x - promptX) < size.width / 2 + promptHalf && bottom > promptY - promptHeight && bottom - size.height < promptY;
-        if (!underPrompt && !underHud(x, bottom, size)) tags.draw(ctx, bubble, "bubble", x, bottom);
+        if (!underPrompt && !underHud(x, bottom, size)) {
+          tags.draw(ctx, news.text, "bubble", x, bottom);
+          bubbleHit = { lot: n.lot, href: news.href, x: x - size.width / 2, y: bottom - size.height, width: size.width, height: size.height };
+        }
+      }
+      // 글 쓰고 돌아온 순간의 쪽지 (C2): 창이 다 켜지면 내 집 오른쪽 위에 잠깐
+      if (celebrateNote && celebrateLitAt !== null && mineStructure) {
+        const age = now - (still ? celebrateStart! : celebrateLitAt);
+        if (age >= 0 && age < CELEBRATE.note) {
+          if (!noteShown) {
+            noteShown = true;
+            setNote(celebrateNote);
+          }
+          const x = mineStructure.x + 150 - camera.x;
+          const y = mineStructure.y - artVisibleHeight(mineStructure.art) + 34 - camera.y;
+          ctx.globalAlpha = still ? 1 : Math.min(1, age / 200, (CELEBRATE.note - age) / 400);
+          if (!underHud(x, y, tags.size(celebrateNote, "bubble"))) tags.draw(ctx, celebrateNote, "bubble", x, y);
+          ctx.globalAlpha = 1;
+        } else if (noteShown && age >= CELEBRATE.note) {
+          noteShown = false;
+          setNote(null);
+        }
       }
       tags.draw(ctx, name, "player", pos.x - camera.x, pos.y - camera.y - PLAYER_SIZE);
       lastPos.current = { from, pos };
       if (frame++ % 3 === 0) {
         canvas.dataset.feet = `${Math.round(pos.x)},${Math.round(pos.y)}`;
+        canvas.dataset.camera = `${camera.x},${camera.y}`;
+        // 시험 훅 (광장 개편 2): 지금 그린 이름표 글자, 지금 그린 말풍선 (`자리:가운데x,y`, 캔버스 안 좌표)
+        canvas.dataset.tags = drawn.join("|");
+        canvas.dataset.bubbles = bubbleHit ? `${bubbleHit.lot}:${Math.round(bubbleHit.x + bubbleHit.width / 2)},${Math.round(bubbleHit.y + bubbleHit.height / 2)}` : "";
+        // 게시판 가까이 서면 위 가운데 장소 간판을 접는다 (게시판 이름표를 가리지 않게)
+        const compactNow = Math.hypot(pos.x - BOARD_POS.x, pos.y - BOARD_POS.y) <= BOARD_COMPACT;
+        if (compactNow !== compact) {
+          compact = compactNow;
+          window.dispatchEvent(new CustomEvent(COMPACT_EVENT, { detail: { compact } }));
+        }
         // 시험 훅: 지금 걷는 이웃 수, 화면에 보이는(메뉴·창에 가리지 않은) 이웃의 자리 번호와 몸 가운데 (캔버스 안 좌표)
         canvas.dataset.npcWalking = String(npcs.filter((n) => n.walking).length);
         const rect = canvas.getBoundingClientRect();
@@ -931,6 +1520,8 @@ export function TownGame({
       offMail();
       offEnter();
       offPanel();
+      window.removeEventListener("bv-note", onNote);
+      for (const t of noteTimers) window.clearTimeout(t);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
@@ -939,6 +1530,7 @@ export function TownGame({
       canvas.removeEventListener("pointerleave", onLeave);
       canvas.removeEventListener("bv-teleport", onTeleport);
       delete canvas.dataset.ready;
+      if (compact) window.dispatchEvent(new CustomEvent(COMPACT_EVENT, { detail: { compact: false } }));
     };
   }, [data, phone, router]);
 
@@ -992,6 +1584,10 @@ export function TownGame({
           </button>
         )}
       </div>
+      {/* 글 쓰고 돌아온 순간의 쪽지 (C2): 캔버스에 그리고, 화면 낭독기에는 여기서 읽힌다 */}
+      <p role="status" className="sr-only" data-town-note>
+        {note ?? ""}
+      </p>
       {hintFolded ? (
         <div className="group absolute bottom-4 right-4 flex flex-col items-end gap-3">
           <p id="town-hint" className="px-box px-float hidden px-3 py-2 text-[13px] leading-5 group-focus-within:block group-hover:block" data-town-hint>

@@ -146,7 +146,7 @@ test.describe("TOWN-12 ☰ 마을 메뉴", () => {
     await expect(panel(page).getByRole("link", { name: "🔑 로그인하고 내 집 만들기" })).toHaveAttribute("href", "/");
     await expect(panel(page).getByRole("link", { name: "📋 마을 소식" })).toHaveAttribute("href", "/feed");
     await panel(page).getByRole("button", { name: /✨ 텔레포트/ }).click();
-    await expect(panel(page).locator("[data-spot]").first()).toHaveText(/^(내 집 자리|🏠 .+)$/);
+    await expect(panel(page).locator("[data-spot]").first()).toHaveText(/^(내 집 자리|🏡 여기에 내 집 짓기|🏠 .+)$/);
     await expect(panel(page)).not.toContainText("친구 목록에서 ⭐를 누르면 집이 생겨요");
   });
 });
