@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminDeleteButton } from "@/components/admin/AdminDeleteButton";
+import { SheetLine } from "@/components/blog/SheetTitle";
 import { ViewCount } from "@/components/blog/ViewCount";
 import { CategoryBadge } from "@/components/post/CategoryBadge";
 import { DeletePostButton } from "@/components/post/DeletePostButton";
@@ -124,16 +125,18 @@ export default async function PostPage({ params, searchParams }: PageProps<"/blo
         />
       )}
       {notice && <PublishNotice rewarded={await hasPostReward(blog.ownerId, post.id)} />}
-      <article className="mx-auto max-w-3xl rounded-2xl border border-line bg-surface p-5 md:p-8">
+      <article className="post-page mx-auto max-w-3xl rounded-2xl border border-line bg-surface p-5 md:px-12 md:py-10">
         {isOwner && post.blindedAt && <BlindNotice reason={post.blindReason} />}
-        <Link href={`/@${blog.slug}`} className="-ml-1 flex min-h-11 w-fit max-w-full items-center px-1 font-semibold text-ink-soft hover:text-ink" data-blog-link>
-          <span className="truncate">📖 {blog.title}</span>
+        {/* 블로그 이름은 블로그 홈처럼 원고지 칸에 (작게) */}
+        <Link href={`/@${blog.slug}`} className="sheet-wrap sheet-link mb-4 flex min-h-11 w-full items-center" aria-label={`📖 ${blog.title}`} data-blog-link>
+          <span className="sr-only">📖 </span>
+          <SheetLine text={blog.title} />
         </Link>
         <CategoryBadge categoryName={categoryName} subcategoryName={subcategoryName} href={categoryHref} />
-        <h1 className="mt-2 text-3xl font-extrabold focus:outline-none" tabIndex={-1}>
+        <h1 className="post-heading mt-3 focus:outline-none" tabIndex={-1}>
           {post.title}
         </h1>
-        <p className="mt-2 text-sm text-ink-soft">
+        <p className="mt-3 text-sm text-ink-soft">
           {nickname} · <Time date={post.createdAt} absolute />
           {edited && " · 수정됨"}
           {` · 약 ${readingMinutes(post.contentText)}분 읽기`}

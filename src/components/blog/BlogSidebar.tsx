@@ -10,7 +10,7 @@ import { BlogNews } from "./BlogNews";
 import { BlogStocks } from "./BlogStocks";
 import { CalendarWidget } from "./widgets/CalendarWidget";
 import { WeatherWidget } from "./widgets/WeatherWidget";
-import { WIDGET_LIMITS, type WidgetKey, type WidgetLayout, type WidgetSize } from "@/lib/widgets";
+import { splitColumns, WIDGET_LIMITS, widgetWeight, type WidgetKey, type WidgetLayout, type WidgetSize } from "@/lib/widgets";
 import { thumbUrl } from "@/lib/attachments";
 import { VisitSparkline } from "./VisitSparkline";
 import { VisitCount } from "./VisitCount";
@@ -34,10 +34,12 @@ type Props = {
   weatherPlaceSearch?: boolean;
   /** 👣 방문자를 크게 보일 때 최근 7일 (작게면 null) */
   visitDays: { date: string; count: number }[] | null;
+  /** 카테고리 목록 줄 수 (전체 글 포함). 넓은 화면에서 옆 칸을 두 줄로 나눌 때 높이 어림에 쓴다 */
+  categoryRows?: number;
 };
 
 /** 블로그 홈 오른쪽 옆 칸 (BLOG-09). 휴대폰에서는 글 목록 아래. */
-export function BlogSidebar({ blogId, slug, sidebar, visits, recordVisit, search, townSearch, activeTag, categoryNav, isOwner = false, layout, weather, weatherPlaceSearch = false, visitDays }: Props) {
+export function BlogSidebar({ blogId, slug, sidebar, visits, recordVisit, search, townSearch, activeTag, categoryNav, isOwner = false, layout, weather, weatherPlaceSearch = false, visitDays, categoryRows = 3 }: Props) {
   const empty = <p className="px-1 text-sm text-ink-soft">아직 없어요</p>;
   const linkClass = "flex min-h-11 items-center gap-2 rounded-lg px-2 hover:bg-bg";
   const sizeOf = (key: WidgetKey): WidgetSize => layout.items.find((it) => it.key === key)?.size ?? "lg";
@@ -224,18 +226,23 @@ export function BlogSidebar({ blogId, slug, sidebar, visits, recordVisit, search
         );
     }
   };
+  const slots = layout.items
+    .filter((it) => it.visible)
+    .map((it) => ({ it, node: render(it.key) }))
+    .filter((s) => s.node);
+  // 넓은 화면에서는 두 줄 (앞 줄 → 뒤 줄 순서는 그대로). 좁은 화면에서는 두 칸이 이어져 한 줄
+  const columns = splitColumns(slots, (s) => widgetWeight(s.it, categoryRows));
   return (
-    <aside aria-label="옆 칸" className="min-w-0 space-y-4" data-sidebar>
-      {layout.items
-        .filter((it) => it.visible)
-        .map((it) => {
-          const node = render(it.key);
-          return node ? (
+    <aside aria-label="옆 칸" className="blog-aside min-w-0" data-sidebar>
+      {columns.map((col, i) => (
+        <div key={i} className="blog-aside-col">
+          {col.map(({ it, node }) => (
             <div key={it.key} data-widget-slot={it.key} data-size={it.size}>
               {node}
             </div>
-          ) : null;
-        })}
+          ))}
+        </div>
+      ))}
     </aside>
   );
 }

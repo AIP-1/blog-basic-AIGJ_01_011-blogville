@@ -5,7 +5,8 @@ import { signUpOk, sql } from "./helpers";
 // 👣 방문자 7일 그래프. (☀️ 날씨·📅 캘린더 화면은 weather-calendar.spec.ts)
 test.describe.configure({ timeout: 60_000 });
 
-const slots = (page: import("@playwright/test").Page) => page.locator("[data-sidebar] > [data-widget-slot]");
+// 넓은 화면에서는 옆 칸이 두 줄(앞 줄·뒤 줄)로 나뉘어 한 겹 안에 있다. 순서는 그대로
+const slots = (page: import("@playwright/test").Page) => page.locator("[data-sidebar] [data-widget-slot]");
 
 test("위젯 순서를 ▲▼·끌어 놓기로 바꾸고 숨기고 크기를 고르면 옆 칸이 따르고, 기본 배치로 되돌릴 수 있다", async ({ page, browser }) => {
   const me = await signUpOk(page);

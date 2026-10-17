@@ -90,3 +90,55 @@ export const WIDGET_MESSAGES = {
   invalid: "위젯 배치를 읽을 수 없어요. 새로 고침한 뒤 다시 해 주세요.",
   reset: "기본 배치로 되돌렸어요",
 } as const;
+
+/**
+ * 넓은 화면(1280px~)에서 옆 칸을 두 줄로 나눌 때 위젯 높이 어림 (대략 40px 단위).
+ * 실제 높이로 나누면 캘린더 날짜를 누르거나 시세가 늦게 올 때 위젯이 다른 줄로 튀므로, 배치만 보고 정한다.
+ */
+export function widgetWeight(item: WidgetItem, categoryRows = 3): number {
+  const lg = item.size === "lg";
+  switch (item.key) {
+    case "guestbook":
+    case "rss":
+      return 1.2;
+    case "calendar":
+      return 8.5;
+    case "weather":
+      return 6;
+    case "news":
+      return lg ? 7 : 5;
+    case "stocks":
+      return lg ? 6 : 4;
+    case "search":
+    case "town":
+      return 2.5;
+    case "categories":
+      return 1.5 + categoryRows * 1.1;
+    case "recent":
+      return lg ? 5.5 : 4;
+    case "popular":
+    case "comments":
+      return lg ? 5 : 3.5;
+    case "tags":
+      return lg ? 6 : 4;
+    case "visits":
+      return lg ? 5.5 : 3;
+  }
+}
+
+/** 순서를 지킨 채 앞 줄·뒤 줄로 나눈다. 두 줄 높이(어림) 차이가 가장 작은 곳에서 자르고, 같으면 앞 줄을 길게 */
+export function splitColumns<T>(items: readonly T[], weight: (item: T) => number): [T[], T[]] {
+  const total = items.reduce((sum, it) => sum + weight(it), 0);
+  let best = 0;
+  let bestDiff = total;
+  let acc = 0;
+  for (let k = 1; k <= items.length; k++) {
+    acc += weight(items[k - 1]);
+    const diff = Math.abs(total - 2 * acc);
+    if (diff <= bestDiff) {
+      bestDiff = diff;
+      best = k;
+    }
+  }
+  return [items.slice(0, best), items.slice(best)];
+}
