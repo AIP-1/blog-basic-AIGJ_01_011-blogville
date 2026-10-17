@@ -1,46 +1,17 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { outfitAction, type OutfitState } from "@/app/clothes/actions";
 import { PixelLayers } from "@/components/game/PixelLayers";
-import { findArt } from "@/lib/art";
-import type { PixelArt } from "@/lib/art/characters";
-import { walkFrame, WALK_FPS, WALK_FRAMES, type WalkDir } from "@/lib/art/walk";
+import { WalkingMirror } from "@/components/game/WalkingMirror";
 import { billButton, CLOTHES_TABS, outfitBill, type ClothesItem, type Outfit } from "@/lib/clothes";
 import { formatNumber } from "@/lib/game";
 import { avatarLayers, type AvatarSlot, type StyleSlot } from "@/lib/shop";
-
-const DIRS: readonly { dir: WalkDir; label: string }[] = [
-  { dir: "down", label: "앞" },
-  { dir: "left", label: "왼쪽" },
-  { dir: "up", label: "뒤" },
-  { dir: "right", label: "오른쪽" },
-];
 
 /** 옷 그림 키 묶음 (캐릭터 → 옷 → 소품 → 모자) */
 function layersOf(character: string, style: Partial<Record<StyleSlot, string>>, outfit: Outfit, catalog: readonly ClothesItem[]): string[] {
   const art = (slot: AvatarSlot) => catalog.find((i) => i.id === outfit[slot])?.art;
   return avatarLayers(character, { ...style, clothes: art("clothes"), accessory: art("accessory"), hat: art("hat") });
-}
-
-/** 거울: 고른 모습이 그 방향으로 걷는다 */
-function Mirror({ layers, dir, walking }: { layers: readonly string[]; dir: WalkDir; walking: boolean }) {
-  const [frame, setFrame] = useState(0);
-  useEffect(() => {
-    if (!walking) return;
-    const timer = setInterval(() => setFrame((f) => (f % WALK_FRAMES) + 1), 1000 / WALK_FPS);
-    return () => clearInterval(timer);
-  }, [walking]);
-  const arts = layers.flatMap((k) => {
-    const a = findArt(k);
-    return a ? [a] : ([] as PixelArt[]);
-  });
-  const grid = walkFrame(arts, dir, walking ? frame : 0);
-  return (
-    <svg viewBox="0 0 16 16" width={192} height={192} shapeRendering="crispEdges" role="img" aria-label="거울에 비친 내 모습" data-mirror={layers.join(" ")} data-mirror-dir={dir}>
-      {grid.flatMap((row, y) => row.map((color, x) => (color ? <rect key={`${x}:${y}`} x={x} y={y} width={1} height={1} fill={color} /> : null)))}
-    </svg>
-  );
 }
 
 /** 옷가게 (SHOP-08): 카드를 누르면 거울이 바로 그 모습이 되고, 계산서 버튼으로 한 번에 사서 입는다 */
@@ -61,8 +32,6 @@ export function ClothesStudio({
 }) {
   const [outfit, setOutfit] = useState<Outfit>(current);
   const [tab, setTab] = useState<AvatarSlot>("clothes");
-  const [dir, setDir] = useState<WalkDir>("down");
-  const [walking, setWalking] = useState(true);
   const [state, action, pending] = useActionState<OutfitState, FormData>(outfitAction, null);
   const bill = useMemo(() => outfitBill(outfit, current, catalog, level, coins), [outfit, current, catalog, level, coins]);
   const layers = layersOf(character, style, outfit, catalog);
@@ -75,20 +44,8 @@ export function ClothesStudio({
 
   return (
     <div className="grid gap-6 md:grid-cols-[18rem_1fr]">
-      <section aria-label="거울" className="space-y-3 rounded-3xl border border-line bg-surface p-4 text-center">
-        <div className="mx-auto w-fit rounded-[2rem] border-8 border-[#c58b4f] bg-[#eaf6ff] p-3">
-          <Mirror layers={layers} dir={dir} walking={walking} />
-        </div>
-        <div className="flex flex-wrap justify-center gap-1" role="group" aria-label="돌려 보기">
-          {DIRS.map((d) => (
-            <button key={d.dir} type="button" className={`rounded-xl border border-line px-3 py-2 text-sm font-semibold ${dir === d.dir ? "bg-ink text-surface" : "bg-surface"}`} aria-pressed={dir === d.dir} onClick={() => setDir(d.dir)}>
-              {d.label}
-            </button>
-          ))}
-          <button type="button" className="rounded-xl border border-line px-3 py-2 text-sm font-semibold" aria-pressed={walking} onClick={() => setWalking((w) => !w)}>
-            {walking ? "⏸ 멈춤" : "▶ 걷기"}
-          </button>
-        </div>
+      <section aria-label="거울" className="px-tile space-y-4 p-4 text-center">
+        <WalkingMirror layers={layers} />
         <form action={action} className="space-y-2 border-t border-line pt-3 text-left" data-bill={bill.kind}>
           <h2 className="font-bold">🧾 계산서</h2>
           {(bill.kind === "ok" || bill.kind === "coins") && bill.buy.length > 0 ? (
@@ -111,27 +68,27 @@ export function ClothesStudio({
             <input key={slot} type="hidden" name={slot} value={outfit[slot] ?? ""} />
           ))}
           <input type="hidden" name="pay" value={pay} />
-          <button type="submit" className="btn btn-primary w-full" disabled={!can || pending} data-outfit-submit>
+          <button type="submit" className="px-btn px-btn--primary w-full" disabled={!can || pending} data-outfit-submit>
             {pending ? "입는 중…" : billButton(bill)}
           </button>
           {state && (
-            <p role={state.ok ? "status" : "alert"} className={`text-sm font-semibold ${state.ok ? "text-accent" : "text-danger"}`} data-outfit-message>
+            <p role={state.ok ? "status" : "alert"} className={`text-sm font-semibold ${state.ok ? "px-gain" : "px-loss"}`} data-outfit-message>
               {state.message}
             </p>
           )}
         </form>
       </section>
-      <section aria-label="고르기" className="space-y-3">
-        <div className="flex flex-wrap gap-1" role="tablist">
+      <section aria-label="고르기" className="min-w-0 space-y-3">
+        <div className="px-tabs flex-wrap" role="tablist">
           {CLOTHES_TABS.map((t) => (
-            <button key={t.slot} type="button" role="tab" aria-selected={tab === t.slot} className={`rounded-xl border border-line px-4 py-2 font-bold ${tab === t.slot ? "bg-ink text-surface" : "bg-surface"}`} onClick={() => setTab(t.slot)}>
+            <button key={t.slot} type="button" role="tab" aria-selected={tab === t.slot} className="px-tab" onClick={() => setTab(t.slot)}>
               {t.title}
             </button>
           ))}
         </div>
-        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4" role="tabpanel" aria-label={tabInfo.title}>
+        <ul className="mt-1 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4" role="tabpanel" aria-label={tabInfo.title}>
           <li>
-            <button type="button" className={`flex h-full w-full flex-col items-center gap-1 rounded-2xl border p-3 ${outfit[tab] === null ? "border-accent ring-2 ring-accent" : "border-line"} bg-surface`} aria-pressed={outfit[tab] === null} onClick={() => pick(tab, null)} data-outfit-card="none">
+            <button type="button" className="px-tile flex h-full w-full flex-col items-center gap-1 p-3" aria-pressed={outfit[tab] === null} onClick={() => pick(tab, null)} data-outfit-card="none">
               <PixelLayers arts={layersOf(character, style, { ...outfit, [tab]: null }, catalog)} size={64} />
               <span className="font-semibold">{tabInfo.none}</span>
             </button>
@@ -142,7 +99,7 @@ export function ClothesStudio({
             const locked = !item.owned && item.requiredLevel > level;
             return (
               <li key={item.id}>
-                <button type="button" className={`flex h-full w-full flex-col items-center gap-1 rounded-2xl border p-3 ${chosen ? "border-accent ring-2 ring-accent" : "border-line"} bg-surface`} aria-pressed={chosen} onClick={() => pick(tab, item.id)} data-outfit-card={item.id}>
+                <button type="button" className="px-tile flex h-full w-full flex-col items-center gap-1 p-3" aria-pressed={chosen} onClick={() => pick(tab, item.id)} data-outfit-card={item.id}>
                   <PixelLayers arts={layersOf(character, style, { ...outfit, [tab]: item.id }, catalog)} size={64} />
                   <span className="font-semibold">{item.name}</span>
                   <span className="text-sm text-ink-soft">{worn ? "입는 중 ✓" : item.owned ? "보유 ✓" : locked ? `🔒 Lv.${item.requiredLevel}` : `🪙 ${formatNumber(item.price)}`}</span>
