@@ -234,11 +234,22 @@ test.describe("광장 HUD", () => {
     await page.mouse.click(shop.x, shop.y);
     await menu.click();
     await expect(panel(page)).toHaveAttribute("data-town-panel", "menu");
-    await expect(prompt(page)).toHaveText("🏪 상점 · Space 들어가기", { timeout: 8000 });
-    await expect.poll(async () => canvas(page).getAttribute("data-walk")).toMatch(/^idle-/);
+    // 문 앞에 닿아 멈출 때까지 (창이 열린 동안 입구 안내는 쉰다, D4)
+    await expect
+      .poll(async () => {
+        const [x, y] = await feet(page);
+        const walk = await canvas(page).getAttribute("data-walk");
+        return Math.hypot(x - 1050, y - 960) > 200 && /^idle-/.test(walk ?? "");
+      }, { timeout: 8000 })
+      .toBe(true);
     await page.waitForTimeout(300);
     await expect(page).toHaveURL("/town");
     await expect(panel(page)).toHaveAttribute("data-town-panel", "menu");
+    await expect(prompt(page)).toBeHidden();
+    // 창을 닫으면 그 문 앞 안내가 다시 보인다
+    await page.keyboard.press("Escape");
+    await expect(panel(page)).toHaveCount(0);
+    await expect(prompt(page)).toHaveText("🏪 상점 · Space 들어가기");
   });
 
   test("입구 안내는 그 건물 이름표 자리에 뜨고, 낮은 화면에서도 위 간판 묶음 아래에 있다", async ({ page }) => {

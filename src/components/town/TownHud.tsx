@@ -183,13 +183,14 @@ export function TownHud({
   }, [panel, phone]);
 
   // 창이 열리고 닫힐 때 게임에 알린다 (열면 멀리서 누른 건물에 걸어가 들어가기를 그만둔다)
+  // 창 종류가 바뀌어도(☰ → 우체통) 알린다: 게임이 우체통 창만큼 카메라를 비킨다 (D4)
   const isOpen = panel !== null;
-  const announced = useRef(isOpen);
+  const announced = useRef<string | null>(panel);
   useEffect(() => {
-    if (phone || announced.current === isOpen) return;
-    announced.current = isOpen;
+    if (phone || announced.current === panel) return;
+    announced.current = panel;
     emitTown("bv-panel", { open: isOpen });
-  }, [isOpen, phone]);
+  }, [panel, isOpen, phone]);
 
   // 게임에서 우체통 앞 Space·클릭 (TOWN-13)
   useEffect(() => {

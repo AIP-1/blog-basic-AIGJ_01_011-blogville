@@ -791,7 +791,7 @@ export function TownGame({
     let hudRects: { left: number; top: number; right: number; bottom: number }[] = [];
     // 펼친 광장 소식 서랍이 덮는 오른쪽 폭 (A2): 카메라 가운데를 그만큼 왼쪽으로 옮긴다 (접힌 탭은 치지 않는다)
     let drawerCover = 0;
-    // 열린 창(☰·우체통·자리 고르기, 왼쪽 위)이 덮는 왼쪽 폭 (D4): 카메라 가운데를 그만큼 오른쪽으로, 창이 열린 동안 입구 안내는 쉰다
+    // 열린 우체통 창(왼쪽 위)이 덮는 왼쪽 폭 (D4): 카메라 가운데를 그만큼 오른쪽으로. 어떤 창이든 열린 동안 입구 안내는 쉰다
     let panelCover = 0;
     let panelOpen = false;
     const measureHud = () => {
@@ -802,7 +802,8 @@ export function TownGame({
       panelCover = 0;
       const panelEl = document.querySelector<HTMLElement>("[data-town-panel]");
       panelOpen = panelEl !== null;
-      if (panelEl) {
+      // 카메라는 우체통 창만 비킨다 (그 집·우체통이 창 뒤에 숨지 않게). ☰ 메뉴 같은 창은 그대로 둔다
+      if (panelEl?.dataset.townPanel === "mailbox") {
         const r = panelEl.getBoundingClientRect();
         if (r.width > 0 && r.width < c.width / 2) panelCover = Math.max(0, Math.round(r.right - c.left + 12));
       }
