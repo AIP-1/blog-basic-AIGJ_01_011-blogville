@@ -208,8 +208,13 @@ export function TaskList({
                   )}
                 </span>
                 {task.id === "post" && (
-                  <Link href="/prompt" className="mt-1 block truncate text-xs font-semibold underline underline-offset-2 hover:text-(--kit-ink)" data-task-prompt>
-                    📝 이번 주 글감: {prompt.title}
+                  // 손가락으로 누르는 화면에서는 44px 높이 (PC 서랍 줄은 그대로 얇게)
+                  <Link
+                    href="/prompt"
+                    className="mt-1 flex items-center text-xs font-semibold underline underline-offset-2 hover:text-(--kit-ink) pointer-coarse:min-h-11"
+                    data-task-prompt
+                  >
+                    <span className="min-w-0 truncate">📝 이번 주 글감: {prompt.title}</span>
                   </Link>
                 )}
               </span>

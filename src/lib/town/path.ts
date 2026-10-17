@@ -67,7 +67,19 @@ export class WalkGrid {
     // 도착 자리: 목표가 걸을 수 있는 땅이면 그대로, 아니면 가까운 빈 칸 (넓혀 가며 찾는다)
     let goalPoint: Point = to;
     let goal = cellOf(to);
-    if (!this.free(to)) {
+    if (this.free(to)) {
+      // 목표 칸 가운데가 막혀 있으면 목표가 곧게 보이는 가까운 빈 칸을 도착 칸으로 (도착 자리는 그대로)
+      if (!open(goal) || !this.clear(center(goal), to)) {
+        const found = this.nearestOpen(goal, W, H, (i) => open(i) && this.clear(center(i), to));
+        if (found >= 0) goal = found;
+        else {
+          const near = this.nearestOpen(goal, W, H, open);
+          if (near < 0) return null;
+          goal = near;
+          goalPoint = center(near);
+        }
+      }
+    } else {
       const found = this.nearestOpen(goal, W, H, open);
       if (found < 0) return null;
       goal = found;
@@ -77,7 +89,7 @@ export class WalkGrid {
 
     // 출발 칸: 서 있는 칸 가운데가 막혔으면 곧게 닿는 가까운 빈 칸에서
     let start = cellOf(from);
-    if (!open(start)) {
+    if (!open(start) || !this.clear(from, center(start))) {
       const found = this.nearestOpen(start, W, H, (i) => open(i) && this.clear(from, center(i)));
       if (found < 0) return null;
       start = found;
@@ -128,18 +140,22 @@ export class WalkGrid {
     for (let i = goal; i !== start && i >= 0; i = came[i]) cells.push(center(i));
     cells.push(center(start));
     cells.reverse();
-    cells[cells.length - 1] = goalPoint;
+    // 도착 칸 가운데에서 도착 자리까지는 곧게 보인다 (위에서 골랐다)
+    if (Math.hypot(goalPoint.x - cells[cells.length - 1].x, goalPoint.y - cells[cells.length - 1].y) >= 1) cells.push(goalPoint);
     return this.smooth(from, cells);
   }
 
-  /** 곧게 갈 수 있는 점은 건너뛴다: 지금 자리에서 보이는 가장 먼 점으로 */
+  /**
+   * 곧게 갈 수 있는 점은 건너뛴다: 지금 자리에서 보이는 가장 먼 점으로.
+   * 보이는 점이 하나도 없으면 칸 사슬 그대로 다음 칸으로 (A*가 이웃한 빈 칸으로 이어 둔 걸음).
+   */
   private smooth(from: Point, points: Point[]): Point[] {
     const out: Point[] = [];
     let at = from;
     let i = 0;
     while (i < points.length) {
       let far = i;
-      for (let j = points.length - 1; j > i; j--) {
+      for (let j = points.length - 1; j >= i; j--) {
         if (this.clear(at, points[j])) {
           far = j;
           break;

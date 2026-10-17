@@ -7,7 +7,7 @@ import { farmArt } from "@/lib/art/town";
 import { animalStage, SPECIES, STAGE_LABEL } from "@/lib/farm";
 import { parseHostSlug } from "@/lib/town/zones";
 import { requireMember } from "@/server/dal";
-import { getFarm, listGrownAnimals, type FarmAnimal, type GrownAnimal } from "@/server/farm";
+import { getFarm, getFarmPen, type FarmAnimal, type GrownAnimal } from "@/server/farm";
 import { getTownHost } from "@/server/town";
 
 export async function generateMetadata({ searchParams }: PageProps<"/farm">): Promise<Metadata> {
@@ -51,7 +51,8 @@ export default async function FarmPage({ searchParams }: PageProps<"/farm">) {
 
 /** 친구의 농장 구경 (읽기 전용) */
 async function FriendFarm({ host }: { host: { userId: string; nickname: string; slug: string } }) {
-  const [farm, grown] = await Promise.all([getFarm(host.userId), listGrownAnimals(host.userId)]);
+  const farm = await getFarmPen(host.userId);
+  const grown = farm.grown;
   const room = { key: "farm", emoji: "🐮", title: `${host.nickname}님의 농장 구경`, spot: "farm", width: "wide" } as const;
   return (
     <GamePageShell room={room} art={farmArt()} host={host.slug} description={`${host.nickname}님이 키우는 동물을 구경해요. 돌보기는 주인만 할 수 있어요.`}>
@@ -70,7 +71,7 @@ async function FriendFarm({ host }: { host: { userId: string; nickname: string; 
                     <PixelLayers arts={["animal.egg"]} size={56} label="알" />
                   </div>
                   <h3 className="mt-2 font-bold">알</h3>
-                  <p className="text-sm text-ink-soft">곧 부화할 거예요</p>
+                  <p className="text-sm text-ink-soft">주인이 부화를 기다리는 알이에요</p>
                 </li>
               ))}
               {farm.animals.map((a) => (

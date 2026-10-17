@@ -5,6 +5,7 @@ import { blogs, follows, posts, profiles } from "@/db/schema";
 import { NOTICE_SLUG } from "@/lib/names";
 import { FAVORITE_MESSAGES, favoriteRefusal } from "@/lib/social";
 import { assignLots, INVITE_ERRORS, isNeighborLot, LOT_ERRORS, moveToLot } from "@/lib/town/lots";
+import { isUniqueViolation } from "./names";
 
 /** 블로그 홈의 `이웃 N`: 이 블로그 주인을 이웃 추가한 사람 수 (SOC-04) */
 export async function countFollowers(ownerId: string): Promise<number> {
@@ -165,6 +166,14 @@ export async function setTownLot(followerId: string, followeeId: string, lot: un
  */
 export async function inviteNeighbor(followerId: string, slug: string, lot: unknown): Promise<string | null> {
   if (!isNeighborLot(lot)) return LOT_ERRORS.lot;
+  return inviteTx(followerId, slug, lot).catch((error: unknown) => {
+    // 마지막 방어선: 그 자리를 잡은 행이 있으면(부분 유일 인덱스) 자리 거절로
+    if (isUniqueViolation(error)) return INVITE_ERRORS.taken;
+    throw error;
+  });
+}
+
+function inviteTx(followerId: string, slug: string, lot: number): Promise<string | null> {
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"fav:" + followerId}))`);
     const [blog] = await tx.select({ ownerId: blogs.ownerId }).from(blogs).where(eq(blogs.slug, slug));
@@ -180,6 +189,13 @@ export async function inviteNeighbor(followerId: string, slug: string, lot: unkn
     const refusal = favoriteRefusal({ turningOn: true, isNotice: slug === NOTICE_SLUG, count: rows.length });
     if (refusal) return refusal;
     if (assignLots(rows).some((p) => p.lot === lot)) return INVITE_ERRORS.taken;
+    // 블로그가 사라진 이웃의 행도 자리를 쥐고 있을 수 있어 follows만 바로 본다
+    const [held] = await tx
+      .select({ followeeId: follows.followeeId })
+      .from(follows)
+      .where(and(eq(follows.followerId, followerId), eq(follows.townLot, lot), sql`${follows.followeeId} <> ${blog.ownerId}`))
+      .limit(1);
+    if (held) return INVITE_ERRORS.taken;
     await tx.execute(sql`
       insert into follows (follower_id, followee_id, is_favorite, town_lot)
       values (${followerId}, ${blog.ownerId}, true, ${lot})

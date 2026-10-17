@@ -38,6 +38,9 @@ test.describe("이번 주 글감", () => {
     expect(tags.split(",").map((t) => t.trim())[0]).toBe("글감");
     const tag = tags.split(",").map((t) => t.trim())[1];
     expect(tag.length).toBeGreaterThan(0);
+    // 지난 주 열쇠로 와도 이번 주 글감으로
+    await page.goto("/write?topic=2020-W05");
+    await expect(page.locator(`[data-write-topic="${key}"]`)).toContainText(`이번 주 글감: ${topic}`);
 
     const open = `글감 공개 ${Date.now()}`;
     const hidden = `글감 비공개 ${Date.now()}`;

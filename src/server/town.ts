@@ -8,6 +8,7 @@ import { previousDay, todayKST } from "@/lib/kst";
 import { NOTICE_SLUG } from "@/lib/names";
 import { assignLots, pickSuggestions, suggestionLots } from "@/lib/town/lots";
 import { dailyLots, dailyPick, todayTasks } from "@/lib/town/plaza";
+import { layoutOf } from "@/lib/widgets";
 import { currentRoof, ROOF_HEX } from "@/lib/roof";
 import { feedbackNotificationText, guestbookNotificationText, levelUpText, notificationText, notificationTime } from "@/lib/notifications";
 import { getMyBlog, getNickname } from "./dal";
@@ -62,6 +63,9 @@ export const NEIGHBOR_HOUSES = 10;
 export const POPULAR_POOL = 100;
 /** 방문자 마을 후보(인기 100곳)는 누구에게나 같아 1분 기억한다 */
 const GUEST_POOL_TTL = 60_000;
+/** 이사 올 이웃의 하루 후보(활동 블로그) 수와 기억 시간: 열쇠에 날짜가 들어 있어 날이 바뀌면 새로 읽는다 */
+const SETTLED_POOL = 60;
+const SETTLED_POOL_TTL = 3_600_000;
 
 const exp = sql<number>`(select coalesce(sum(l.exp_delta), 0) from ${pointLedger} l where l.user_id = ${blogs.ownerId})::int`;
 const hasPublicPost = sql`exists (select 1 from posts p where p.blog_id = ${blogs.id} and p.is_public)`;
@@ -73,6 +77,7 @@ const houseColumns = {
   nickname: profiles.nickname,
   blogTitle: blogs.title,
   roofColor: blogs.roofColor,
+  widgetLayout: blogs.widgetLayout,
   exp,
 };
 
@@ -83,6 +88,8 @@ type HouseRow = {
   nickname: string;
   blogTitle: string;
   roofColor: string | null;
+  /** 옆 칸 위젯 배치: 👣 방문자를 숨긴 집은 마을에서도 방문 수를 보이지 않는다 */
+  widgetLayout: unknown;
   exp: number;
 };
 
@@ -99,9 +106,15 @@ export async function getTownHost(slug: string): Promise<TownHost | null> {
   return row ?? null;
 }
 
-function toHouse(row: HouseRow, lot: number, mine: boolean): TownHouse & { blogId: number } {
+/** 블로그 옆 칸처럼: 👣 방문자 위젯이 보이는 블로그만 방문 수를 남에게 보인다 */
+function visitsShown(widgetLayout: unknown): boolean {
+  return layoutOf(widgetLayout).items.some((it) => it.key === "visits" && it.visible);
+}
+
+function toHouse(row: HouseRow, lot: number, mine: boolean): TownHouse & { blogId: number; showVisits: boolean } {
   return {
     blogId: row.blogId,
+    showVisits: mine || visitsShown(row.widgetLayout),
     lot,
     userId: row.ownerId,
     slug: row.slug,
@@ -122,35 +135,40 @@ function toHouse(row: HouseRow, lot: number, mine: boolean): TownHouse & { blogI
  * 집마다 안 읽은 24시간 새 글이 있는지(`unread`), 오늘·어제 방문 수(blog_visits 기본 키, 한 번의 group by)를 붙인다.
  * 세 쿼리(입은 모습·글·방문 수)는 함께 돈다.
  */
-async function withRecentPosts(houses: (TownHouse & { blogId: number })[], visitorId: string | null = null): Promise<TownHouse[]> {
+async function withRecentPosts(houses: (TownHouse & { blogId: number; showVisits: boolean })[], visitorId: string | null = null): Promise<TownHouse[]> {
   if (houses.length === 0) return [];
-  const ids = houses.map((h) => h.blogId);
-  const idList = sql.join(
-    ids.map((id) => sql`${id}`),
-    sql`, `,
-  );
+  const idSql = (ids: number[]) =>
+    sql.join(
+      ids.map((id) => sql`${id}`),
+      sql`, `,
+    );
+  const idList = idSql(houses.map((h) => h.blogId));
+  // 방문 수는 내 집과 👣 방문자를 보이는 집만 읽고 보낸다
+  const visitIds = houses.filter((h) => h.showVisits).map((h) => h.blogId);
   const today = todayKST();
   const yesterday = previousDay(today);
   const [avatars, rows, visits] = await Promise.all([
     avatarLayersOf(houses.map((h) => h.userId)),
     db.execute<{ blog_id: number; id: number; title: string; created_at: Date | string; read: boolean }>(sql`
-    select blog_id, id, title, created_at, read from (
-      select p.blog_id, p.id, p.title, p.created_at, ${viewedRecently(sql`p.id`, visitorId)} as read,
+    select t.blog_id, t.id, t.title, t.created_at, ${viewedRecently(sql`t.id`, visitorId)} as read from (
+      select p.blog_id, p.id, p.title, p.created_at,
         row_number() over (partition by p.blog_id order by p.created_at desc, p.id desc) as n
       from ${posts} p where p.is_public and p.blog_id in (${idList})
-    ) t where n <= ${MAILBOX_POSTS} order by blog_id, n`),
-    db
-      .select({
-        blogId: blogVisits.blogId,
-        today: sql<number>`count(*) filter (where ${blogVisits.date} = ${today})::int`,
-        yesterday: sql<number>`count(*) filter (where ${blogVisits.date} = ${yesterday})::int`,
-      })
-      .from(blogVisits)
-      .where(and(sql`${blogVisits.blogId} in (${idList})`, sql`${blogVisits.date} >= ${yesterday}`))
-      .groupBy(blogVisits.blogId),
+    ) t where t.n <= ${MAILBOX_POSTS} order by t.blog_id, t.n`),
+    visitIds.length === 0
+      ? Promise.resolve([])
+      : db
+          .select({
+            blogId: blogVisits.blogId,
+            today: sql<number>`count(*) filter (where ${blogVisits.date} = ${today})::int`,
+            yesterday: sql<number>`count(*) filter (where ${blogVisits.date} = ${yesterday})::int`,
+          })
+          .from(blogVisits)
+          .where(and(sql`${blogVisits.blogId} in (${idSql(visitIds)})`, sql`${blogVisits.date} >= ${yesterday}`))
+          .groupBy(blogVisits.blogId),
   ]);
   const since = Date.now() - FRESH_HOURS * 3_600_000;
-  return houses.map(({ blogId, ...house }) => {
+  return houses.map(({ blogId, showVisits, ...house }) => {
     const recentPosts = rows
       .filter((r) => Number(r.blog_id) === blogId)
       .map((r) => ({ id: Number(r.id), title: r.title, createdAt: new Date(r.created_at).toISOString(), ...(r.read ? { read: true } : {}) }));
@@ -163,8 +181,7 @@ async function withRecentPosts(houses: (TownHouse & { blogId: number })[], visit
       fresh,
       unread: fresh && recentPosts.some((p) => Date.parse(p.createdAt) >= since && !p.read),
       latestTitle: recentPosts[0]?.title,
-      visitsToday: Number(visit?.today ?? 0),
-      visitsYesterday: Number(visit?.yesterday ?? 0),
+      ...(showVisits ? { visitsToday: Number(visit?.today ?? 0), visitsYesterday: Number(visit?.yesterday ?? 0) } : {}),
     };
   });
 }
@@ -203,7 +220,7 @@ export async function getMemberHouses(userId: string, viewerId = userId, visitor
 
 /**
  * 이사 올 이웃 후보 중 가까운 사람 (plaza-upgrade-2): 나를 ⭐한 회원(tier 1, follows_followee_idx), 내가 이웃만 맺은 회원(tier 2).
- * 나·공지 블로그·이미 ⭐한 이웃은 뺀다. 묶음마다 50명까지.
+ * 나·공지 블로그·이미 ⭐한 이웃은 뺀다. tier 1이 먼저 오게 묶음, 블로그 번호 순으로 100명까지.
  */
 function loadCloseCandidates(userId: string): Promise<(HouseRow & { tier: number })[]> {
   const favoredMe = sql`exists (select 1 from ${follows} f where f.followee_id = ${userId} and f.follower_id = ${blogs.ownerId} and f.is_favorite)`;
@@ -214,7 +231,7 @@ function loadCloseCandidates(userId: string): Promise<(HouseRow & { tier: number
     .from(blogs)
     .innerJoin(profiles, eq(profiles.userId, blogs.ownerId))
     .where(and(sql`${blogs.ownerId} <> ${userId}`, sql`${blogs.slug} <> ${NOTICE_SLUG}`, sql`not ${iFavorite}`, sql`(${favoredMe} or ${iFollow})`))
-    .orderBy(asc(blogs.id))
+    .orderBy(sql`(case when ${favoredMe} then 1 else 2 end)`, asc(blogs.id))
     .limit(100)
     .then((rows) => rows);
 }
@@ -232,7 +249,8 @@ async function suggestHouses(userId: string, placed: readonly { ownerId: string;
   const tiers: HouseRow[][] = [close.filter((c) => c.tier === 1), close.filter((c) => c.tier === 2)];
   let chosen = pickSuggestions(tiers, (r) => r.ownerId, skip, lots.length, pick);
   if (chosen.length < lots.length) {
-    const settled = await loadSettledCandidates(seed, userId);
+    const day = todayKST();
+    const settled = await cached(`settled-pool:${day}`, SETTLED_POOL_TTL, () => loadSettledCandidates(day));
     chosen = pickSuggestions([...tiers, settled], (r) => r.ownerId, skip, lots.length, pick);
   }
   if (chosen.length < lots.length) {
@@ -240,7 +258,7 @@ async function suggestHouses(userId: string, placed: readonly { ownerId: string;
     const pool = await cached("guest-town-pool", GUEST_POOL_TTL, loadGuestPool);
     chosen = pickSuggestions([...tiers, chosen, pool], (r) => r.ownerId, skip, lots.length, pick);
   }
-  return chosen.map((row, i) => ({ ...toHouse(row, lots[i], false), suggested: true }));
+  return chosen.map((row, i) => ({ ...toHouse(row, lots[i], false), showVisits: false, suggested: true }));
 }
 
 /**
@@ -261,22 +279,21 @@ export async function getGuestHouses(now = new Date(), visitorId: string | null 
 }
 
 /**
- * 이사 올 이웃의 활동 블로그 후보 (tier 3): 어제까지 만들어졌고 어제까지 쓴 공개 글이 있는 블로그(공지·나 제외) 중
- * 하루 씨앗(`md5(씨앗 || 블로그 번호)`) 순으로 30곳. 오늘 생긴 블로그·오늘 쓴 글·방문 수와 상관없어서 하루 동안 같은 후보가 선다
- * (방문 수 순 인기 100곳은 하루에도 들고 나서 후보가 바뀌었다).
+ * 이사 올 이웃의 활동 블로그 후보 (tier 3): 어제까지 만들어졌고 어제까지 쓴 공개 글이 있는 블로그(공지 제외) 중
+ * 그날 씨앗(`md5(날짜 || 블로그 번호)`) 순으로 `SETTLED_POOL`곳. 누구에게나 같은 하루 후보라 기억해 두고(`settled-pool:날짜`),
+ * 사람마다 나·이미 선 집을 빼고 내 씨앗으로 고른다(`suggestHouses`). 오늘 생긴 블로그·오늘 쓴 글·방문 수와 상관없어서 하루 동안 같은 후보가 선다.
  */
-function loadSettledCandidates(seed: string, userId: string): Promise<HouseRow[]> {
+function loadSettledCandidates(day: string): Promise<HouseRow[]> {
   const today = sql`(date_trunc('day', now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul')`;
   return houseQuery(
     and(
       sql`${blogs.slug} <> ${NOTICE_SLUG}`,
-      sql`${blogs.ownerId} <> ${userId}`,
       sql`${blogs.createdAt} < ${today}`,
       sql`exists (select 1 from posts p where p.blog_id = ${blogs.id} and p.is_public and p.created_at < ${today})`,
     ),
   )
-    .orderBy(sql`md5(${seed} || ${blogs.id}::text)`)
-    .limit(30)
+    .orderBy(sql`md5(${day} || ${blogs.id}::text)`)
+    .limit(SETTLED_POOL)
     .then((rows) => rows);
 }
 

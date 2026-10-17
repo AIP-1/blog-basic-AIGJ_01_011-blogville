@@ -52,6 +52,8 @@ const SMALL = "px-btn px-btn--quiet px-btn--sm";
  * 이름표 아래 설명 줄은 없앴으므로(1.26) 숫자는 창 안에만 둔다. 시험 훅 `data-visits`(오늘,어제).
  */
 function VisitLine({ house }: { house: TownHouse }) {
+  // 주인이 👣 방문자 위젯을 숨긴 이웃 집은 서버가 방문 수를 보내지 않는다
+  if (house.visitsToday === undefined) return null;
   const today = house.visitsToday ?? 0;
   const yesterday = house.visitsYesterday ?? 0;
   return (

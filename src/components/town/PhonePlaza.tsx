@@ -52,7 +52,7 @@ export function PhonePlaza({ hud, houses, news, sky, season }: { hud: HudMember;
   const title = `${hud.nickname}님의 마을`;
   // 불 켜진 집: 24시간 안에 글을 쓴 이웃 집 (광장 개편 '등불 마을')
   const lit = houses.filter((h) => h.lot > 0 && !h.suggested && h.fresh).length;
-  const newsTitle = news.scope === "village" ? "📋 마을 소식" : "이웃 새 글";
+  const newsTitle = news.scope === "village" ? "📋 마을 소식" : "불 켜진 집";
   return (
     <div className="mx-auto max-w-md space-y-6" data-phone-plaza>
       <section aria-labelledby="plaza-title" className="px-box overflow-hidden">

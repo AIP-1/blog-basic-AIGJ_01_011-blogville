@@ -190,7 +190,9 @@ function SuggestList({ suggested, lot }: { suggested: readonly TownHouse[]; lot:
   }
   return (
     <div className="space-y-2" data-lot-suggest>
-      <p className="text-sm text-(--kit-ink-soft)">오늘 이사 올 수 있는 이웃이에요. 모시면 ⭐ 즐겨찾는 이웃이 되고 {lot === null ? "지금 선 빈 집터" : `${lot}번 자리`}에 집이 서요.</p>
+      <p className="text-sm text-(--kit-ink-soft)">
+        오늘 이사 올 수 있는 이웃이에요. {lot === null ? "모시면 ⭐ 즐겨찾는 이웃이 돼요." : `모시면 ⭐ 즐겨찾는 이웃이 되고 ${lot}번 자리에 집이 서요.`}
+      </p>
       <ul className="grid gap-2 p-0.5" aria-label="이사 올 이웃">
         {suggested.map((h) => (
           <li key={h.userId} className="flex flex-wrap items-center gap-2 bg-(--kit-paper-2) px-3 py-2" data-suggest={h.slug}>
@@ -200,6 +202,11 @@ function SuggestList({ suggested, lot }: { suggested: readonly TownHouse[]; lot:
                 <span className="block truncate font-(family-name:--blog-serif) text-xs font-bold text-(--kit-ink-soft)">{h.recentPosts[0].title}</span>
               ) : (
                 <span className="block truncate text-xs text-(--kit-ink-soft)">{h.blogTitle}</span>
+              )}
+              {lot === null && (
+                <span className="block text-xs text-(--kit-ink-soft)" data-suggest-lot={h.lot}>
+                  {h.lot}번 빈 집터에 집이 서요
+                </span>
               )}
             </span>
             <InviteButton house={{ ...h, lot: lot ?? h.lot }} label="모시기" />

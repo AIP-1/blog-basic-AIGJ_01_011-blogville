@@ -32,7 +32,7 @@ test.describe("휴대폰 광장", () => {
     await expect(write).toHaveAttribute("href", "/write");
     await expect(write).toHaveAttribute("data-write-progress", "0/3");
 
-    await expect(plaza.getByRole("heading", { name: "이웃 새 글" })).toBeVisible();
+    await expect(plaza.getByRole("heading", { name: "불 켜진 집", exact: true })).toBeVisible();
     const news = plaza.locator('[data-town-news="neighbors"]');
     await expect(news.locator("[data-news-post]")).toHaveCount(1);
     await expect(news.locator("[data-news-post]")).toHaveAttribute("href", new RegExp(`^/@${neighbor}/\\d+$`));

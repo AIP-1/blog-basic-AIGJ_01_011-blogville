@@ -152,6 +152,7 @@ export const FISHING_DAILY_LIMIT = 1;
  * 오늘 할 일: 이미 있는 하루 루프와 그 보상·상한만 보여 준다 (새 보상 없음).
  * 글쓰기는 보상 n/3을 세지만, 짧은 글이라 보상을 못 받았어도 오늘 공개 글을 썼으면 한 것으로 친다.
  * 돌보기 보상 15번은 키우는 동물이 5마리여야 채울 수 있어서, 오늘 한 번이라도 돌봤고 더 돌볼 동물이 없으면 한 것으로 친다.
+ * 댓글은 이웃 글에 하나라도 달았으면 한 것으로 친다 (보상 n/10은 진행 문구로 그대로).
  * 출석은 텔레포트하지 않는다: 게시판 앞은 마을 소식·출석 두 입구 한가운데라 Space가 마을 소식으로 들어간다 (링크로 출석 화면).
  */
 export function todayTasks(state: TodayState, commentHref = "/feed"): TodayTask[] {
@@ -205,7 +206,8 @@ export function todayTasks(state: TodayState, commentHref = "/feed"): TodayTask[
       id: "comment",
       icon: "💬",
       label: "이웃 글에 댓글",
-      done: comments >= commentCap,
+      // 이웃 글에 댓글 하나면 오늘 한 것으로 친다 (보상 n/10은 그대로 보인다)
+      done: comments >= 1,
       progress: { current: Math.min(comments, commentCap), total: commentCap },
       href: commentHref,
       reward: rewardText(REWARD_RULES.comment),

@@ -150,9 +150,13 @@ test.describe("B3 우체통 쪽지", () => {
 
     // 1시간에 10개: 이미 10개를 썼으면 거절 (방명록 화면과 같은 상한)
     for (let i = 0; i < 8; i++) await sql`insert into guestbook_entries (blog_id, author_id, content) values (${blog.id}, ${meId}, ${"채우기 " + i})`;
+    // 주인이 👣 방문자 위젯을 숨기면 마을 우체통에도 방문 수가 없다
+    await sql`update blogs set widget_layout = ${JSON.stringify({ items: [{ key: "visits", visible: false, size: "lg" }] })}::jsonb where id = ${blog.id}`;
     await openTown(page);
     await teleport(page, 418, 420);
     await page.keyboard.press("Space");
+    await expect(panel(page).getByRole("button", { name: "✉️ 쪽지 넣기" })).toBeVisible();
+    await expect(panel(page).locator("[data-visits]")).toHaveCount(0);
     await panel(page).getByRole("button", { name: "✉️ 쪽지 넣기" }).click();
     await panel(page).getByRole("textbox", { name: /쪽지/ }).fill("열한 번째");
     await panel(page).getByRole("button", { name: "쪽지 넣기", exact: true }).click();

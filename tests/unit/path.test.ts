@@ -42,6 +42,27 @@ describe("클릭 이동 길찾기 (A1)", () => {
     expect(Math.hypot(end.x - 1000, end.y - 815)).toBeLessThan(60);
   });
 
+  it("빈 자리인데 그 칸 가운데가 막혀 있어도 그 자리까지 간다", () => {
+    for (const to of [
+      { x: 1105, y: 527 },
+      { x: 786, y: 1102 },
+      { x: 896, y: 1082 },
+      { x: 1603, y: 1324 },
+    ]) {
+      const grid = new WalkGrid(bodies);
+      expect(grid.free(to)).toBe(true);
+      const path = grid.find(START_POS, to);
+      expect(path, `${to.x},${to.y}`).not.toBeNull();
+      expect(path!.at(-1)).toEqual(to);
+      expect(clearPath(START_POS, path!)).toBe(true);
+      let at = START_POS;
+      for (const p of path!) {
+        expect(grid.clear(at, p)).toBe(true);
+        at = p;
+      }
+    }
+  });
+
   it("둘러싸인 곳에는 길이 없다", () => {
     const box = [
       { x: 900, y: 900, width: 200, height: 10 },

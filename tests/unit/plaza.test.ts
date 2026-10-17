@@ -238,12 +238,15 @@ describe("방문자 마을 자리 (dailyLots)", () => {
 });
 
 describe("오늘 할 일 다듬기 (plaza-upgrade-2 B2)", () => {
-  it("💬 이웃 글에 댓글은 맨 끝, 10개면 한 일. 기존 보상을 줄마다 적는다", () => {
+  it("💬 이웃 글에 댓글은 맨 끝, 하나면 한 일(보상 n/10은 그대로). 기존 보상을 줄마다 적는다", () => {
     const tasks = todayTasks({ ...IDLE, comments: 3 });
     const comment = tasks.at(-1)!;
     expect(comment.id).toBe("comment");
-    expect(comment).toMatchObject({ icon: "💬", label: "이웃 글에 댓글", done: false, progress: { current: 3, total: 10 }, href: "/feed", reward: "✨5 🪙5" });
+    expect(comment).toMatchObject({ icon: "💬", label: "이웃 글에 댓글", done: true, progress: { current: 3, total: 10 }, href: "/feed", reward: "✨5 🪙5" });
     expect(taskProgressText(comment)).toBe("댓글 보상 3/10");
+    expect(todayTasks({ ...IDLE, comments: 0 }).at(-1)!.done).toBe(false);
+    expect(todayTasks({ ...IDLE, comments: 1 }).at(-1)!.done).toBe(true);
+    expect(taskProgressText(todayTasks({ ...IDLE, comments: 1 }).at(-1)!)).toBe("댓글 보상 1/10");
     expect(todayTasks({ ...IDLE, comments: 10 }).at(-1)!.done).toBe(true);
     expect(todayTasks({ ...IDLE, comments: 14 }).at(-1)!.progress.current).toBe(10);
     expect(tasks[1].reward).toBe("✨30 🪙30");

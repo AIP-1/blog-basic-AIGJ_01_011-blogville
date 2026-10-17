@@ -64,12 +64,12 @@ test.describe("광장 HUD", () => {
     const post = drawer(page).locator('[data-task="post"]');
     await expect(post).toHaveAttribute("data-done", "1");
     await expect(post).toContainText("글 보상 1/3");
-    // 오늘 댓글 보상 하나 (원장 reason='comment') → 💬 줄 1/10 (plaza-upgrade-2 B2)
+    // 오늘 댓글 보상 하나 (원장 reason='comment') → 💬 줄 1/10, 하나면 한 일 (plaza-upgrade-2 B2)
     await sql`insert into point_ledger (user_id, reason, exp_delta, coin_delta) values (${await userId(username)}, 'comment', 0, 1)`;
     await openTown(page);
     await drawer(page).getByRole("tab", { name: /오늘 할 일/ }).click();
     await expect(drawer(page).locator('[data-task="comment"]')).toContainText("댓글 보상 1/10");
-    await expect(drawer(page).locator('[data-task="comment"]')).toHaveAttribute("data-done", "0");
+    await expect(drawer(page).locator('[data-task="comment"]')).toHaveAttribute("data-done", "1");
     // ✏️ 글쓰기 설명: 초점을 두면 보상 n/3과 한 편의 보상
     await write.focus();
     await expect(town(page).locator("[data-write-tip]")).toBeVisible();

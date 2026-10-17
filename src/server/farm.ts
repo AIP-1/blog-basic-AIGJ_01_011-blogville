@@ -80,6 +80,27 @@ export async function getFarm(userId: string): Promise<Farm> {
   };
 }
 
+/**
+ * 친구 농장 구경 (읽기 전용, plaza-upgrade-2 C4): 알·키우는 동물·다 키운 동물만. 지갑·성장 아이템·오늘 돌보기는 읽지 않는다
+ */
+export async function getFarmPen(userId: string): Promise<Pick<Farm, "eggs" | "animals" | "grown">> {
+  const rows = await db
+    .select({ id: animals.id, species: animals.species, source: animals.source, growth: animals.growth, grownAt: animals.grownAt })
+    .from(animals)
+    .where(eq(animals.userId, userId))
+    .orderBy(asc(animals.id));
+  return {
+    eggs: rows.filter((r) => r.species === null).map((r) => ({ id: r.id, source: r.source })),
+    animals: rows
+      .filter((r) => isSpecies(r.species) && r.grownAt === null)
+      .map((r) => ({ id: r.id, species: r.species as Species, growth: r.growth, cared: [] })),
+    grown: rows
+      .filter((r) => isSpecies(r.species) && r.grownAt !== null)
+      .map((r) => ({ id: r.id, species: r.species as Species, grownAt: r.grownAt! }))
+      .sort((a, b) => b.grownAt.getTime() - a.grownAt.getTime() || b.id - a.id),
+  };
+}
+
 /** 가진 성장 아이템, 성장이 작은 것부터 */
 export async function listGrowthItems(userId: string): Promise<GrowthItem[]> {
   const rows = await db
