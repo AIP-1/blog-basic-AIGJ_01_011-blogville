@@ -1,5 +1,7 @@
 // 마을 바닥 (TOWN-02·05): 잔디·흙길·돌광장·절벽 앞면·계단·먼 하늘을 도트(칸 4px)로 한 번만 굽는다. 브라우저에서만 부른다.
+// 광장 개편: 하늘 시각(새벽·노을·밤)마다 먼 하늘 띠, 밤하늘 별, 가로등·창 불빛 무리도 여기서 굽는다.
 import { CENTER, GARDEN, PLAZA_RADIUS, ROADS, WORLD } from "@/lib/town/layout";
+import type { Sky } from "@/lib/town/sky";
 import { CLIFF_FACE, CLIFF_LINES, RAIL, SKY_HEIGHT, STAIRS } from "@/lib/town/terrain";
 
 export const GROUND_CELL = 4;
@@ -65,7 +67,7 @@ export function bakeGround(): HTMLCanvasElement {
     }
   }
   drawCliffs(ctx, w, c);
-  drawSky(ctx, w, c(SKY_HEIGHT));
+  drawSky(ctx, w, c(SKY_HEIGHT), SKY_COLORS.day);
   // 대기 원근: 북쪽(먼 곳)일수록 하늘빛을 섞는다
   const air = ctx.createLinearGradient(0, 0, 0, c(900));
   air.addColorStop(0, "rgba(214, 233, 255, 0.28)");
@@ -112,17 +114,25 @@ function drawCliffs(ctx: CanvasRenderingContext2D, w: number, c: (v: number) => 
   }
 }
 
+/** 먼 하늘 띠의 색: 위·아래 하늘, 먼 산, 가까운 숲. 낮은 예전 그림 그대로 */
+const SKY_COLORS: Record<Sky, { top: string; bottom: string; far: string; near: string }> = {
+  day: { top: "#a9d8ff", bottom: "#e2f2ff", far: "#a7bfd6", near: "#6f9f6a" },
+  dawn: { top: "#b7a6dc", bottom: "#f8cbbd", far: "#b4a2c8", near: "#7d9878" },
+  dusk: { top: "#e98c62", bottom: "#ffd394", far: "#c48777", near: "#6c7c4c" },
+  night: { top: "#1b2149", bottom: "#36477e", far: "#2a3563", near: "#1f3a2e" },
+};
+
 /** 맨 위 먼 하늘과 산 (걸을 수 없는 띠) */
-function drawSky(ctx: CanvasRenderingContext2D, w: number, sky: number) {
+function drawSky(ctx: CanvasRenderingContext2D, w: number, sky: number, colors: (typeof SKY_COLORS)[Sky]) {
   const g = ctx.createLinearGradient(0, 0, 0, sky);
-  g.addColorStop(0, "#a9d8ff");
-  g.addColorStop(1, "#e2f2ff");
+  g.addColorStop(0, colors.top);
+  g.addColorStop(1, colors.bottom);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, sky);
   // 먼 산 (푸른빛), 가까운 숲 (진한 초록) 실루엣
   for (const [base, amp, period, color] of [
-    [sky - 6, 9, 61, "#a7bfd6"],
-    [sky - 2, 5, 23, "#6f9f6a"],
+    [sky - 6, 9, 61, colors.far],
+    [sky - 2, 5, 23, colors.near],
   ] as const) {
     ctx.fillStyle = color;
     for (let x = 0; x < w; x++) {
@@ -130,4 +140,58 @@ function drawSky(ctx: CanvasRenderingContext2D, w: number, sky: number) {
       ctx.fillRect(x, base - peak, 1, sky - (base - peak));
     }
   }
+}
+
+/** 낮이 아닌 하늘의 먼 하늘 띠 (바닥 위 맨 위 `SKY_HEIGHT`에 덮어 그린다). 칸 4px */
+export function bakeSkyBand(sky: Exclude<Sky, "day">): HTMLCanvasElement {
+  const w = WORLD.width / GROUND_CELL;
+  const h = Math.round(SKY_HEIGHT / GROUND_CELL);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  drawSky(canvas.getContext("2d")!, w, h, SKY_COLORS[sky]);
+  return canvas;
+}
+
+/** 밤하늘 별 (먼 하늘 띠 위쪽, 칸 4px). 하늘 덧칠 뒤에 그려 어둠에 묻히지 않는다 */
+export function bakeStars(): HTMLCanvasElement {
+  const w = WORLD.width / GROUND_CELL;
+  const h = Math.round(SKY_HEIGHT / GROUND_CELL);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  let seed = 41;
+  const random = () => {
+    seed = (seed * 16807) % 2147483647;
+    return seed / 2147483647;
+  };
+  for (let i = 0; i < w / 9; i++) {
+    ctx.fillStyle = i % 5 === 0 ? "#fff3c4" : "#e8ecff";
+    ctx.fillRect(Math.floor(random() * w), Math.floor(random() * (h - 9)), 1, 1);
+  }
+  return canvas;
+}
+
+/**
+ * 도트 빛 무리 (가로등·불 켜진 창): 4px 칸으로 끊은 동심 타원 몇 겹. 안쪽 겹일수록 진하다(`alphas` 안쪽부터).
+ * 흐린 그러데이션 대신 계단으로 끊어 도트 그림과 어울리게 하고, `lighter`로 더해 그린다. 칸 수 × 4px 크기로 늘려 찍는다.
+ */
+export function bakeGlow(rx: number, ry: number, rgb: readonly [number, number, number], alphas: readonly number[]): HTMLCanvasElement {
+  const w = Math.max(1, Math.round((rx * 2) / GROUND_CELL));
+  const h = Math.max(1, Math.round((ry * 2) / GROUND_CELL));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const d = Math.hypot((x + 0.5 - w / 2) / (w / 2), (y + 0.5 - h / 2) / (h / 2));
+      const ring = Math.floor(d * alphas.length);
+      if (ring >= alphas.length) continue;
+      ctx.fillStyle = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alphas[ring]})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+  return canvas;
 }

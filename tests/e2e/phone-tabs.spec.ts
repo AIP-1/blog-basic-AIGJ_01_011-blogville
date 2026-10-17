@@ -7,11 +7,11 @@ test.describe.configure({ timeout: 90_000 });
 const PHONE = { width: 375, height: 800 };
 
 test.describe("TOWN-11 휴대폰 아래 탭", () => {
-  test("회원: 아래 탭으로 내 블로그·마을 소식·상점·알림을 오가고, 헤더에서는 겹치는 버튼이 빠진다", async ({ browser }) => {
+  test("회원: 아래 탭으로 내 블로그·마을 소식·마을·알림을 오가고, 헤더에서는 겹치는 버튼이 빠진다", async ({ browser }) => {
     const page = await browser.newPage({ viewport: PHONE });
     const username = await signUpOk(page);
     // 가입 직후 환영 문구는 휴대폰 안내
-    await expect(page.getByText("화면 아래 탭으로 마을 소식·상점·알림을 오가고")).toBeVisible();
+    await expect(page.getByText("화면 아래 탭으로 마을·마을 소식·알림을 오가고")).toBeVisible();
     await expect(page.getByText("🚪 밖으로를 눌러 마을을 구경해 보세요")).toBeHidden();
 
     const tabs = page.getByRole("navigation", { name: "아래 탭" });
@@ -31,8 +31,12 @@ test.describe("TOWN-11 휴대폰 아래 탭", () => {
     await expect(page).toHaveURL("/feed");
     await expect(tabs.getByRole("link", { name: "마을 소식" })).toHaveAttribute("aria-current", "page");
     await expect(tabs.getByRole("link", { name: "내 블로그" })).not.toHaveAttribute("aria-current", "page");
-    await tabs.getByRole("link", { name: "상점" }).click();
-    await expect(page).toHaveURL("/shop");
+    // 광장 개편: 가운데 탭은 🏘 마을(휴대폰 광장). 메뉴와 주소가 같아도 지금 탭은 마을만
+    await tabs.getByRole("link", { name: "마을", exact: true }).click();
+    await expect(page).toHaveURL("/town");
+    await expect(page.locator("[data-phone-plaza]")).toBeVisible();
+    await expect(tabs.getByRole("link", { name: "마을", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(tabs.getByRole("link", { name: "메뉴" })).not.toHaveAttribute("aria-current", "page");
     await tabs.getByRole("link", { name: /^알림/ }).click();
     await expect(page).toHaveURL("/notifications");
     await expect(tabs.getByRole("link", { name: /^알림/ })).toHaveAttribute("aria-current", "page");
@@ -63,6 +67,7 @@ test.describe("TOWN-11 휴대폰 아래 탭", () => {
     await tabs.getByRole("link", { name: "메뉴" }).click();
     await expect(page).toHaveURL("/town?menu=1");
     await expect(tabs.getByRole("link", { name: "메뉴" })).toHaveAttribute("aria-current", "page");
+    await expect(tabs.getByRole("link", { name: "마을", exact: true })).not.toHaveAttribute("aria-current", "page");
     const panel = page.locator('[data-town-panel="menu"]');
     await expect(panel).toBeVisible();
     await expect(page.locator("[data-town]")).toBeHidden();
@@ -82,9 +87,12 @@ test.describe("TOWN-11 휴대폰 아래 탭", () => {
     await page.getByRole("button", { name: "메뉴로" }).click();
     await page.locator('[data-town-panel="menu"]').getByRole("link", { name: "📮 출석" }).click();
     await expect(page).toHaveURL("/attendance");
-    // ☰ 메뉴 없이 /town을 열면 그대로 내 블로그로
+    // ☰ 메뉴 없이 /town을 열면 휴대폰 광장 (광장 개편: 예전에는 내 블로그로 옮겼다)
     await page.goto("/town");
-    await expect(page).toHaveURL(`/@${username}`);
+    await expect(page).toHaveURL("/town");
+    await expect(page.locator("[data-phone-plaza]")).toBeVisible();
+    await expect(page.locator('[data-town-panel="menu"]')).toHaveCount(0);
+    await expect(tabs.getByRole("link", { name: "마을", exact: true })).toHaveAttribute("aria-current", "page");
     await page.close();
   });
 

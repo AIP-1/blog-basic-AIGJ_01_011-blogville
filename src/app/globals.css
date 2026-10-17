@@ -12,7 +12,9 @@
   }
 }
 
-:root {
+/* 밝은 화면 값. PC 광장([data-town])에도 다시 적어 늘 밝은 값이다: 캔버스 위 종이 쪽지가 사이트 테마가 아니라 마을 하늘을 따른다 (town-kit.css) */
+:root,
+[data-town] {
   --bg: #fbfaf7;
   --surface: #ffffff;
   --ink: #23201b;
@@ -21,6 +23,8 @@
   --accent: #2a7348; /* 옅은 초록 바탕(accent 10%) 위 글씨도 대비 4.5:1 이상 (Lighthouse color-contrast) */
   --accent-ink: #ffffff;
   --danger: #c62828;
+  /* 맨 위 막대 높이 (h-14 + 아래 줄 1px): 붙는 결과 띠·목차로 건너뛴 소제목이 막대 밑에 숨지 않게 */
+  --header-h: calc(3.5rem + 1px);
 }
 
 @theme inline {
@@ -262,7 +266,12 @@ body {
 .release-body td { border: 1px solid var(--line); padding: 0.35rem 0.6rem; text-align: left; vertical-align: top; }
 
 /* 글 읽기 편의 (읽는 시간·목차·코드 색칠·사진 크게 보기·공유·맨 위로) */
-.prose-post :is(h2, h3)[id] { scroll-margin-top: 1rem; }
+/* 주소의 #으로 건너뛰는 자리는 붙어 있는 맨 위 막대 밑에 숨지 않게 그만큼 띄운다:
+   목차 소제목, #comments·#comment-ID·#reply-ID(article), 방명록 #entry-ID(article), 블로그 설정 카드(section#accent 등).
+   층 없는 규칙이라 각 파일의 scroll-mt-20(유틸리티 층)보다 앞선다 */
+.prose-post :is(h2, h3)[id],
+section[id],
+article[id] { scroll-margin-top: calc(var(--header-h) + 1rem); }
 .toc summary { list-style-position: inside; }
 .code-block { position: relative; }
 .code-block pre { padding-right: 4.5rem; }
@@ -312,3 +321,80 @@ body {
 .food-map-info span { color: var(--ink-soft); font-size: 12px; }
 .food-map-info a { color: var(--accent); font-weight: 700; font-size: 12px; }
 .food-map-links { display: flex; gap: 10px; }
+
+/* 첫 화면 원고지 제목 (app/page.tsx): 9칸 두 줄. 줄 사이 띠와 세로 칸선을 한 장의 원고지처럼 잇는다 (칸 크기는 .sheet와 같은 식) */
+.landing-sheet {
+  --cell: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--cell) * 0.16);
+  width: fit-content;
+  max-width: 100%;
+  background-color: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  background-image: linear-gradient(to right, color-mix(in srgb, var(--accent) 42%, var(--surface)) 0 1px, transparent 1px);
+  background-size: var(--cell) 100%;
+}
+@supports (width: 1cqi) {
+  .landing-sheet { --cell: clamp(1.75rem, calc((100cqi - 2px) / 9), 3.5rem); }
+}
+/* 칸 크기를 이미 h1 폭의 1/9로 정했으니 줄마다 9칸이 꼭 들어간다. 칸 배수로 줄이는 max-width(감싼 틀 폭 기준)는 끈다 */
+.landing-sheet .sheet { max-width: none; }
+
+/* 첫 화면 (app/page.tsx): 넓은 화면에서는 머리글·마을 그림·로그인 칸 묶음을 헤더와 아래 막대 사이 세로 가운데에 (위로 쏠려 아래가 비지 않게).
+   본문(main)을 세로 flex로 바꿔 남은 높이를 채우고, 그 안에서 줄 묶음을 가운데로 */
+@media (min-width: 768px) {
+  main:has(> [data-landing]) { display: flex; flex-direction: column; }
+  [data-landing] { flex: 1 0 auto; align-content: center; }
+}
+
+/* 작은 마을 그림 (components/town/VillageDiorama.tsx): 정수 칸 크기(max-width)에서 멈추고, 자리가 좁으면 그림째 줄인다 */
+.village-diorama { width: 100%; margin-inline: auto; }
+.village-diorama-scene { display: block; width: 100%; height: auto; }
+.village-diorama-captions {
+  display: grid;
+  padding-block: 0.5rem 0.625rem;
+  color: var(--kit-ink);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  text-align: center;
+}
+.village-diorama-caption { min-width: 0; padding-inline: 0.25rem; font-weight: 600; }
+.village-diorama-sub { display: block; color: var(--kit-ink-soft); font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+/* 굴뚝 연기: 세 장을 차례로 넘긴다(steps, 1.2초에 한 바퀴). 움직임 줄이기면 첫 장에 멈춘다 */
+.village-smoke-frame { opacity: 0; }
+.village-smoke-frame[data-frame="0"] { opacity: 1; }
+@media (prefers-reduced-motion: no-preference) {
+  .village-smoke-frame { animation: village-smoke 1.2s steps(1, end) infinite; }
+  .village-smoke-frame[data-frame="1"] { animation-delay: -0.8s; }
+  .village-smoke-frame[data-frame="2"] { animation-delay: -0.4s; }
+}
+@keyframes village-smoke {
+  0% { opacity: 1; }
+  33.333%, 100% { opacity: 0; }
+}
+
+/* 모아 보는 화면의 머리 (components/layout/PageHeader.tsx): 작은 도트 그림 + 제목. 그림 칸 폭을 고정해 화면마다 제목이 같은 자리에 선다 */
+.page-head { display: flex; align-items: center; gap: 0.75rem; }
+.page-head-mark { display: flex; flex: none; align-items: center; justify-content: center; width: 2.75rem; min-height: 2.25rem; color: var(--ink); }
+
+/* 작성자가 있는 글 카드 (마을 소식·인기 글·스크랩, components/blog/PostCard.tsx): 틀은 article, 글 링크에 올리면 틀이 강조색 */
+.post-note:has(> a.group:hover) { border-color: var(--accent); }
+/* 작성자 첫 글자를 원고지 한 칸에 (꾸밈, 화면 낭독기는 이름만 읽는다) */
+.post-note-mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-right: 0.25rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--surface));
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  color: var(--ink);
+  font-family: var(--blog-serif);
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.post-note-author:hover .post-note-mark { border-color: var(--accent); }
+.post-note-author:hover > span:not(.post-note-mark) { text-decoration: underline; text-underline-offset: 3px; }

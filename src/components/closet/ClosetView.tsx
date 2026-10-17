@@ -94,7 +94,7 @@ export function ClosetView({
           type="button"
           onClick={() => choose(item)}
           aria-pressed={on}
-          className={`flex w-full flex-col items-center rounded-xl border-2 p-2 text-sm ${on ? "border-yellow-400 bg-yellow-50 font-bold" : "border-line bg-surface hover:bg-bg"}`}
+          className={`px-tile flex w-full flex-col items-center p-2 text-sm ${on ? "font-bold" : ""}`}
           data-closet-item={item.name}
         >
           <PixelLayers arts={arts} size={56} />
@@ -110,7 +110,7 @@ export function ClosetView({
   return (
     <div className="space-y-6">
       {notice && (
-        <p role={notice.ok ? "status" : "alert"} className={`sticky top-0 z-10 rounded-xl border px-4 py-3 font-semibold ${notice.ok ? "border-green-300 bg-green-50 text-green-800" : "border-red-300 bg-red-50 text-red-700"}`} data-equip-result={notice.ok ? "ok" : "error"}>
+        <p role={notice.ok ? "status" : "alert"} className="px-note px-sticky" data-tone={notice.ok ? "ok" : "error"} data-equip-result={notice.ok ? "ok" : "error"}>
           {notice.message}
         </p>
       )}
@@ -125,7 +125,7 @@ export function ClosetView({
         ) : (
           <>
             <p className="mt-1 text-sm text-ink-soft">모자·옷·소품을 하나씩 입을 수 있어요. 입은 걸 한 번 더 누르면 벗어요.</p>
-            <ul className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">{avatar.map((i) => card(i, avatarLayers(character, { [i.type]: i.art })))}</ul>
+            <ul className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">{avatar.map((i) => card(i, avatarLayers(character, { [i.type]: i.art })))}</ul>
           </>
         )}
       </section>
@@ -134,7 +134,7 @@ export function ClosetView({
         <h2 id="closet-background" className="text-lg font-bold">
           🖼 내 배경
         </h2>
-        <ul className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">{backgrounds.map((i) => card(i, [i.art]))}</ul>
+        <ul className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">{backgrounds.map((i) => card(i, [i.art]))}</ul>
       </section>
 
       {furniture.length > 0 && (
@@ -143,9 +143,9 @@ export function ClosetView({
             🪑 가구
           </h2>
           <p className="mt-1 text-sm text-ink-soft">가구는 내 블로그의 우리 집에 놓아요.</p>
-          <ul className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+          <ul className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
             {furniture.map((i) => (
-              <li key={i.id} className="flex flex-col items-center rounded-xl border border-line bg-surface p-2 text-sm" data-closet-furniture={i.name}>
+              <li key={i.id} className="px-tile flex flex-col items-center p-2 text-sm" data-closet-furniture={i.name}>
                 <PixelLayers arts={[i.art]} size={56} />
                 <span className="mt-1">{i.name}</span>
               </li>

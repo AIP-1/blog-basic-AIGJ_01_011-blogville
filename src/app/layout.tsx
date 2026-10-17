@@ -14,6 +14,8 @@ import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import { UpdatesNewBadge } from "@/components/layout/UpdatesNewBadge";
 import { PixelLayers } from "@/components/game/PixelLayers";
+import { PixelArtSvg } from "@/components/game/PixelArtSvg";
+import { houseMarkArt } from "@/lib/art/site";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { getMyBlog, getNickname, getSession } from "@/server/dal";
 import { formatNumber } from "@/lib/game";
@@ -33,6 +35,7 @@ import "./globals.css";
 import "./post-extras.css";
 import "./theme-dark.css";
 import "./blog-design.css";
+import "./town-kit.css";
 
 // metadataBase는 실행할 때의 사이트 주소로 정한다 (공유 미리보기의 사진·주소를 절대 주소로)
 export async function generateMetadata(): Promise<Metadata> {
@@ -62,7 +65,16 @@ async function attendToday(userId: string, sessionId: string) {
 }
 
 const HEADER = "sticky top-0 z-40 border-b border-line bg-surface/90 backdrop-blur supports-[backdrop-filter]:bg-surface/75";
-const LOGO = "flex min-h-11 shrink-0 items-center whitespace-nowrap text-xl font-extrabold tracking-tight text-accent";
+const LOGO = "flex min-h-11 shrink-0 items-center gap-1 whitespace-nowrap sm:gap-1.5 text-xl font-extrabold tracking-tight text-accent";
+
+/**
+ * 로고 앞 도트 집 (파비콘·홈 화면 아이콘과 같은 그림, 칸 하나 2px). 먹선은 글자색이라 어두운 화면에서 밝아진다. 읽는 이름은 'Blogville' 그대로.
+ * 1024px 미만에서는 숨긴다: 집 마크 자리(28px + 사이)만큼 넓어지면 360px 회원 헤더의 Lv 칩이 두 줄로 접히고, 375px 방문자 헤더(맛집 메뉴까지)와
+ * 태블릿 폭 회원 헤더(메뉴 글자·글쓰기 글자·긴 닉네임이 나오는 폭)가 옆으로 넘쳤다. 휴대폰 헤더의 사이·메뉴 여백도 조금씩 줄여 두었다 (큰 레벨·코인 자리)
+ */
+function LogoMark() {
+  return <PixelArtSvg art={houseMarkArt()} cell={2} className="text-ink max-lg:hidden" />;
+}
 
 /** 헤더를 그리는 동안 자리를 지키는 막대 (로고만). 본문은 헤더를 기다리지 않고 먼저 그린다 */
 function HeaderFallback() {
@@ -70,6 +82,7 @@ function HeaderFallback() {
     <header className={HEADER} aria-busy="true">
       <div className="mx-auto flex h-14 max-w-5xl items-center px-4">
         <Link href="/" className={LOGO}>
+          <LogoMark />
           Blogville
         </Link>
       </div>
@@ -99,8 +112,9 @@ async function Header() {
   return (
     <>
     <header className={HEADER}>
-      <div className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-4 sm:gap-4">
+      <div className="mx-auto flex h-14 max-w-5xl items-center gap-1.5 px-4 sm:gap-4">
         <Link href={blog ? `/@${blog.slug}` : "/"} className={LOGO}>
+          <LogoMark />
           Blogville
         </Link>
         <nav className="flex min-w-0 flex-1 items-center" aria-label="메뉴">
@@ -115,14 +129,15 @@ async function Header() {
                   aria-label={`Lv.${wallet.progress.level}, 코인 ${formatNumber(wallet.coin)}: 경험치·코인 내역`}
                   data-wallet
                 >
-                  <span className="rounded-full bg-accent/10 px-1.5 font-bold text-accent">Lv.{wallet.progress.level}</span>
+                  <span className="whitespace-nowrap rounded-full bg-accent/10 px-1.5 font-bold text-accent">Lv.{wallet.progress.level}</span>
                   <span className="whitespace-nowrap font-semibold tabular-nums">🪙 {formatNumber(wallet.coin)}</span>
                 </Link>
                 <span className="contents max-sm:hidden">
                   <NotificationBell unread={{ count: unread }} iconOnly className="relative flex size-11 items-center justify-center rounded-full text-lg hover:bg-bg" />
                 </span>
-                <Link href="/write" className="btn btn-primary gap-1 rounded-full px-4 max-sm:size-11 max-sm:px-0" aria-label="글쓰기">
-                  ✏️<span className="max-sm:hidden">글쓰기</span>
+                {/* 768px 미만은 ✏️만 (태블릿 폭에서 메뉴 글자와 함께 헤더가 넘치지 않게) */}
+                <Link href="/write" className="btn btn-primary gap-1 rounded-full px-4 max-md:size-11 max-md:px-0" aria-label="글쓰기">
+                  ✏️<span className="max-md:hidden">글쓰기</span>
                 </Link>
                 <UserMenu
                   userId={member.userId}

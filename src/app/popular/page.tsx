@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PostCard } from "@/components/blog/PostCard";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { parsePopularRange, POPULAR_LIMIT, POPULAR_RANGE_INFO, POPULAR_RANGES, DEFAULT_POPULAR_RANGE } from "@/lib/popular";
 import { listPopular } from "@/server/popular";
 
@@ -16,12 +17,13 @@ export default async function PopularPage({ searchParams }: PageProps<"/popular"
   const info = POPULAR_RANGE_INFO[range];
   return (
     <section aria-labelledby="popular-title" className="mx-auto max-w-3xl min-w-0">
-      <h1 id="popular-title" className="text-2xl font-extrabold">
-        🔥 인기 글
-      </h1>
-      <p className="mt-1 text-sm text-ink-soft">
-        {info.hint} 동안 많이 읽히고 공감·댓글을 받은 글 {POPULAR_LIMIT}개 (조회 + 공감 ×3 + 댓글 ×2)
-      </p>
+      <PageHeader
+        id="popular-title"
+        emoji="🔥"
+        title="인기 글"
+        mark="fountain"
+        description={`${info.hint} 동안 많이 읽히고 공감·댓글을 받은 글 ${POPULAR_LIMIT}개 (조회 + 공감 ×3 + 댓글 ×2)`}
+      />
       <nav aria-label="인기 글 기간" className="mt-3 flex flex-wrap gap-2">
         {POPULAR_RANGES.map((key) => (
           <Link
