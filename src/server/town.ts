@@ -4,15 +4,19 @@ import { db } from "@/db";
 import { blogs, follows, pointLedger, posts, profiles } from "@/db/schema";
 import { levelFromExp } from "@/lib/game";
 import { houseStage } from "@/lib/house";
+import { todayKST } from "@/lib/kst";
 import { NOTICE_SLUG } from "@/lib/names";
 import { assignLots } from "@/lib/town/lots";
+import { seededShuffle, todayTasks } from "@/lib/town/plaza";
 import { currentRoof, ROOF_HEX } from "@/lib/roof";
 import { feedbackNotificationText, guestbookNotificationText, levelUpText, notificationText, notificationTime } from "@/lib/notifications";
 import { getMyBlog, getNickname } from "./dal";
 import { listMyNeighbors } from "./follows";
 import { avatarLayersOf, getAvatar } from "./items";
 import { countUnreadNotifications, listNotifications } from "./notifications";
+import { getTodayState } from "./plaza";
 import { getWallet } from "./points";
+import { cached } from "./ttl-cache";
 
 /** 마을 길가의 집 하나 (TOWN-04). `lot`은 집 자리 번호(0은 내 집) */
 export type TownHouse = {
@@ -31,6 +35,8 @@ export type TownHouse = {
   layers: string[];
   /** 최근 24시간 안에 공개 글을 썼다: 광장에서 그 집 창에 불이 켜지고 굴뚝에 연기가 난다 (광장 개편) */
   fresh: boolean;
+  /** 가장 최근 공개 글 제목 (`recentPosts[0]`, 걷는 이웃 말풍선·집 위 쪽지). 글이 없으면 없음 */
+  latestTitle?: string;
 };
 
 /** `createdAt`은 ISO 문자열 (클라이언트 게임에 그대로 넘긴다) */
@@ -44,8 +50,10 @@ export const MAILBOX_POSTS = 3;
 
 /** 즐겨찾는 이웃의 집은 10채까지 (TOWN-08과 같은 수) */
 export const NEIGHBOR_HOUSES = 10;
-/** 방문자 마을: 인기 블로그 이만큼에서 무작위로 고른다 */
+/** 방문자 마을: 인기 블로그 이만큼에서 고른다 */
 export const POPULAR_POOL = 100;
+/** 방문자 마을 후보(인기 100곳)는 누구에게나 같아 1분 기억한다 */
+const GUEST_POOL_TTL = 60_000;
 
 const exp = sql<number>`(select coalesce(sum(l.exp_delta), 0) from ${pointLedger} l where l.user_id = ${blogs.ownerId})::int`;
 const hasPublicPost = sql`exists (select 1 from posts p where p.blog_id = ${blogs.id} and p.is_public)`;
@@ -120,6 +128,7 @@ async function withRecentPosts(houses: (TownHouse & { blogId: number })[]): Prom
       recentPosts,
       layers: avatars.get(house.userId) ?? [],
       fresh: recentPosts.length > 0 && Date.parse(recentPosts[0].createdAt) >= since,
+      latestTitle: recentPosts[0]?.title,
     };
   });
 }
@@ -152,36 +161,35 @@ export async function getMemberHouses(userId: string, viewerId = userId): Promis
 
 /**
  * 방문자의 마을 (TOWN-04): 공개 글이 있고 공지 블로그가 아닌 블로그를 누적 방문자 수 → 최근 공개 글 순으로
- * 100곳 고른 뒤, 그 안에서 열 때마다 무작위 10곳. 0번(내 집 자리)은 비어 있다.
+ * 100곳 고른 뒤(1분 기억), 그 안에서 10곳. 고르는 순서는 한국 날짜를 씨앗으로 섞어 하루 동안 같은 마을이 선다
+ * (새로고침마다 집이 바뀌지 않게). 우체통 글·불 켜진 집은 기억하지 않고 매번 읽는다. 0번(내 집 자리)은 비어 있다.
  */
-export async function getGuestHouses(): Promise<TownHouse[]> {
-  const popular = db
-    .select({ blogId: blogs.id })
-    .from(blogs)
-    .where(and(hasPublicPost, sql`${blogs.slug} <> ${NOTICE_SLUG}`))
+export async function getGuestHouses(now = new Date()): Promise<TownHouse[]> {
+  const pool = await cached("guest-town-pool", GUEST_POOL_TTL, loadGuestPool);
+  const rows = seededShuffle(pool, todayKST(now)).slice(0, NEIGHBOR_HOUSES);
+  return withRecentPosts(rows.map((r, i) => toHouse(r, i + 1, false)));
+}
+
+function loadGuestPool(): Promise<HouseRow[]> {
+  return houseQuery(and(hasPublicPost, sql`${blogs.slug} <> ${NOTICE_SLUG}`))
     .orderBy(
       desc(sql`(select count(*) from blog_visits v where v.blog_id = ${blogs.id})`),
       desc(sql`(select max(p.created_at) from posts p where p.blog_id = ${blogs.id} and p.is_public)`),
       desc(blogs.id),
     )
     .limit(POPULAR_POOL)
-    .as("popular");
-  const rows = await db
-    .select(houseColumns)
-    .from(popular)
-    .innerJoin(blogs, eq(blogs.id, popular.blogId))
-    .innerJoin(profiles, eq(profiles.userId, blogs.ownerId))
-    .orderBy(sql`random()`)
-    .limit(NEIGHBOR_HOUSES);
-  return withRecentPosts(rows.map((r, i) => toHouse(r, i + 1, false)));
+    .then((rows) => rows);
 }
 
 export type HudNotification = { id: number; text: string; time: string; read: boolean };
 
-/** ☰ 메뉴에 보일 회원 정보 (TOWN-12): 지갑·안 읽은 수·최근 알림 5개·이웃 목록. 페이지를 열 때 한 번 읽는다 */
+/**
+ * ☰ 메뉴와 광장 HUD에 보일 회원 정보 (TOWN-12, 광장 개편): 지갑·안 읽은 수·최근 알림 5개·이웃 목록,
+ * 그리고 오늘 할 일(글쓰기 보상 n/3·출석·낚시·동물 돌보기). 페이지를 열 때 한 번 읽는다
+ */
 export async function getHudMember(userId: string) {
   const now = new Date();
-  const [wallet, unread, recent, neighbors, blog, avatar, nickname] = await Promise.all([
+  const [wallet, unread, recent, neighbors, blog, avatar, nickname, today] = await Promise.all([
     getWallet(userId),
     countUnreadNotifications(userId),
     listNotifications(userId, 1),
@@ -189,6 +197,7 @@ export async function getHudMember(userId: string) {
     getMyBlog(userId),
     getAvatar(userId),
     getNickname(userId),
+    getTodayState(userId),
   ]);
   const notifications: HudNotification[] = recent.items.slice(0, HUD_NOTIFICATIONS).map((n) => ({
     id: n.id,
@@ -215,6 +224,12 @@ export async function getHudMember(userId: string) {
     neighbors: neighbors.items.map((n) => ({ userId: n.userId, slug: n.slug, nickname: n.nickname, blogTitle: n.blogTitle, isFavorite: n.isFavorite, isNotice: n.isNotice })),
     neighborTotal: neighbors.total,
     favorites: neighbors.favorites,
+    /** 오늘 받은 글쓰기 보상 수 (상한 REWARD_RULES.post 3번): ✏️ 글쓰기 버튼의 칸 */
+    postRewardsToday: today.postRewards,
+    /** 오늘 공개 글을 1편 이상 썼다 (보상과 따로: 짧은 글도 친다) */
+    postedToday: today.postedToday,
+    /** 광장 소식 서랍 [오늘 할 일] */
+    tasks: todayTasks(today),
   };
 }
 

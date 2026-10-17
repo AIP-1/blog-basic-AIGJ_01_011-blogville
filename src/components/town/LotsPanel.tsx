@@ -31,8 +31,8 @@ export function LotsPanel({
   if (picked === null) {
     return (
       <div className="space-y-2">
-        <p className="text-sm text-ink-soft">⭐ 즐겨찾는 이웃이 어느 자리에 살지 골라요. 안 고른 이웃은 남은 자리에 차례로 서요.</p>
-        <ul className="divide-y divide-line" aria-label="이웃 집 자리">
+        <p className="text-sm text-(--kit-ink-soft)">⭐ 즐겨찾는 이웃이 어느 자리에 살지 골라요. 안 고른 이웃은 남은 자리에 차례로 서요.</p>
+        <ul className="divide-y-2 divide-(--kit-paper-2)" aria-label="이웃 집 자리">
           {NEIGHBOR_LOTS.map((lot) => {
             const house = at(lot);
             // 빈 집터에도 갈 수 있다 (가서 Space면 이 창이 다시 열린다)
@@ -43,16 +43,16 @@ export function LotsPanel({
                   <span className="block truncate font-semibold">
                     {lot}번 · {house ? `🏠 ${house.nickname}의 집` : "빈 집터"}
                   </span>
-                  <span className="block text-xs text-ink-soft">{lotArea(lot)}</span>
+                  <span className="block text-xs text-(--kit-ink-soft)">{lotArea(lot)}</span>
                 </span>
                 {spot && (
-                  <button type="button" className="btn btn-ghost min-w-11 px-2" aria-label={`${lot}번 자리로 텔레포트`} onClick={() => onTeleport({ ...spot, enabled: true })}>
+                  <button type="button" className="px-btn px-btn--quiet px-btn--sm" aria-label={`${lot}번 자리로 텔레포트`} onClick={() => onTeleport({ ...spot, enabled: true })}>
                     ✨
                   </button>
                 )}
                 <button
                   type="button"
-                  className="btn"
+                  className="px-btn px-btn--sm"
                   aria-label={`${lot}번 자리 고르기`}
                   onClick={() => {
                     setError(null);
@@ -75,7 +75,7 @@ export function LotsPanel({
       <div className="flex items-center gap-2">
         <button
           type="button"
-          className="btn btn-ghost"
+          className="px-btn px-btn--quiet px-btn--sm"
           onClick={() => {
             setError(null);
             onPick(null);
@@ -88,15 +88,15 @@ export function LotsPanel({
         </p>
       </div>
       {neighbors.length === 0 ? (
-        <p className="text-ink-soft">⭐ 즐겨찾는 이웃이 없어요. 👫 친구 목록에서 ⭐를 누르면 이 자리에 집이 생겨요.</p>
+        <p className="text-(--kit-ink-soft)">⭐ 즐겨찾는 이웃이 없어요. 👫 친구 목록에서 ⭐를 누르면 이 자리에 집이 생겨요.</p>
       ) : (
-        <ul className="grid gap-1" aria-label={`${picked}번 자리에 살 이웃`}>
+        <ul className="grid gap-2 p-0.5" aria-label={`${picked}번 자리에 살 이웃`}>
           {neighbors.map((h) => (
             <li key={h.userId}>
               {h.lot === picked ? (
-                <p className="flex min-h-11 flex-col justify-center rounded-xl border border-line px-3 py-1.5" data-lot-choice={h.nickname}>
+                <p className="flex min-h-11 flex-col justify-center px-3 py-1.5 shadow-[inset_0_0_0_2px_var(--kit-paper-2)]" data-lot-choice={h.nickname}>
                   <span className="font-semibold">{h.nickname}</span>
-                  <span className="text-xs text-ink-soft">지금 이 자리에 살아요</span>
+                  <span className="text-xs text-(--kit-ink-soft)">지금 이 자리에 살아요</span>
                 </p>
               ) : (
                 <form
@@ -108,9 +108,13 @@ export function LotsPanel({
                 >
                   <input type="hidden" name="followeeId" value={h.userId} />
                   <input type="hidden" name="lot" value={picked} />
-                  <button type="submit" className="flex min-h-11 w-full flex-col items-start rounded-xl border border-line bg-bg px-3 py-1.5 text-left hover:bg-ink/5" data-lot-choice={h.nickname}>
+                  <button
+                    type="submit"
+                    className="flex min-h-11 w-full flex-col items-start bg-(--kit-paper-2) px-3 py-1.5 text-left shadow-[0_-2px_0_0_var(--kit-ink),0_2px_0_0_var(--kit-ink),-2px_0_0_0_var(--kit-ink),2px_0_0_0_var(--kit-ink)] hover:bg-(--kit-paper-hover)"
+                    data-lot-choice={h.nickname}
+                  >
                     <span className="font-semibold">{h.nickname}</span>
-                    <span className="text-xs text-ink-soft">
+                    <span className="text-xs text-(--kit-ink-soft)">
                       지금 {h.lot}번 자리 → {occupant ? `${occupant.nickname}님과 자리 바꾸기` : "이 자리로 옮기기"}
                     </span>
                   </button>
@@ -121,7 +125,7 @@ export function LotsPanel({
         </ul>
       )}
       {error && (
-        <p role="alert" className="text-sm font-semibold text-[#b71c1c]">
+        <p role="alert" className="text-sm font-semibold text-(--danger)">
           {error}
         </p>
       )}

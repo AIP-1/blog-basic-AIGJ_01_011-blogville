@@ -197,7 +197,7 @@ test.describe("TOWN 마을", () => {
     expect(await feet(page)).toEqual(start);
   });
 
-  test("휴대폰(375px): 회원은 내 블로그로 가고 🚪 문·🏘 마을이 숨는다, 방문자는 간단 메뉴", async ({ browser }) => {
+  test("휴대폰(375px): 회원은 게임 대신 휴대폰 광장이고 블로그의 🚪 문·🏘 마을이 숨는다, 방문자는 간단 메뉴", async ({ browser }) => {
     const page = await browser.newPage({ viewport: { width: 375, height: 800 } });
     const username = await signUpOk(page);
     await page.goto(`/@${username}`);
@@ -206,8 +206,12 @@ test.describe("TOWN 마을", () => {
     await expect(page.locator(`a[href="/town?at=${username}"]`)).toBeHidden();
     await expect(page.locator('header a[href="/town"]')).toBeAttached();
     await expect(page.locator('header a[href="/town"]')).toBeHidden();
+    // 광장 개편: 내 블로그로 옮기지 않고 휴대폰 광장 (PHONE_PLAZA, 자세한 것은 plaza.mobile.spec)
     await page.goto("/town");
-    await expect(page).toHaveURL(`/@${username}`);
+    await expect(page).toHaveURL("/town");
+    await expect(page.locator("[data-phone-plaza]")).toBeVisible();
+    await expect(page.locator("[data-town]")).toBeHidden();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
     await page.close();
 
     const guest = await browser.newPage({ viewport: { width: 375, height: 800 } });
