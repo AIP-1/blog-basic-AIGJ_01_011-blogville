@@ -2,6 +2,7 @@
 
 import { useId, useState, useTransition } from "react";
 import { leaveTownNote } from "@/app/town/actions";
+import { emitTown } from "@/lib/town/events";
 import { TOWN_NOTE_MAX } from "@/lib/town/plaza";
 
 /**
@@ -64,7 +65,7 @@ export function MailboxNote({ slug, lot }: { slug: string; lot: number }) {
             return;
           }
           setState("sent");
-          window.dispatchEvent(new CustomEvent("bv-note", { detail: { lot } }));
+          emitTown("bv-note", { lot });
         });
       }}
     >

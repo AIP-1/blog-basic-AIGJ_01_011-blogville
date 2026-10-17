@@ -77,8 +77,7 @@ test.describe("이번 주 글감", () => {
     await guest.close();
   });
 
-  // A(게시판 세 번째 입구)·B(from=home·celebrate)와 합친 뒤 켠다
-  test.fixme("합친 뒤: 게시판 '글감' 입구 Space → /prompt, [내 초롱 켜기] → 내 집 앞에서 축하, 다시 열면 축하 없음", async ({ page }) => {
+  test("게시판 '글감' 입구 Space → /prompt, [내 초롱 켜기] → 내 집 앞에서 축하, 다시 열면 축하 없음", async ({ page }) => {
     await signUpOk(page);
     await page.goto("/write");
     await page.getByLabel("제목", { exact: true }).fill("초롱 켜기 글");

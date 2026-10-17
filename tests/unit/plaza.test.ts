@@ -152,6 +152,9 @@ describe("오늘 할 일 (광장 개편)", () => {
     expect(taskProgressText(twoAnimals)).toBe("돌보기 보상 6/15");
     // 동물이 없어 한 번도 못 돌봤으면 아직
     expect(todayTasks({ ...IDLE, canCare: false })[3].done).toBe(false);
+    // 그때 광장 외양간 위 '!'는 띄우지 않는다 (돌볼 동물이 있으면 띄운다)
+    expect(todayTasks({ ...IDLE, canCare: false })[3].nudge).toBe(false);
+    expect(todayTasks(IDLE)[3].nudge).toBe(true);
     expect(taskProgressText(attendance)).toBe("오늘 했어요");
     expect(taskProgressText(fishing)).toBe("아직이에요");
   });

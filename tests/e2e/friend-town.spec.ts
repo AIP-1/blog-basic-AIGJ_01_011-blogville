@@ -154,8 +154,7 @@ test.describe("TOWN-15 친구 마을 구경", () => {
     await expect(page.locator("[data-room-exit]")).toHaveAttribute("href", "/town?from=shop");
   });
 
-  // A6(외양간 입구 href ?host=)·B([slug]의 from=)와 합친 뒤 켠다
-  test.fixme("합친 뒤: 친구 마을 외양간 Space → /farm?host=, [광장으로] → 친구 마을 외양간 문 앞", async ({ page, browser }) => {
+  test("친구 마을 외양간 Space → /farm?host=, [광장으로] → 친구 마을 외양간 문 앞", async ({ page, browser }) => {
     await signUpOk(page);
     const other = await browser.newPage();
     const host = await signUpOk(other);
@@ -164,13 +163,15 @@ test.describe("TOWN-15 친구 마을 구경", () => {
     await expect(canvas(page)).toHaveAttribute("data-ready", "1");
     await menu(page).click();
     await panel(page).getByRole("button", { name: /✨ 텔레포트/ }).click();
-    await panel(page).locator("[data-spot]").filter({ hasText: "농장" }).click();
+    await panel(page).getByRole("button", { name: "🐮 동물 농장" }).click();
+    await expect(page.locator("[data-town-prompt]")).toContainText("의 농장 · Space 구경하기");
+    const barn = await feet(page);
     await page.keyboard.press("Space");
     await expect(page).toHaveURL(`/farm?host=${host}`);
     await page.locator("[data-room-exit]").click();
     await expect(page).toHaveURL(`/town/${host}?from=farm`);
     await expect(canvas(page)).toHaveAttribute("data-ready", "1");
-    const door = await feet(page);
-    expect(door).not.toEqual([1000, 1290]);
+    // 그 외양간 문 앞 (텔레포트로 섰던 자리), 친구 집 앞이 아니다
+    await expect.poll(() => feet(page)).toEqual(barn);
   });
 });

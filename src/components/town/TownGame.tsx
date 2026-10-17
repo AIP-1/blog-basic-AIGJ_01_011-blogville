@@ -571,11 +571,11 @@ export function TownGame({
       return { x: Math.round(l.hook.x - img.width / 2 + sway), y: Math.round(y), width: img.width, height: img.height };
     };
 
-    // 오늘 할 일 '!' 쪽지 (A3): 안 끝낸 일의 장소 위. 낚시는 연못, 돌보기는 외양간(내 마을만), 공개 글은 내 집
+    // 오늘 할 일 '!' 쪽지 (A3): 안 끝낸 일의 장소 위. 낚시는 연못, 돌보기는 외양간(내 마을만, 돌볼 동물이 있을 때: `nudge`), 공개 글은 내 집
     const markerSprites = [bake([markerArt()], TOWN_CELL)];
     const taskEntrance = (id: string) => entrances.find((e) => e.id === id);
     const markers = (tasks ?? [])
-      .filter((t) => !t.done)
+      .filter((t) => !t.done && t.nudge !== false)
       .flatMap((t) => {
         const spot = t.id === "fishing" ? "pond" : t.id === "farm" && !hostTown ? "farm" : t.id === "post" && mineStructure ? "home" : null;
         if (!spot) return [];
@@ -607,8 +607,8 @@ export function TownGame({
     if (celebrateLitAt !== null && mineLit?.lantern) sparks.push({ x: mineLit.lantern.x, y: mineLit.lantern.y, at: celebrateLitAt + CELEBRATE.gap });
     const celebrateNote = parsed.celebrate
       ? parsed.celebrate.villages > 0
-        ? `🏮 이웃 마을 ${parsed.celebrate.villages}곳에 불이 켜졌어요`
-        : "🏮 내 초롱이 켜졌어요 · 이웃이 ⭐하면 그 마을에도 켜져요"
+        ? `🏮 내 초롱이 켜졌어요 · 이웃 ${parsed.celebrate.villages}명의 마을에서 내 집이 빛나요`
+        : "🏮 내 초롱이 켜졌어요 · 이웃이 ⭐하면 그 마을에 내 집이 서요"
       : null;
     let noteShown = false;
 

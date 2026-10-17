@@ -133,6 +133,8 @@ export type TodayTask = {
   reward?: string;
   /** 출석만: 이어진 출석 날 수 */
   streak?: number;
+  /** false면 아직 안 했어도 PC 광장 위 '!' 쪽지를 띄우지 않는다 (돌보기: 지금 돌볼 동물이 없을 때, `canCare`) */
+  nudge?: boolean;
 };
 
 /** 기존 보상 한 줄 (`✨30 🪙30`, 코인이 없으면 경험치만) */
@@ -195,6 +197,8 @@ export function todayTasks(state: TodayState, commentHref = "/feed"): TodayTask[
       href: "/farm",
       spot: "farm",
       reward: rewardText(REWARD_RULES.farm_care),
+      // 돌볼 동물이 없으면 외양간 위 '!'로 조르지 않는다 (서랍 줄은 그대로 아직)
+      nudge: state.canCare,
     },
     // 기존 인덱스([1] 글쓰기·[3] 돌보기)를 지키려고 맨 끝에 둔다
     {

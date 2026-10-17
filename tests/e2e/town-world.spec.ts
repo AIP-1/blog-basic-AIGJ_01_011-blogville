@@ -2,8 +2,7 @@ import { expect, test, type Page } from "./fixtures";
 import { signUpOk, sql } from "./helpers";
 
 // 광장 개편 2 · 세계 (A1~A6): 게시판 세 문, 줄등 초롱, 말풍선 누르기, 넓은 화면 서랍 비키기, 방문자 내 집 자리.
-// 게임은 캔버스라 `data-*` 훅과 `bv-teleport`로 본다. 오늘 할 일(`tasks`)·계절(`season`)·글 쓰고 돌아온 순간(`celebrate`)은
-// 페이지가 넘겨야 보이는 것이라 그 연결이 들어온 뒤에 켠다 (test.fixme).
+// 게임은 캔버스라 `data-*` 훅과 `bv-teleport`로 본다. 오늘 할 일(`tasks`)·계절(`season`)·글 쓰고 돌아온 순간(`celebrate`)은 페이지(B)가 넘긴다.
 test.describe.configure({ timeout: 90_000 });
 
 const canvas = (page: Page) => page.locator("[data-town] canvas");
@@ -116,13 +115,42 @@ test.describe("광장 개편 2 · 세계", () => {
     }
   });
 
-  test.fixme("오늘 할 일 '!' 쪽지 (`tasks`): 낚시터·농장·내 집 쪽지, 누르면 걸어가 들어간다", async () => {
-    // 페이지가 `tasks`를 넘기면: data-markers가 "pond farm home" 중 안 한 일, 쪽지를 누르면 그 입구로
+  test("오늘 할 일 '!' 쪽지 (`tasks`): 안 한 일의 장소 위, 돌볼 동물이 없으면 외양간은 조르지 않는다, 일을 하면 사라진다", async ({ page }) => {
+    const username = await signUpOk(page);
+    const [{ id }] = await sql<{ id: string }[]>`select id from users where username = ${username}`;
+    // 가입 직후: 낚시·공개 글은 아직, 부화한 동물이 없어 돌보기 '!'는 없다
+    await openTown(page);
+    await expect(canvas(page)).toHaveAttribute("data-markers", "pond home");
+    // 부화한 동물이 생기면 외양간 위에도
+    await sql`insert into animals (user_id, source, species, hatched_at) values (${id}, 'buy', 'calf', now())`;
+    await openTown(page);
+    await expect(canvas(page)).toHaveAttribute("data-markers", "pond farm home");
+    // 낚시를 하고 공개 글을 쓰면 그 쪽지가 빠진다
+    await sql`insert into fishing_catches (user_id, date, catch) values (${id}, (now() at time zone 'Asia/Seoul')::date, 'minnow')`;
+    await sql`insert into posts (blog_id, title, content_html, content_text, is_public)
+      select b.id, '오늘 쓴 글', '<p>본문</p>', '본문', true from blogs b where b.owner_id = ${id}`;
+    await openTown(page);
+    await expect(canvas(page)).toHaveAttribute("data-markers", "farm");
   });
-  test.fixme("계절 (`season`): ?season=winter면 data-season=winter", async () => {
-    // 페이지가 `season`을 넘기면 켠다
+
+  test("계절 (`season`): ?season=winter면 data-season=winter, 잘못된 값이면 오늘 계절", async ({ page }) => {
+    await openTown(page, "/town?season=winter");
+    await expect(canvas(page)).toHaveAttribute("data-season", "winter");
+    await openTown(page, "/town?season=nope");
+    await expect(canvas(page)).toHaveAttribute("data-season", /^(spring|summer|autumn|winter)$/);
   });
-  test.fixme("글 쓰고 돌아온 순간 (`celebrate`): /town?from=home&lit=1이면 data-celebrate=1, 쪽지에 '이웃'", async () => {
-    // 페이지가 `celebrate`를 넘기면 켠다
+
+  test("글 쓰고 돌아온 순간 (`celebrate`): /town?from=home&lit=1이면 내 집 앞에서 data-celebrate=1, 쪽지에 '이웃', 다시 열면 0", async ({ page }) => {
+    const username = await signUpOk(page);
+    // 오늘 글이 없으면 축하하지 않는다
+    await openTown(page, "/town?from=home&lit=1");
+    await expect(canvas(page)).toHaveAttribute("data-celebrate", "0");
+    await sql`insert into posts (blog_id, title, content_html, content_text, is_public)
+      select b.id, '초롱 켜는 글', '<p>본문</p>', '본문', true from blogs b join users u on u.id = b.owner_id where u.username = ${username}`;
+    await openTown(page, "/town?from=home&lit=1");
+    await expect(canvas(page)).toHaveAttribute("data-celebrate", "1");
+    await expect(page.locator("[data-town]")).toContainText("이웃", { timeout: 10_000 });
+    await openTown(page, "/town?from=home&lit=1");
+    await expect(canvas(page)).toHaveAttribute("data-celebrate", "0");
   });
 });
