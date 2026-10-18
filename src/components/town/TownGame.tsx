@@ -818,27 +818,61 @@ export function TownGame({
     };
     const underHud = (x: number, bottom: number, size: { width: number; height: number }) =>
       hudRects.some((r) => x + size.width / 2 > r.left && x - size.width / 2 < r.right && bottom > r.top && bottom - size.height < r.bottom);
-    // 축하 쪽지 자리 (가운데 x, 밑변 y, 화면 좌표): 내 집 오른쪽 옆 처마 높이, 모자라면 왼쪽 옆, 그래도 모자라면 지붕 위로 띄운다.
+    // 축하 쪽지 자리 (가운데 x, 밑변 y, 화면 좌표): 내 집 오른쪽 옆 처마 높이 → 왼쪽 옆 → 지붕 위 → 문 앞 캐릭터 아래 순으로 보고,
+    // 다른 건물(외양간·나무 등)을 가리지 않는 첫 자리를 고른다. 다 겹치면 덜 겹치는 자리.
     // 화면(서랍이 덮는 오른쪽 뺀 `right`) 안으로 당기고, 위 간판 줄(promptTop) 아래에 둔다
     const celebrateNoteSpot = (size: { width: number; height: number }, right: number) => {
       const house = mineStructure!;
       const { width } = artSize(house.art);
-      const roof = house.y - artVisibleHeight(house.art) - camera.y;
+      const height = artVisibleHeight(house.art);
+      const roof = house.y - height - camera.y;
       const left = house.x - width / 2 - camera.x;
       const end = house.x + width / 2 - camera.x;
+      const mid = house.x - camera.x;
       const gap = 30; // 처마 초롱과 불꽃 자리
       const edge = 8;
-      let x: number;
-      let y = roof + Math.round(artVisibleHeight(house.art) * 0.4);
-      if (end + gap + size.width + edge <= right) x = end + gap + size.width / 2;
-      else if (left - gap - size.width - edge >= 0) x = left - gap - size.width / 2;
-      else {
-        x = house.x - camera.x;
-        y = roof - 14;
+      const eave = roof + Math.round(height * 0.4);
+      const fit = ({ x, y }: { x: number; y: number }) => ({
+        x: Math.min(Math.max(x, size.width / 2 + edge), Math.max(size.width / 2 + edge, right - size.width / 2 - edge)),
+        y: Math.max(y, promptTop + size.height),
+      });
+      const covered = ({ x, y }: { x: number; y: number }) => {
+        const l = x - size.width / 2;
+        const r = x + size.width / 2;
+        const t = y - size.height;
+        let area = 0;
+        for (const s of structures) {
+          if (s === house) continue;
+          const w = artSize(s.art).width;
+          const sl = s.x - w / 2 - camera.x;
+          const sr = s.x + w / 2 - camera.x;
+          const sb = s.y - camera.y;
+          const st = sb - artVisibleHeight(s.art);
+          const ow = Math.min(r, sr) - Math.max(l, sl);
+          const oh = Math.min(y, sb) - Math.max(t, st);
+          if (ow > 0 && oh > 0) area += ow * oh;
+        }
+        return area;
+      };
+      const tries = [
+        { x: end + gap + size.width / 2, y: eave, ok: end + gap + size.width + edge <= right },
+        { x: left - gap - size.width / 2, y: eave, ok: left - gap - size.width - edge >= 0 },
+        { x: mid, y: roof - 14, ok: true },
+        { x: mid, y: house.y - camera.y + size.height + 56, ok: true }, // 문 앞에 선 캐릭터 아래
+      ];
+      let best: { x: number; y: number } | null = null;
+      let bestArea = Infinity;
+      for (const c of tries) {
+        if (!c.ok) continue;
+        const at = fit(c);
+        const area = covered(at);
+        if (area === 0) return at;
+        if (area < bestArea) {
+          best = at;
+          bestArea = area;
+        }
       }
-      x = Math.min(Math.max(x, size.width / 2 + edge), Math.max(size.width / 2 + edge, right - size.width / 2 - edge));
-      y = Math.max(y, promptTop + size.height);
-      return { x, y };
+      return best ?? fit(tries[2]);
     };
     const resize = () => {
       dpr = window.devicePixelRatio || 1;
