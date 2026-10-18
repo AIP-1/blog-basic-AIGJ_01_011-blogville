@@ -148,3 +148,87 @@ test.describe("TOWN-18 이웃 집 자리 고르기", () => {
     await expect(page.locator("[data-town-prompt]")).toBeHidden();
   });
 });
+
+// 이사 올 이웃 (plaza-upgrade-2 B1): 즐겨찾기가 10명보다 적은 내 마을의 빈 자리(뒤쪽부터, 4번 빼고) 3곳에 추천 이웃의 흐린 집
+test.describe("B1 이사 올 이웃", () => {
+  const suggestedLots = async (page: Page) => {
+    await page.locator("[data-town-menu]").click();
+    await panel(page).getByRole("button", { name: /🏡 이웃 집 자리/ }).click();
+    const lots: number[] = [];
+    for (const lot of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) if ((await lotRow(page, lot).textContent())?.includes("이사 올 수 있어요")) lots.push(lot);
+    const text = await panel(page).locator("[data-lot]").allTextContents();
+    await page.keyboard.press("Escape");
+    return { lots, text };
+  };
+
+  test("즐겨찾기 0명이면 8·7·6번에 추천 집(4번은 빈 집터, 절벽 아래 9·10번은 빼고), 같은 날 다시 와도 같은 후보. 우체통에서 모시면 그 자리의 이웃이 되고 서 있던 자리는 그대로", async ({ page }) => {
+    const me = await signUpOk(page);
+    const meId = await userId(me);
+    // 가입 직후 환영: 즐겨찾기가 없으면 텔레포트 안내 대신 이사 올 이웃 안내
+    await page.goto("/town?welcome=1");
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+    await expect(page.locator("[data-town-welcome]")).toContainText("이사 올 이웃");
+    await expect(page.locator("[data-town-welcome]")).not.toContainText("텔레포트");
+    await page.getByRole("button", { name: "환영 닫기" }).click();
+
+    const first = await suggestedLots(page);
+    expect(first.lots).toEqual([6, 7, 8]);
+    await openLots(page);
+    await expect(lotRow(page, 4)).toHaveAttribute("data-lot-owner", "");
+    await expect(lotRow(page, 4)).not.toContainText("이사 올");
+    // 추천 집 자리도 빈 자리로 친다
+    await expect(lotRow(page, 8)).toHaveAttribute("data-lot-owner", "");
+    await page.keyboard.press("Escape");
+    // 같은 날 다시 로드하면 같은 후보
+    await page.reload();
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+    expect((await suggestedLots(page)).text).toEqual(first.text);
+
+    // 8번 추천 집 우체통 (게임이 우체통 입구에서 보내는 bv-mailbox)
+    const before = await canvas(page).getAttribute("data-feet");
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent("bv-mailbox", { detail: { lot: 8 } })));
+    const box = page.locator('[data-town-panel="mailbox"]');
+    await expect(box.getByRole("heading")).toHaveText(/^🏡 .+님이 이사 올 수 있어요$/);
+    await expect(box.getByRole("link", { name: "📖 블로그 구경" })).toBeVisible();
+    const slug = (await box.locator("[data-mailbox]").getAttribute("data-mailbox"))!;
+    await box.getByRole("button", { name: /^⭐ 이웃 맺고 여기 모시기/ }).click();
+    await expect(box.getByRole("heading")).toHaveText(/^📮 .+님의 우체통$/);
+    await expect(box.locator("[data-mailbox-suggested]")).toHaveCount(0);
+    const [row] = await sql`select f.is_favorite, f.town_lot from follows f join blogs b on b.owner_id = f.followee_id where f.follower_id = ${meId} and b.slug = ${slug}`;
+    expect(row).toEqual({ is_favorite: true, town_lot: 8 });
+    expect(await canvas(page).getAttribute("data-feet")).toBe(before);
+    // 새 보상 없음
+    expect((await sql`select count(*)::int as n from point_ledger where user_id = ${meId} and reason not in ('signup', 'attendance')`)[0].n).toBe(0);
+    await page.keyboard.press("Escape");
+
+    // 새로고침해도 8번은 그 이웃의 집, 나머지 추천은 남은 뒤쪽 자리
+    await page.reload();
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+    const after = await suggestedLots(page);
+    expect(after.lots).toEqual([5, 6, 7]);
+    await openLots(page);
+    await expect(lotRow(page, 8)).not.toHaveAttribute("data-lot-owner", "");
+
+    // 빈 4번 자리 고르기: 즐겨찾는 이웃 1명이 있어도 '새 이웃 모시기'로 오늘의 후보를 모신다
+    await panel(page).getByRole("button", { name: "4번 자리 고르기" }).click();
+    await panel(page).getByText("🏡 새 이웃 모시기").click();
+    const suggest = panel(page).locator("[data-suggest]");
+    await expect(suggest).toHaveCount(3);
+    const pick = (await suggest.first().getAttribute("data-suggest"))!;
+    await suggest.first().getByRole("button", { name: /^모시기/ }).click();
+    await expect.poll(async () => (await sql`select f.town_lot from follows f join blogs b on b.owner_id = f.followee_id where f.follower_id = ${meId} and b.slug = ${pick}`)[0]?.town_lot).toBe(4);
+    // 다시 그린 창: 4번 자리에 그 이웃이 산다
+    await expect(panel(page).locator('[data-lot-picker="4"]').getByText("지금 이 자리에 살아요")).toBeVisible();
+  });
+
+  test("즐겨찾기가 10명이면 추천 집이 없다", async ({ page }) => {
+    const me = await signUpOk(page);
+    const meId = await userId(me);
+    // 오래된 블로그 10곳 (함께 도는 다른 시험의 새 회원을 ⭐하면 그 회원 마을의 '나를 ⭐한 회원' 후보가 바뀐다)
+    const others = await sql`select b.owner_id from blogs b where b.slug <> 'notice' and b.owner_id <> ${meId} order by b.id limit 10`;
+    for (const o of others) await sql`insert into follows (follower_id, followee_id, is_favorite) values (${meId}, ${o.owner_id}, true)`;
+    await page.goto("/town");
+    await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+    expect((await suggestedLots(page)).lots).toEqual([]);
+  });
+});

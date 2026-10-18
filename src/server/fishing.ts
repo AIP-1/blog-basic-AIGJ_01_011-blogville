@@ -4,6 +4,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { fishingCatches, items, userItems, users } from "@/db/schema";
 import { FEED_ITEM_CODE, findCatch, FISHING_DONE, pickCatch, type CatchCode } from "@/lib/fishing";
+import { catchBook, type DexCell } from "@/lib/fishing-book";
 import { todayKST } from "@/lib/kst";
 import { addLedgerEntry, lockUser } from "./points";
 
@@ -22,6 +23,16 @@ export async function getFishing(userId: string): Promise<{ today: CatchCode | n
   const today = todayKST();
   const logs = recent.map((r) => ({ date: r.date, catch: r.catch as CatchCode }));
   return { today: logs.find((r) => r.date === today)?.catch ?? null, recent: logs };
+}
+
+/** 낚시 도감 (plaza-upgrade-2 C3): 낚은 것별 횟수와 처음 낚은 날(`YYYY-MM-DD`, 한국 날짜), 표 순서의 여섯 칸 */
+export async function getCatchBook(userId: string): Promise<DexCell[]> {
+  const groups = await db
+    .select({ catch: fishingCatches.catch, count: sql<number>`count(*)::int`, first: sql<string>`min(${fishingCatches.date})::text` })
+    .from(fishingCatches)
+    .where(eq(fishingCatches.userId, userId))
+    .groupBy(fishingCatches.catch);
+  return catchBook(groups);
 }
 
 export type CastResult = { ok: true; catch: CatchCode } | { ok: false; error: string };

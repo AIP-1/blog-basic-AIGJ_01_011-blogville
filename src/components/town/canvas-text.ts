@@ -37,6 +37,23 @@ export function bubbleText(title: string, max = BUBBLE_CHARS): string {
   return `✎ ${shortName(title.replace(/\s+/g, " ").trim(), max)}`;
 }
 
+/** 글을 쓴 때를 짧게: `방금`, `3분 전`, `2시간 전`, `어제`, `4일 전` */
+export function agoText(createdAt: string, now = new Date()): string {
+  const minutes = Math.max(0, Math.floor((now.getTime() - Date.parse(createdAt)) / 60_000));
+  if (minutes < 1) return "방금";
+  if (minutes < 60) return `${minutes}분 전`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}시간 전`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? "어제" : `${days}일 전`;
+}
+
+/** 이웃 새 글 말풍선 (광장 개편 2): `✎ 제목… · 2시간 전`. 쓴 때를 모르면 제목만 */
+export function bubbleWithAge(title: string, createdAt: string | undefined, now = new Date()): string {
+  const text = bubbleText(title);
+  return createdAt ? `${text} · ${agoText(createdAt, now)}` : text;
+}
+
 /** 이름표 높이 (CSS px, 말풍선은 꼬리 포함) */
 export function tagHeight(style: TagStyle): number {
   return TAG_BOX.border * 2 + TAG_BOX.padY * 2 + TAG_BOX.line + (style === "bubble" ? TAG_BOX.tail : 0);

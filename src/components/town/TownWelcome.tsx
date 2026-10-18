@@ -7,8 +7,9 @@ import { useEffect, useState } from "react";
 /**
  * 첫 마을 환영 (TOWN-01): 가입 직후 블로그의 🚪 밖으로(`/town?welcome=1`)로 나왔을 때 한 번만.
  * 보여 준 직후 주소에서 `?welcome`을 지워 새로고침해도 다시 뜨지 않는다. 광장 개편: 종이 쪽지 모양과 [✏️ 첫 글 쓰기].
+ * 텔레포트로 즐겨찾기 이웃 집에 가는 안내는 즐겨찾는 이웃(`favorites`)이 있을 때만, 없으면 빈 집터의 이사 올 이웃 안내 (plaza-upgrade-2).
  */
-export function TownWelcome({ nickname, show }: { nickname: string; show: boolean }) {
+export function TownWelcome({ nickname, show, favorites = 0 }: { nickname: string; show: boolean; favorites?: number }) {
   // 처음 그릴 때만 정한다
   const [open, setOpen] = useState(show);
   const router = useRouter();
@@ -31,7 +32,14 @@ export function TownWelcome({ nickname, show }: { nickname: string; show: boolea
       <div className="flex items-start gap-2">
         <p className="flex-1">
           🎉 <strong>{nickname}</strong>님, 마을에 처음 나왔어요! 글을 쓰면 뒤에 있는 <strong>내 집</strong> 창에 불이 켜지고, 이웃들도 광장에서 내 새 글을
-          봐요. 왼쪽 위 <strong>☰ 메뉴</strong>의 텔레포트로 즐겨찾기한 이웃 집에 바로 갈 수 있어요.
+          봐요.{" "}
+          {favorites > 0 ? (
+            <>
+              왼쪽 위 <strong>☰ 메뉴</strong>의 텔레포트로 즐겨찾기한 이웃 집에 바로 갈 수 있어요.
+            </>
+          ) : (
+            <>빈 집터의 흐린 집 우체통에서 이사 올 이웃을 모셔 보세요.</>
+          )}
         </p>
         <button type="button" className="px-btn px-btn--quiet px-btn--sm shrink-0" aria-label="환영 닫기" onClick={() => setOpen(false)}>
           ✕

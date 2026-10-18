@@ -4,7 +4,7 @@ import type { HudNotification } from "@/server/town";
 
 /**
  * 최근 알림 5개 (☰ 🔔 알림·내 우체통·휴대폰 광장의 내 우체통이 같이 쓴다, TOWN-12·13).
- * 누르면 읽음으로 바꾸고 그 글로 간다. 안 읽은 알림은 햇빛 종이 바탕(`--kit-sun-paper`)에 굵게, 화면 낭독기에는 `안 읽음,`.
+ * 누르면 읽음으로 바꾸고 그 글로 간다. 방명록 알림(`note`)은 우체통 쪽지라 ✉️를 붙인다. 안 읽은 알림은 햇빛 종이 바탕(`--kit-sun-paper`)에 굵게, 화면 낭독기에는 `안 읽음,`.
  */
 export function NotificationList({ notifications }: { notifications: readonly HudNotification[] }) {
   return (
@@ -26,7 +26,8 @@ export function NotificationList({ notifications }: { notifications: readonly Hu
                 >
                   <span>
                     {!n.read && <span className="sr-only">안 읽음, </span>}
-                    {n.text}
+                    {/* 방명록 알림은 우체통 쪽지라 ✉️ (plaza-upgrade-2) */}
+                    {n.note ? `✉️ ${n.text.replace(/^📖\s*/u, "")}` : n.text}
                   </span>
                   {/* 햇빛 종이 바탕과 먹색 글자는 같은 토큰이라 함께 뒤집힌다(휴대폰 메뉴). PC 광장([data-town])은 늘 밝은 값이다 */}
                   <span className={`text-xs font-normal ${n.read ? "text-(--kit-ink-soft)" : ""}`}>{n.time}</span>

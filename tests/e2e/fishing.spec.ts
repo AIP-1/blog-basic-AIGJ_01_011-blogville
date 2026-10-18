@@ -56,6 +56,40 @@ test.describe("TOWN-14 연못 낚시터", () => {
     await second.close();
   });
 
+  test("낚시 도감: 처음엔 여섯 칸 모두 '???', 한 번 던지면 그 칸에 오늘 날짜·1번, 머리 '6종 중 1종', 이모지 카드 없음", async ({ page }) => {
+    const me = await signUpOk(page);
+    const id = await userId(me);
+    await page.goto("/fishing");
+    const cells = page.locator("[data-dex-cell]");
+    await expect(cells).toHaveCount(6);
+    await expect(page.locator('[data-dex-cell][data-caught="0"]')).toHaveCount(6);
+    await expect(cells.first()).toContainText("???");
+    await expect(page.locator("[data-dex-progress]")).toHaveText("6종 중 0종");
+    await expect(page.locator("[data-fishing-pond]")).toBeVisible();
+    // 이모지 카드 대신 도트 그림: 도감·연못에 물고기·장화 이모지가 없다
+    await expect(page.locator("#fishing-catches + ul")).not.toContainText(/[🐟🐠👢🌱✨🌊]/u);
+    await expect(page.locator("[data-fishing]")).not.toContainText("🌊");
+
+    await page.getByRole("button", { name: "🎣 낚싯대 던지기" }).click();
+    const pond = page.locator("[data-fishing]");
+    await expect(pond).not.toHaveAttribute("data-fishing", "ready");
+    const [log] = await sql`select catch, date::text from fishing_catches where user_id = ${id}`;
+    const cell = page.locator(`[data-dex-cell="${log.catch}"]`);
+    await expect(cell).toHaveAttribute("data-caught", "1");
+    await expect(cell.locator("[data-dex-first]")).toHaveAttribute("data-dex-first", log.date);
+    await expect(cell.locator("[data-dex-count]")).toHaveText("1");
+    await expect(page.locator("[data-dex-progress]")).toHaveText("6종 중 1종");
+    await expect(page.locator(`[data-catch="${log.catch}"] svg`)).toBeVisible();
+
+    // 다시 열어도 같고, 어제 기록을 더하면 그 칸 횟수와 처음 낚은 날이 바뀐다
+    await sql`insert into fishing_catches (user_id, date, catch) values (${id}, ${log.date}::date - 3, ${log.catch})`;
+    await page.reload();
+    await expect(cell.locator("[data-dex-count]")).toHaveText("2");
+    const [first] = await sql`select (${log.date}::date - 3)::text as d`;
+    await expect(cell.locator("[data-dex-first]")).toHaveAttribute("data-dex-first", first.d);
+    await expect(page.locator("[data-dex-progress]")).toHaveText("6종 중 1종");
+  });
+
   test("마을 낚시터: 입구에서 Space로 들어가고, 방문자는 /fishing에서 첫 화면으로", async ({ page, browser }) => {
     await signUpOk(page);
     await page.goto("/town");

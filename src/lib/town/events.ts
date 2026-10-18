@@ -19,6 +19,8 @@ export type TownEvents = {
   "bv-panel": { open: boolean };
   /** HUD·터치 [들어가기] 버튼 → window: 지금 가까운 입구로 들어간다 (Space와 같음) */
   "bv-enter": Record<string, never>;
+  /** HUD(우체통 쪽지, plaza-upgrade-2 B3) → window: 그 집 우체통에 쪽지를 넣었다. 게임은 그 우체통 깃발을 잠깐 든다 */
+  "bv-note": { lot: number };
 };
 
 export type TownEventName = keyof TownEvents;

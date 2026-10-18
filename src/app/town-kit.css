@@ -339,6 +339,11 @@
   --kit-on-accent: #0c1f14;
 }
 
+/* 창을 열 때 초점을 받는 창 제목 (tabIndex=-1, 탭으로는 오지 않는다): 읽기 위치만 옮기고 테두리는 그리지 않는다 */
+[data-panel-focus]:focus-visible {
+  outline: none;
+}
+
 /* 키트 위 초점: 종이 위는 먹색, 나무 위는 나무 위 글자색 (밝은·어두운 나무 모두 5:1 이상) */
 :is(.px-btn, .px-tab, .px-box a, .px-box button):focus-visible {
   outline: 3px solid var(--kit-ink);

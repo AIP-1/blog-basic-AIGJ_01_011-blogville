@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { houseArt, HOUSE_ART_WIDTH } from "@/lib/art/town";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { cherryTreeArt, houseArt, HOUSE_ART_WIDTH, lanternArt } from "@/lib/art/town";
 import { CLIFF_FACE, CLIFF_LINES, heightAt, onStairs, stairEnds, STAIRS, TERRAIN_WALLS } from "@/lib/town/terrain";
 import { ROOF_HEX } from "@/lib/roof";
 import { TOWN_CELL } from "@/lib/art/town";
@@ -21,7 +23,22 @@ import {
   WORLD,
   type Point,
 } from "@/lib/town/layout";
-import { artSize, EMPTY_LOT_HINT, entranceOwner, entrancePrompt, mailboxLot, onArt, structureAt, townLayout, townSpots, type TownHouseInput } from "@/lib/town/structures";
+import {
+  artSize,
+  EMPTY_LOT_HINT,
+  entranceOwner,
+  entrancePrompt,
+  FOUNTAIN_BODIES,
+  lanternBrightness,
+  lanternPlacements,
+  lanternSlots,
+  mailboxLot,
+  onArt,
+  structureAt,
+  townLayout,
+  townSpots,
+  type TownHouseInput,
+} from "@/lib/town/structures";
 
 const house = (lot: number, mine = false): TownHouseInput => ({ lot, slug: `blog${lot}`, nickname: `주민${lot}`, blogTitle: `블로그 ${lot}`, stage: 1, roof: ROOF_HEX.red, mine });
 
@@ -67,7 +84,8 @@ describe("마을 배치 (TOWN-03·04)", () => {
       ["house:0", "/@blog0", "🏠 내 집"],
       ["house:3", "/@blog3", "🏠 주민3의 집"],
     ]);
-    expect(townLayout([], false).structures.find((s) => s.id === "lot:0")!.label).toBe("내 집 자리");
+    // 회원이 아직 고르지 않은 0번 자리 (방문자는 '여기에 내 집 짓기' 흐린 집, A6)
+    expect(townLayout([], true).structures.find((s) => s.id === "lot:0")!.label).toBe("내 집 자리");
   });
 
   it("집이 다 차도 모든 입구에 처음 자리(분수 아래)에서 걸어서 갈 수 있다", () => {
@@ -223,13 +241,14 @@ describe("집 그림 (TOWN-11)", () => {
 describe("☰ 텔레포트 목록 (TOWN-12)", () => {
   it("마을 5곳 + 집 11자리, 집은 입구 앞 좌표·블로그 주소, 빈 집터는 못 고르고 회원에게만 ⭐ 안내", () => {
     const member = townSpots([house(0, true), house(2)], true);
-    expect(member.places.map((s) => s.label)).toEqual(["⛲ 광장 분수", "📋 마을 게시판", "🏪 상점", "👗 옷가게", "💇 미용실", "🐮 동물 농장", "🎣 낚시터"]);
+    expect(member.places.map((s) => s.label)).toEqual(["⛲ 광장 분수", "🏮 줄등", "📋 마을 게시판", "📝 이번 주 글감", "🏪 상점", "👗 옷가게", "💇 미용실", "🐮 동물 농장", "🎣 낚시터"]);
     expect(member.houses).toHaveLength(11);
     expect(member.houses[0]).toMatchObject({ label: "🏠 내 집", sub: "블로그 0", enabled: true, slug: "blog0", ...lotFront(0) });
     expect(member.houses[2]).toMatchObject({ label: "🏠 주민2의 집", enabled: true, slug: "blog2" });
     expect(member.houses[1]).toMatchObject({ label: "빈 집터", sub: EMPTY_LOT_HINT, enabled: false, slug: null });
     const guest = townSpots([house(1)], false);
-    expect(guest.houses[0]).toMatchObject({ label: "내 집 자리", sub: null, enabled: false });
+    expect(guest.houses[0]).toMatchObject({ label: "🏡 여기에 내 집 짓기", sub: null, enabled: true, ...lotFront(0) });
+    expect(townSpots([], true).houses[0]).toMatchObject({ label: "내 집 자리", sub: null, enabled: false });
     expect(guest.houses[2]).toMatchObject({ label: "빈 집터", sub: null });
   });
   it("텔레포트 자리는 몸체에 걸리지 않는다", () => {
@@ -266,13 +285,180 @@ describe("집 앞 우체통 (TOWN-13)", () => {
     const boxes = entrances.filter((e) => mailboxLot(e.href) !== null);
     expect(boxes.map((e) => mailboxLot(e.href))).toEqual([0, 3]);
     expect(entrancePrompt(boxes[0])).toBe("📬 내 우체통 · Space 소식 보기");
-    expect(entrancePrompt(boxes[1])).toBe("📬 주민3의 우체통 · Space 소식 보기");
+    expect(entrancePrompt(boxes[1])).toBe("📬 주민3님의 우체통 · Space 소식 보기");
     expect(structures.filter((s) => s.id.startsWith("mailbox:"))).toHaveLength(2);
     const mine = structures.find((s) => s.id === "mailbox:0")!;
-    expect(Object.values(mine.art.palette)).toContain("#4a90d9");
+    expect(Object.values(mine.art.palette)).toContain("#3a6ea5");
     expect(mine.art.rows.join("")).not.toEqual(townLayout([house(0, true)], true, false).structures.find((s) => s.id === "mailbox:0")!.art.rows.join(""));
-    expect(Object.values(structures.find((s) => s.id === "mailbox:3")!.art.palette)).toContain("#d9534f");
+    expect(Object.values(structures.find((s) => s.id === "mailbox:3")!.art.palette)).toContain("#b8452f");
     expect(mailboxLot("/@abc")).toBeNull();
     expect(mailboxLot("mailbox:x")).toBeNull();
+  });
+});
+
+describe("이사 올 이웃·방문자 내 집 자리·친구 마을 농장 (A6)", () => {
+  it("이사 올 집(suggested)은 흐린 집이고 들어가면 우체통 창, 걷는 이웃이 되지 않는다", () => {
+    const houses = [house(0, true), { ...house(3), suggested: true, fresh: true }, house(5)];
+    const { structures, entrances } = townLayout(houses, true, false, true);
+    const ghost = structures.find((s) => s.id === "house:3")!;
+    expect(ghost.alpha).toBe(0.55);
+    expect(ghost.lit).toBeUndefined();
+    expect(ghost.label).toBe("이사 올 집 · 주민3");
+    const door = entrances.find((e) => e.id === "house:3")!;
+    expect(door.href).toBe("mailbox:3");
+    expect(mailboxLot(door.href)).toBe(3);
+    // 빈 집터 자리 고르기 입구는 없다 (집이 서 있다)
+    expect(entrances.some((e) => e.href === "lots:3")).toBe(false);
+    // 걷는 이웃 (TownGame이 createNpcs에 넘기는 집): 이사 올 집은 빠진다
+    const walkers = houses.filter((h) => h.lot > 0 && !h.suggested).map((h) => h.lot);
+    expect(walkers).toEqual([5]);
+    expect(lanternSlots(houses).map((l) => l.lot)).toEqual([5]);
+  });
+  it("방문자: 0번 자리에 그날 지붕색의 흐린 집과 '여기에 내 집 짓기' 가입 입구, 정원은 '빈 정원'", () => {
+    const { structures, entrances } = townLayout([house(1)], false);
+    const home = entrances.find((e) => e.id === "house:0")!;
+    expect(home.href).toBe("login");
+    expect(home.label).toBe("🏡 여기에 내 집 짓기");
+    expect(entrancePrompt(home)).toBe("🏡 여기에 내 집 짓기 · Space 가입하기");
+    const ghost = structures.find((s) => s.id === "house:0")!;
+    expect(ghost.alpha).toBe(0.55);
+    expect(Object.values(ROOF_HEX)).toContain(ghost.art.palette.R);
+    expect(structures.find((s) => s.id === "garden-arch")!.label).toBe("빈 정원");
+    expect(townLayout([house(0, true)], true).structures.find((s) => s.id === "garden-arch")!.label).toBe("내 정원");
+  });
+  it("친구 마을(0번이 남의 집): 농장 입구는 그 집 농장 구경, 게임 방은 주인 주소를 이어 받는다", () => {
+    const friend = [{ ...house(0), slug: "mint", nickname: "민트" }, house(2)];
+    const { entrances } = townLayout(friend, true);
+    const href = (id: string) => entrances.find((e) => e.id === id)!.href;
+    expect(href("farm")).toBe("/farm?host=mint");
+    expect(href("shop")).toBe("/shop?host=mint");
+    expect(href("pond")).toBe("/fishing?host=mint");
+    expect(href("feed")).toBe("/feed");
+    // 내 마을은 그대로
+    const mine = townLayout([house(0, true)], true).entrances;
+    expect(mine.find((e) => e.id === "farm")!.href).toBe("/farm");
+    expect(mine.find((e) => e.id === "shop")!.href).toBe("/shop");
+  });
+});
+
+describe("게시판 세 입구 (C1 글감)", () => {
+  it("마을 소식·이번 주 글감·출석 체크, 가운데가 /prompt", () => {
+    const { entrances } = townLayout([], true);
+    const board = entrances.filter((e) => ["feed", "prompt", "attendance"].includes(e.id));
+    expect(board.map((e) => [e.id, e.href])).toEqual([
+      ["feed", "/feed"],
+      ["prompt", "/prompt"],
+      ["attendance", "/attendance"],
+    ]);
+    expect(board.map((e) => e.x)).toEqual([935, 1000, 1065]);
+    expect(entranceOwner(board[1], townLayout([], true).structures)?.id).toBe("board");
+    // 게시판 앞 양쪽에서는 그 문이 가장 가깝다 (e2e 텔레포트 자리)
+    expect(nearestEntrance({ x: 940, y: 540 }, entrances)?.id).toBe("feed");
+    expect(nearestEntrance({ x: 1060, y: 540 }, entrances)?.id).toBe("attendance");
+    expect(nearestEntrance({ x: 1000, y: 530 }, entrances)?.id).toBe("prompt");
+  });
+});
+
+describe("청사초롱 줄등 (A4)", () => {
+  const now = new Date("2026-10-17T12:00:00Z");
+  const ago = (h: number) => new Date(now.getTime() - h * 3_600_000).toISOString();
+  const neighbor = (lot: number, hours: number | null) => ({
+    ...house(lot),
+    fresh: hours !== null && hours < 24,
+    recentPosts: hours === null ? [] : [{ id: lot * 10, title: `글 ${lot}`, createdAt: ago(hours) }],
+  });
+  it("lot 순서로 10개까지, 24시간 안에 글 쓴 집만 켜지고 밝기는 1·0.7·0.4", () => {
+    const houses = [house(0, true), ...[10, 3, 1, 2, 4, 5, 6, 7, 8, 9].map((lot, i) => neighbor(lot, [2, 10, 20, 30, null][i % 5]))];
+    const slots = lanternSlots(houses, now);
+    expect(slots).toHaveLength(10);
+    expect(slots.map((s) => s.lot)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    for (const s of slots) {
+      const h = houses.find((x) => x.lot === s.lot)!;
+      expect(s.lit).toBe(h.fresh);
+      if (s.lit) expect([1, 0.7, 0.4]).toContain(s.brightness);
+      else expect(s.brightness).toBe(0);
+    }
+    expect(lanternBrightness(ago(1), now)).toBe(1);
+    expect(lanternBrightness(ago(9), now)).toBe(0.7);
+    expect(lanternBrightness(ago(17), now)).toBe(0.4);
+    expect(lanternBrightness(ago(25), now)).toBe(0);
+  });
+  it("초롱은 줄 네 가닥에 고르게 매달리고, 켜진 초롱 아래에 그 글로 가는 입구", () => {
+    const houses = [house(0, true), neighbor(1, 2), neighbor(2, null), neighbor(5, 12)];
+    const places = lanternPlacements(3);
+    expect(places.map((p) => p.rope)).toEqual([0, 1, 2]);
+    const { entrances } = townLayout(houses, true, false, false, undefined, { now });
+    const lanterns = entrances.filter((e) => e.id.startsWith("lantern:"));
+    expect(lanterns.map((e) => [e.id, e.href])).toEqual([
+      ["lantern:1", "/@blog1/10"],
+      ["lantern:5", "/@blog5/50"],
+      ["lantern:home", "/write"],
+    ]);
+    expect(entrancePrompt(lanterns[0])).toBe("🏮 주민1 · 글 1 · Space 글 읽기");
+    // 내 초롱: 오늘 글을 썼으면 켜지고 내 글로
+    const posted = townLayout([{ ...house(0, true), recentPosts: [{ id: 7, title: "오늘 글", createdAt: ago(1) }] }], true, false, false, undefined, { now, homePosted: true });
+    expect(posted.entrances.find((e) => e.id === "lantern:home")!.href).toBe("/@blog0/7");
+    // 처음 자리(분수 아래)에서는 초롱 입구가 가깝지 않다 (Space가 글을 열지 않는다)
+    const many = townLayout([house(0, true), ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((l) => neighbor(l, 1))], true, false, false, undefined, { now });
+    expect(nearestEntrance(START_POS, many.entrances)).toBeNull();
+  });
+  it("장대는 분수 몸체 안에 서서 길을 막지 않는다", () => {
+    const { structures, walls } = townLayout([], true);
+    const mast = structures.find((s) => s.id === "mast")!;
+    expect(mast.body).toBeNull();
+    expect(FOUNTAIN_BODIES.some((b) => mast.x >= b.x && mast.x <= b.x + b.width && mast.y >= b.y && mast.y <= b.y + b.height)).toBe(true);
+    for (const b of FOUNTAIN_BODIES) expect(walls).toContain(b);
+  });
+  it("초롱 그림: 크기마다 칸 수, 켜면 속이 노랗고 끄면 회색 비단", () => {
+    expect([lanternArt(true, "s"), lanternArt(true, "m"), lanternArt(true, "l")].map((a) => [a.rows[0].length, a.rows.length])).toEqual([
+      [5, 8],
+      [7, 11],
+      [9, 13],
+    ]);
+    expect(lanternArt(true, "m").palette.J).toBe("#ffd56e");
+    expect(lanternArt(false, "m").palette.R).toBe("#8c7f74");
+    expect(lanternArt(false, "m").palette.B).toBe("#6f7690");
+    expect(lanternArt(true, "m").palette.R).toBe("#c8342c");
+  });
+  it("글 쓴 집은 처마 끝에 소형 초롱 (속은 J 칸), 크기는 그대로", () => {
+    const { structures } = townLayout([house(0, true), { ...house(1), fresh: true }], true);
+    const lit = structures.find((s) => s.id === "house:1")!;
+    expect(lit.art.rows.join("")).toContain("J");
+    expect(lit.art.rows).toHaveLength(houseArt(1, ROOF_HEX.red).rows.length);
+    expect(structures.find((s) => s.id === "house:0")!.art.rows.join("")).not.toContain("J");
+  });
+});
+
+describe("계절 (A5)", () => {
+  it("마을 그림 팔레트에 Material 기본색(#4caf50·#d9534f·#4a90d9)이 없다", () => {
+    const src = readFileSync(resolve(__dirname, "../../src/lib/art/town.ts"), "utf8").toLowerCase();
+    for (const c of ["#4caf50", "#d9534f", "#4a90d9"]) expect(src).not.toContain(c);
+  });
+  it("계절마다 숲 나무와 벚나무 색이 다르다, 가을에는 단풍·은행·감나무", () => {
+    const seasons = ["spring", "summer", "autumn", "winter"] as const;
+    const forest = seasons.map((season) =>
+      JSON.stringify(
+        townLayout([], true, false, false, undefined, { season })
+          .structures.filter((s) => s.id.startsWith("tree:"))
+          .map((s) => s.art),
+      ),
+    );
+    expect(new Set(forest).size).toBe(4);
+    expect(new Set(seasons.map((season) => JSON.stringify(cherryTreeArt(season)))).size).toBe(4);
+    expect(cherryTreeArt().palette.L).toBe("#ffb7c5");
+    const autumn = townLayout([], true, false, false, undefined, { season: "autumn" }).structures.filter((s) => s.id.startsWith("tree:"));
+    const leaves = new Set(autumn.map((t) => t.art.palette.L));
+    expect(leaves).toContain("#d9692e");
+    expect(leaves).toContain("#e9b341");
+    expect(autumn.some((t) => t.art.palette.O === "#e8762c")).toBe(true);
+  });
+  it("겨울에는 지붕·울타리에 눈 (칸 크기는 그대로)", () => {
+    const winter = townLayout([house(0, true)], true, false, false, undefined, { season: "winter" }).structures;
+    const summer = townLayout([house(0, true)], true).structures;
+    const roof = winter.find((s) => s.id === "house:0")!.art;
+    expect(roof.rows.join("")).toContain("Z");
+    expect(roof.rows.map((r) => r.length)).toEqual(summer.find((s) => s.id === "house:0")!.art.rows.map((r) => r.length));
+    expect(winter.find((s) => s.id.startsWith("fence:"))!.art.rows.join("")).toContain("Z");
+    expect(summer.find((s) => s.id === "house:0")!.art.rows.join("")).not.toContain("Z");
   });
 });

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { signOut } from "@/app/(auth)/actions";
 import { FavoriteButton } from "@/components/feed/FavoriteButton";
-import { LotsPanel } from "@/components/town/LotsPanel";
+import { InviteButton, LotsPanel } from "@/components/town/LotsPanel";
 import { PixelLayers } from "@/components/game/PixelLayers";
 import { clearDraft } from "@/lib/draft";
 import { formatNumber } from "@/lib/game";
@@ -15,7 +15,9 @@ import type { PlazaNews } from "@/lib/town/plaza";
 import type { Sky } from "@/lib/town/sky";
 import type { TownSpot } from "@/lib/town/structures";
 import type { HudMember, TownHouse } from "@/server/town";
+import { NOTICE_SLUG } from "@/lib/names";
 import { supportHref } from "@/lib/support-rules";
+import { MailboxNote } from "./MailboxNote";
 import { NotificationList } from "./NotificationList";
 import { PlaceSign } from "./PlaceSign";
 import { PlazaDrawer } from "./PlazaDrawer";
@@ -44,6 +46,23 @@ const NOTCH = "shadow-[0_-2px_0_0_var(--kit-ink),0_2px_0_0_var(--kit-ink),-2px_0
 const TILE = `flex min-h-[4.5rem] flex-col items-start justify-center gap-0.5 bg-(--kit-paper-2) px-3 py-2 text-left ${NOTCH} hover:bg-(--kit-paper-hover) active:translate-y-0.5`;
 const ROW = `flex min-h-11 w-full items-center bg-(--kit-paper-2) px-3 py-1.5 text-left font-semibold ${NOTCH} hover:bg-(--kit-paper-hover) disabled:cursor-not-allowed disabled:opacity-60`;
 const SMALL = "px-btn px-btn--quiet px-btn--sm";
+
+/**
+ * 우체통 창 머리의 방문 수 (B3, blog_visits 오늘·어제): 이웃 집은 '오늘 12명 · 어제 9명이 다녀갔어요', 내 집은 '오늘 우리 집 방문 7 (어제 12)'.
+ * 이름표 아래 설명 줄은 없앴으므로(1.26) 숫자는 창 안에만 둔다. 시험 훅 `data-visits`(오늘,어제).
+ */
+function VisitLine({ house }: { house: TownHouse }) {
+  // 주인이 👣 방문자 위젯을 숨긴 이웃 집은 서버가 방문 수를 보내지 않는다
+  if (house.visitsToday === undefined) return null;
+  const today = house.visitsToday ?? 0;
+  const yesterday = house.visitsYesterday ?? 0;
+  return (
+    <p className="text-sm font-semibold" data-visits={`${today},${yesterday}`}>
+      <span aria-hidden="true">👣 </span>
+      {house.mine ? `오늘 우리 집 방문 ${today} (어제 ${yesterday})` : `오늘 ${today}명 · 어제 ${yesterday}명이 다녀갔어요`}
+    </p>
+  );
+}
 
 /** ☰ 계정 줄의 로그아웃: 이 브라우저에 남은 그 회원의 임시 글도 지운다 (POST-08, SignOutButton과 같다) */
 function TownSignOut({ userId }: { userId: string }) {
@@ -164,13 +183,14 @@ export function TownHud({
   }, [panel, phone]);
 
   // 창이 열리고 닫힐 때 게임에 알린다 (열면 멀리서 누른 건물에 걸어가 들어가기를 그만둔다)
+  // 창 종류가 바뀌어도(☰ → 우체통) 알린다: 게임이 우체통 창만큼 카메라를 비킨다 (D4)
   const isOpen = panel !== null;
-  const announced = useRef(isOpen);
+  const announced = useRef<string | null>(panel);
   useEffect(() => {
-    if (phone || announced.current === isOpen) return;
-    announced.current = isOpen;
+    if (phone || announced.current === panel) return;
+    announced.current = panel;
     emitTown("bv-panel", { open: isOpen });
-  }, [isOpen, phone]);
+  }, [panel, isOpen, phone]);
 
   // 게임에서 우체통 앞 Space·클릭 (TOWN-13)
   useEffect(() => {
@@ -320,7 +340,13 @@ export function TownHud({
               </button>
             )}
             <h2 id={titleId} className="flex-1 text-lg font-bold" tabIndex={-1} data-panel-focus>
-              {panel === "mailbox" && mailHouse ? (mailHouse.mine ? "📮 내 우체통" : `📮 ${mailHouse.nickname}님의 우체통`) : TITLES[panel]}
+              {panel === "mailbox" && mailHouse
+                ? mailHouse.mine
+                  ? "📮 내 우체통"
+                  : mailHouse.suggested
+                    ? `🏡 ${mailHouse.nickname}님이 이사 올 수 있어요`
+                    : `📮 ${mailHouse.nickname}님의 우체통`
+                : TITLES[panel]}
             </h2>
             {!phone && (
               <button type="button" className={SMALL} aria-label="닫기" onClick={close}>
@@ -346,7 +372,7 @@ export function TownHud({
                     }}
                   >
                     <span className="font-bold">🏡 이웃 집 자리</span>
-                    <span className="text-sm text-(--kit-ink-soft)">{`이웃 집 ${houses.filter((h) => h.lot > 0).length}/10채`}</span>
+                    <span className="text-sm text-(--kit-ink-soft)">{`이웃 집 ${houses.filter((h) => h.lot > 0 && !h.suggested).length}/10채`}</span>
                   </button>
                 )}
               </div>
@@ -448,9 +474,21 @@ export function TownHud({
 
           {panel === "notifications" && hud && <NotificationList notifications={hud.notifications} />}
 
-          {panel === "mailbox" && mailHouse?.mine && hud && <NotificationList notifications={hud.notifications} />}
+          {panel === "mailbox" && mailHouse?.mine && hud && (
+            <div className="space-y-2">
+              <VisitLine house={mailHouse} />
+              <NotificationList notifications={hud.notifications} />
+            </div>
+          )}
           {panel === "mailbox" && mailHouse && !mailHouse.mine && (
-            <div className="space-y-3" data-mailbox={mailHouse.slug}>
+            <div className="space-y-3" data-mailbox={mailHouse.slug} data-mailbox-suggested={mailHouse.suggested ? "1" : undefined}>
+              {mailHouse.suggested ? (
+                <p className="text-sm text-(--kit-ink-soft)">
+                  빈 집터에 잠깐 들른 이웃이에요. 모시면 ⭐ 즐겨찾는 이웃이 되고 이 자리에 집이 서요.
+                </p>
+              ) : (
+                <VisitLine house={mailHouse} />
+              )}
               <p className="break-words text-sm font-semibold">{mailHouse.blogTitle}의 새 글</p>
               {mailHouse.recentPosts.length === 0 ? (
                 <p className="text-(--kit-ink-soft)">아직 공개 글이 없어요.</p>
@@ -458,34 +496,48 @@ export function TownHud({
                 <ul className="grid gap-2 p-0.5" aria-label="새 글">
                   {mailHouse.recentPosts.map((post) => (
                     <li key={post.id}>
-                      <Link href={`/@${mailHouse.slug}/${post.id}`} className={`${ROW} gap-2 text-sm`}>
-                        <span aria-hidden="true">✉️</span>
+                      <Link href={`/@${mailHouse.slug}/${post.id}`} className={`${ROW} gap-2 text-sm ${post.read ? "text-(--kit-ink-soft)" : ""}`} data-read={post.read ? "1" : "0"}>
+                        <span aria-hidden="true">{post.read ? "✓" : "✉️"}</span>
+                        {post.read && <span className="sr-only">읽은 글, </span>}
                         <span className="min-w-0 break-words font-(family-name:--blog-serif) font-bold">{post.title}</span>
                       </Link>
                     </li>
                   ))}
                 </ul>
               )}
-              <div className="flex flex-wrap gap-2.5 pt-1">
-                <Link href={`/@${mailHouse.slug}`} className="px-btn px-btn--sm">
-                  🏠 집에 들어가기
-                </Link>
-                {hud && mailHouse.slug !== host?.slug && (
-                  <Link href={`/town/${mailHouse.slug}`} className="px-btn px-btn--sm">
-                    🏘 {mailHouse.nickname}님의 마을 구경
+              {mailHouse.suggested ? (
+                <div className="flex flex-wrap gap-2.5 pt-1">
+                  {hud && !host && <InviteButton house={mailHouse} />}
+                  <Link href={`/@${mailHouse.slug}`} className="px-btn px-btn--sm">
+                    📖 블로그 구경
                   </Link>
-                )}
-                <button
-                  type="button"
-                  className="px-btn px-btn--sm"
-                  onClick={() => {
-                    setPanel(null);
-                    teleportTo(lotFront(mailHouse.lot));
-                  }}
-                >
-                  ✨ 집 앞으로
-                </button>
-              </div>
+                </div>
+              ) : (
+                <>
+                  {/* 쪽지(방명록)는 회원만, 공지 블로그에는 없다 */}
+                  {hud && mailHouse.slug !== NOTICE_SLUG && <MailboxNote key={mailHouse.slug} slug={mailHouse.slug} lot={mailHouse.lot} />}
+                  <div className="flex flex-wrap gap-2.5 pt-1">
+                    <Link href={`/@${mailHouse.slug}`} className="px-btn px-btn--sm">
+                      🏠 집에 들어가기
+                    </Link>
+                    {hud && mailHouse.slug !== host?.slug && (
+                      <Link href={`/town/${mailHouse.slug}`} className="px-btn px-btn--sm">
+                        🏘 {mailHouse.nickname}님의 마을 구경
+                      </Link>
+                    )}
+                    <button
+                      type="button"
+                      className="px-btn px-btn--sm"
+                      onClick={() => {
+                        setPanel(null);
+                        teleportTo(lotFront(mailHouse.lot));
+                      }}
+                    >
+                      ✨ 집 앞으로
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
