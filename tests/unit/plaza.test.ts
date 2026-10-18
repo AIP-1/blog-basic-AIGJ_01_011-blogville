@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  allFreshRead,
+  attendanceStreak,
+  commentTarget,
+  countedTasks,
+  unreadFresh,
+  withCommentTarget,
   BOARD_PAPERS_MAX,
   boardPapers,
   clockText,
@@ -116,12 +122,12 @@ describe("광장 소식: 이웃 새 글 (광장 개편)", () => {
 });
 
 describe("오늘 할 일 (광장 개편)", () => {
-  it("출석·글쓰기·낚시·동물 돌보기, 장소가 있는 일은 텔레포트 자리 (출석은 게시판 앞이 마을 소식 입구와 겹쳐 링크)", () => {
+  it("출석·글쓰기·낚시·동물 돌보기·댓글, 장소가 있는 일은 텔레포트 자리 (출석은 게시판 앞이 마을 소식 입구와 겹쳐 링크)", () => {
     const tasks = todayTasks(IDLE);
-    expect(tasks.map((t) => t.id)).toEqual(["attendance", "post", "fishing", "farm"]);
-    expect(tasks.map((t) => t.spot ?? null)).toEqual([null, null, "pond", "farm"]);
+    expect(tasks.map((t) => t.id)).toEqual(["attendance", "post", "fishing", "farm", "comment"]);
+    expect(tasks.map((t) => t.spot ?? null)).toEqual([null, null, "pond", "farm", null]);
     expect(tasks.every((t) => !t.done)).toBe(true);
-    expect(tasks.map((t) => t.progress.total)).toEqual([1, 3, 1, 15]);
+    expect(tasks.map((t) => t.progress.total)).toEqual([1, 3, 1, 15, 10]);
   });
 
   it("글쓰기는 보상 n/3을 세고, 보상 없이 써도 한 것으로", () => {
@@ -146,6 +152,9 @@ describe("오늘 할 일 (광장 개편)", () => {
     expect(taskProgressText(twoAnimals)).toBe("돌보기 보상 6/15");
     // 동물이 없어 한 번도 못 돌봤으면 아직
     expect(todayTasks({ ...IDLE, canCare: false })[3].done).toBe(false);
+    // 그때 광장 외양간 위 '!'는 띄우지 않는다 (돌볼 동물이 있으면 띄운다)
+    expect(todayTasks({ ...IDLE, canCare: false })[3].nudge).toBe(false);
+    expect(todayTasks(IDLE)[3].nudge).toBe(true);
     expect(taskProgressText(attendance)).toBe("오늘 했어요");
     expect(taskProgressText(fishing)).toBe("아직이에요");
   });
@@ -225,5 +234,78 @@ describe("방문자 마을 자리 (dailyLots)", () => {
       }
     }
     expect(moved / cases).toBeLessThan(2.5);
+  });
+});
+
+describe("오늘 할 일 다듬기 (plaza-upgrade-2 B2)", () => {
+  it("💬 이웃 글에 댓글은 맨 끝, 하나면 한 일(보상 n/10은 그대로). 기존 보상을 줄마다 적는다", () => {
+    const tasks = todayTasks({ ...IDLE, comments: 3 });
+    const comment = tasks.at(-1)!;
+    expect(comment.id).toBe("comment");
+    expect(comment).toMatchObject({ icon: "💬", label: "이웃 글에 댓글", done: true, progress: { current: 3, total: 10 }, href: "/feed", reward: "✨5 🪙5" });
+    expect(taskProgressText(comment)).toBe("댓글 보상 3/10");
+    expect(todayTasks({ ...IDLE, comments: 0 }).at(-1)!.done).toBe(false);
+    expect(todayTasks({ ...IDLE, comments: 1 }).at(-1)!.done).toBe(true);
+    expect(taskProgressText(todayTasks({ ...IDLE, comments: 1 }).at(-1)!)).toBe("댓글 보상 1/10");
+    expect(todayTasks({ ...IDLE, comments: 10 }).at(-1)!.done).toBe(true);
+    expect(todayTasks({ ...IDLE, comments: 14 }).at(-1)!.progress.current).toBe(10);
+    expect(tasks[1].reward).toBe("✨30 🪙30");
+    expect(tasks[2].reward).toBe("최대 🪙100");
+    expect(tasks[3].reward).toBe("✨2");
+    expect(tasks[0].reward).toBeUndefined();
+    // 출석은 세지 않는다
+    expect(countedTasks(tasks).map((t) => t.id)).toEqual(["post", "fishing", "farm", "comment"]);
+  });
+
+  it("💬 칸은 서랍 맨 위 이웃 새 글로, 마을 소식이면 /feed", () => {
+    const post: PlazaPost = { id: 7, title: "t", slug: "mint", nickname: "민트", createdAt: hoursAgo(1) };
+    expect(commentTarget({ scope: "neighbors", posts: [post] })).toBe("/@mint/7");
+    expect(commentTarget({ scope: "village", posts: [post] })).toBe("/feed");
+    expect(commentTarget(null)).toBe("/feed");
+    const tasks = withCommentTarget(todayTasks(IDLE), { scope: "neighbors", posts: [post] });
+    expect(tasks.at(-1)!.href).toBe("/@mint/7");
+    expect(tasks[1].href).toBe("/write");
+  });
+
+  it("연속 출석: 3일 이어지고 하루 빠진 뒤 다시 2일이면 2, 오늘 아직이면 어제부터", () => {
+    const dates = ["2026-10-10", "2026-10-11", "2026-10-12", "2026-10-14", "2026-10-15"];
+    expect(attendanceStreak(dates, "2026-10-15")).toBe(2);
+    expect(attendanceStreak(dates, "2026-10-16")).toBe(2);
+    expect(attendanceStreak(dates, "2026-10-17")).toBe(0);
+    expect(attendanceStreak(["2026-10-01", "2026-09-30", "2026-10-02"], "2026-10-02")).toBe(3);
+    expect(attendanceStreak([], "2026-10-02")).toBe(0);
+    expect(todayTasks({ ...IDLE, attended: true, streak: 12 })[0].streak).toBe(12);
+  });
+});
+
+describe("이웃 새 글 읽음 (plaza-upgrade-2 B4)", () => {
+  const post = (id: number, h: number, read = false): PlazaPost => ({ id, title: `글 ${id}`, slug: "a", nickname: "a님", createdAt: hoursAgo(h), fresh: h < 24, ...(read ? { read: true } : {}) });
+  it("칩 숫자는 안 읽은 24시간 새 글, 다 읽으면 다 읽었어요", () => {
+    expect(unreadFresh({ scope: "neighbors", posts: [post(1, 1), post(2, 2, true), post(3, 30)] })).toBe(1);
+    expect(allFreshRead({ scope: "neighbors", posts: [post(1, 1), post(2, 2, true)] })).toBe(false);
+    expect(allFreshRead({ scope: "neighbors", posts: [post(1, 1, true), post(2, 2, true), post(3, 30)] })).toBe(true);
+    expect(unreadFresh({ scope: "neighbors", posts: [post(1, 1, true), post(2, 2, true)] })).toBe(0);
+    // 24시간 새 글이 없으면 다 읽은 것이 아니다
+    expect(allFreshRead({ scope: "neighbors", posts: [post(3, 30)] })).toBe(false);
+    // 마을 전체 새 글은 세지 않는다
+    expect(unreadFresh({ scope: "village", posts: [post(1, 1)] })).toBe(0);
+    expect(allFreshRead({ scope: "village", posts: [post(1, 1, true)] })).toBe(false);
+  });
+  it("우체통 글의 읽음은 이웃 새 글로 그대로 실린다", () => {
+    const houses = [{ lot: 1, mine: false, slug: "a", nickname: "a님", recentPosts: [{ id: 1, title: "t", createdAt: hoursAgo(1), read: true }, { id: 2, title: "u", createdAt: hoursAgo(2) }] }];
+    const news = plazaNews("me", houses, [], NOW);
+    expect(news.posts.map((p) => [p.id, p.read ?? false])).toEqual([
+      [1, true],
+      [2, false],
+    ]);
+    expect(unreadFresh(news)).toBe(1);
+  });
+});
+
+describe("이사 올 이웃은 소식이 아니다 (plaza-upgrade-2 B1)", () => {
+  it("추천 집의 글은 이웃 새 글·게시판 쪽지에서 뺀다", () => {
+    const houses = [{ ...house(1, "a", [[1, 1]]) }, { ...house(10, "s", [[2, 1]]), suggested: true }];
+    expect(neighborNews(houses, NOW).map((p) => p.id)).toEqual([1]);
+    expect(boardPapers(houses, NOW)).toBe(1);
   });
 });

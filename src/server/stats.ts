@@ -1,5 +1,5 @@
 import "server-only";
-import { and, count, desc, eq, gte, lt, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, lt, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import { db } from "@/db";
 import { blogReferrers, blogVisits, posts, postViews } from "@/db/schema";
 import { fillDays, lastDays, previousDay, todayKST } from "@/lib/kst";
@@ -45,6 +45,17 @@ export async function hasViewedToday(postId: number, visitorId: string | null): 
     .where(and(eq(postViews.postId, postId), eq(postViews.date, todayKST()), eq(postViews.visitorId, visitorId)))
     .limit(1);
   return row !== undefined;
+}
+
+/**
+ * 이 브라우저(방문자 쿠키)가 오늘·어제 이 글을 읽었나 (광장의 읽은 새 글, plaza-upgrade-2). 글 목록 쿼리의 한 칸으로 넣어
+ * 따로 왕복하지 않는다(페이지의 Promise.all 안 쿼리에 그대로 실린다). post_views 기본 키(post_id, date, visitor_id)를 탄다.
+ * 오늘·어제치만 남으므로(`cleanupPostViews`) 그보다 오래 전에 읽은 글은 안 읽은 것으로 보인다. 쿠키가 없으면 늘 false.
+ */
+export function viewedRecently(postId: SQLWrapper, visitorId: string | null): SQL<boolean> {
+  if (!visitorId) return sql<boolean>`false`;
+  const since = previousDay(todayKST());
+  return sql<boolean>`exists (select 1 from ${postViews} v where v.post_id = ${postId} and v.date >= ${since}::date and v.visitor_id = ${visitorId}::uuid)`;
 }
 
 /**

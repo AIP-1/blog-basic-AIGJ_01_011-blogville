@@ -128,3 +128,39 @@ describe("작은 마을 그림 (광장 개편)", () => {
     expect(phonePlazaHouses([])).toEqual([]);
   });
 });
+
+describe("작은 마을 그림 계절·줄등 (plaza-upgrade-2 C5)", () => {
+  const three = [
+    { stage: 1, roof: "#d9534f", fresh: true },
+    { stage: 3, roof: "#4a6fd9" },
+    { stage: 6, roof: "#f0883e", fresh: true },
+  ];
+  it("계절 팔레트: 여름(기본)은 그대로, 겨울은 눈 덮인 땅·나무, 가을은 단풍 나무", async () => {
+    const { seasonLand, seasonTreeArt } = await import("@/lib/town/diorama");
+    expect(seasonLand(undefined)).toEqual(seasonLand("summer"));
+    expect(seasonLand("winter").grass).not.toBe(seasonLand("summer").grass);
+    expect(seasonTreeArt(0, "autumn").palette.L).not.toBe(seasonTreeArt(0, undefined).palette.L);
+    const winter = dioramaScene(three, "day", { season: "winter" });
+    const plain = dioramaScene(three, "day");
+    expect(winter.season).toBe("winter");
+    expect(plain.season).toBeNull();
+    expect(winter.backdrop.palette.G).toBe(seasonLand("winter").grass);
+    expect(plain.backdrop.palette.G).toBe(seasonLand(undefined).grass);
+  });
+
+  it("줄등: 하늘을 더 두고, 집 가운데마다 초롱 하나, 글 쓴 집만 켜진다. 가운데가 2칸 처진다", async () => {
+    const { stringY, LANTERN_SAG, LANTERN_SIZE } = await import("@/lib/town/diorama");
+    const off = dioramaScene(three, "night");
+    const on = dioramaScene(three, "night", { lanterns: true });
+    expect(off.string).toBeNull();
+    expect(on.baseY).toBeGreaterThan(off.baseY);
+    expect(on.string!.lanterns.map((l) => l.lit)).toEqual([true, false, true]);
+    on.string!.lanterns.forEach((l, i) => {
+      expect(l.x + LANTERN_SIZE.width / 2).toBe(on.houses[i].center);
+      // 초롱 아래 끝이 가장 높은 집 지붕보다 위
+      expect(l.y + LANTERN_SIZE.height).toBeLessThanOrEqual(Math.min(...on.houses.map((h) => h.y)));
+    });
+    expect(stringY(0, 100, 2, LANTERN_SAG)).toBe(2);
+    expect(stringY(50, 100, 2, LANTERN_SAG)).toBe(2 + LANTERN_SAG);
+  });
+});
