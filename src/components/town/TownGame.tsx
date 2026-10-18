@@ -818,7 +818,7 @@ export function TownGame({
     };
     const underHud = (x: number, bottom: number, size: { width: number; height: number }) =>
       hudRects.some((r) => x + size.width / 2 > r.left && x - size.width / 2 < r.right && bottom > r.top && bottom - size.height < r.bottom);
-    // 축하 쪽지 자리 (가운데 x, 밑변 y, 화면 좌표): 내 집 오른쪽 옆 처마 높이 → 왼쪽 옆 → 지붕 위 → 집 아래 순으로 보고,
+    // 축하 쪽지 자리 (가운데 x, 밑변 y, 화면 좌표): 내 집 오른쪽 옆 처마 높이 → 왼쪽 옆 → 지붕 위 → 문 앞 캐릭터 아래 순으로 보고,
     // 다른 건물(외양간·나무 등)을 가리지 않는 첫 자리를 고른다. 다 겹치면 덜 겹치는 자리.
     // 화면(서랍이 덮는 오른쪽 뺀 `right`) 안으로 당기고, 위 간판 줄(promptTop) 아래에 둔다
     const celebrateNoteSpot = (size: { width: number; height: number }, right: number) => {
@@ -858,7 +858,7 @@ export function TownGame({
         { x: end + gap + size.width / 2, y: eave, ok: end + gap + size.width + edge <= right },
         { x: left - gap - size.width / 2, y: eave, ok: left - gap - size.width - edge >= 0 },
         { x: mid, y: roof - 14, ok: true },
-        { x: mid, y: house.y - camera.y + size.height + 10, ok: true },
+        { x: mid, y: house.y - camera.y + size.height + 56, ok: true }, // 문 앞에 선 캐릭터 아래
       ];
       let best: { x: number; y: number } | null = null;
       let bestArea = Infinity;
