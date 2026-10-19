@@ -17,7 +17,7 @@ const SPONSOR_WORDS = [
   /sponsored/i,
 ];
 // 체험단 사이트 배너 그림 주소 (글 끝에 붙는 "OO에서 제공받아…" 배너)
-const SPONSOR_HOSTS = /(revu\.net|dinnerqueen\.net|reviewnote\.co\.kr|mrblog\.net|seoulouba\.co\.kr|ringble\.co\.kr|cometoplay\.kr|popomon\.com|tble\.kr|chvu\.co\.kr|4blog\.net|reviewplace\.co\.kr|xn--939au0g4vj8sq\.net|gangnammatzip|storyn\.kr|modan\.kr)/i;
+const SPONSOR_HOSTS = /(\/gongjeong\/|revu\.net|dinnerqueen\.net|reviewnote\.(co\.kr|cloud)|mrblog\.net|seoulouba\.co\.kr|ringble\.co\.kr|cometoplay\.kr|popomon\.com|tble\.kr|chvu\.co\.kr|4blog\.net|reviewplace\.co\.kr|xn--939au0g4vj8sq\.net|gangnammatzip|storyn\.kr|modan\.kr)/i;
 const SELF_WORDS = /(내돈내산|내 돈 내 산|내돈 내산|직접 (계산|결제)했|광고 아님|광고 아닙니다|협찬 아님|협찬 아닙니다|협찬 없)/;
 
 // 협찬을 그림이나 태그로만 밝힌 글: "#협찬" 태그, 그림 파일 이름·대체 글("본 포스팅은 협찬을 포함합니다" 배너)
