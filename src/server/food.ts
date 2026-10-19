@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { blogs, posts, profiles } from "@/db/schema";
 import { likePattern } from "@/lib/blog-search";
 import { countBuzz, dongFromRegion, parseDaumBlogs, interestGrowth, interestKeywords, isRegionCandidate, isRising, rankRegion, summarizeInterest, type RankedPlace } from "@/lib/food-quality";
-import { detectSponsor, pickOgImage, reviewFetchUrl, sponsorImageUrls } from "@/lib/food-sponsor";
+import { detectSponsor, naverPostId, naverTagListUrl, parseNaverTags, pickOgImage, reviewFetchUrl, sponsorImageUrls, tagsSponsored } from "@/lib/food-sponsor";
 import { queueSponsorOcr, sponsorOcrState } from "@/server/food-ocr";
 import { placeKind, type FoodKind, type FoodKindFilter } from "@/lib/food-kind";
 import { areaWords, reviewVerdict, REVIEW_DAYS, REVIEW_PAGE_SIZE } from "@/lib/food-relevance";
@@ -416,6 +416,23 @@ function knownBody(place: FoodPlace, url: string): BodyMatch | null {
   return hit && Date.now() - hit.at < PAGE_TTL_MS ? hit.match : null;
 }
 
+/** 네이버 블로그 글의 태그 (못 받으면 빈 목록). 글 화면과 같이 24시간 기억된다 (readReviewPage 안에서만 부른다) */
+async function readNaverTags(url: string): Promise<string[]> {
+  const id = naverPostId(url);
+  if (!id) return [];
+  const target = naverTagListUrl(id);
+  try {
+    const res = await fetch(process.env.FOOD_PAGE_BASE ? `${process.env.FOOD_PAGE_BASE}/page?u=${encodeURIComponent(target)}` : target, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; BlogvilleBot/1.0; +https://unqiuepcg.java21.net)", Accept: "application/json", Referer: `https://blog.naver.com/${id.blogId}/${id.logNo}` },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      cache: "no-store",
+    });
+    return res.ok ? parseNaverTags(await res.text()) : [];
+  } catch {
+    return [];
+  }
+}
+
 /** 블로그 글 한 편을 열어 대표 사진과 협찬 표시를 읽는다 (24시간 기억). 못 읽으면 둘 다 null. place를 주면 본문 판정도 남긴다 */
 function readReviewPage(url: string, place?: FoodPlace): Promise<{ image: string | null; sponsor: FoodReview["sponsor"] }> {
   const target = reviewFetchUrl(url);
@@ -423,6 +440,8 @@ function readReviewPage(url: string, place?: FoodPlace): Promise<{ image: string
   const hit = pageCache.get(target);
   if (hit && Date.now() - hit.at < PAGE_TTL_MS) return hit.value;
   const value = (async () => {
+    // 네이버 블로그 태그(#협찬)는 글 화면에 없어 태그 목록을 함께 받는다 (못 받으면 태그는 없는 셈)
+    const tagsSponsor = readNaverTags(url).then(tagsSponsored);
     // 시험은 FOOD_PAGE_BASE로 가짜 서버를 가리킨다
     const res = await fetch(process.env.FOOD_PAGE_BASE ? `${process.env.FOOD_PAGE_BASE}/page?u=${encodeURIComponent(target)}` : target, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; BlogvilleBot/1.0; +https://unqiuepcg.java21.net)", Accept: "text/html" },
@@ -434,7 +453,7 @@ function readReviewPage(url: string, place?: FoodPlace): Promise<{ image: string
     if (!res.ok || (!process.env.FOOD_PAGE_BASE && !reviewFetchUrl(res.url || target))) return { image: null, sponsor: null };
     const buf = await res.arrayBuffer();
     const html = new TextDecoder().decode(buf.byteLength > PAGE_MAX_BYTES ? buf.slice(0, PAGE_MAX_BYTES) : buf);
-    const sponsor = detectSponsor(html);
+    const sponsor = (await tagsSponsor) ? "sponsored" : detectSponsor(html);
     if (place) bodyCache.set(bodyKey(place, url), { at: Date.now(), match: bodyMatch(html, place) });
     // 문구로 협찬을 못 찾았으면 글 앞뒤 그림의 글자를 뒤에서 읽어 본다 (화면은 기다리지 않는다)
     if (sponsor !== "sponsored") queueSponsorOcr(url, sponsorImageUrls(html));

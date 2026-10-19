@@ -71,6 +71,47 @@ export function pickOgImage(html: string): string | null {
   return /^https:\/\/[^\s"'<>]+$/.test(url) ? url : null;
 }
 
+/** 네이버 블로그 글이면 블로그 ID·글 번호 (태그 목록을 따로 받을 때 쓴다). 아니면 null */
+export function naverPostId(url: string): { blogId: string; logNo: string } | null {
+  const target = reviewFetchUrl(url);
+  const m = target?.match(/^https:\/\/m\.blog\.naver\.com\/([A-Za-z0-9_-]+)\/(\d+)$/);
+  return m ? { blogId: m[1], logNo: m[2] } : null;
+}
+
+/** 네이버 블로그 글의 태그 목록 주소. 태그(#협찬)는 글 화면 HTML에 없고 이 목록으로만 온다 */
+export function naverTagListUrl(id: { blogId: string; logNo: string }): string {
+  return `https://blog.naver.com/BlogTagListInfo.naver?blogId=${id.blogId}&logNoList=${id.logNo}&logType=mylog`;
+}
+
+/** 태그 목록 응답(JSON, 태그는 주소 인코딩된 "a,b,c") → 태그들. 못 읽으면 빈 목록 */
+export function parseNaverTags(body: string): string[] {
+  try {
+    const json = JSON.parse(body) as { taglist?: { tagName?: unknown }[] };
+    return (json.taglist ?? []).flatMap((t) => {
+      if (typeof t.tagName !== "string" || !t.tagName) return [];
+      let raw = t.tagName;
+      try {
+        raw = decodeURIComponent(raw.replace(/\+/g, " "));
+      } catch {}
+      return raw.split(",").map((x) => x.trim()).filter(Boolean);
+    });
+  } catch {
+    return [];
+  }
+}
+
+// 협찬을 밝히는 태그 ("#협찬", "#체험단", "#원고료", "#제품제공"…). "#협찬아님"·"#내돈내산"은 아니다
+const SPONSOR_TAG = /^(광고|광고포함|제공|제품제공|제공받음|서비스제공|서포터즈|기자단)$|협찬|체험단|원고료|유료광고/;
+const NOT_SPONSOR_TAG = /(아님|아닙니다|없음|없는|x$)|내돈내산/i;
+
+/** 태그 중에 협찬 표시가 있나 */
+export function tagsSponsored(tags: string[]): boolean {
+  return tags.some((t) => {
+    const flat = t.replace(/^#/, "").replace(/\s+/g, "");
+    return SPONSOR_TAG.test(flat) && !NOT_SPONSOR_TAG.test(flat);
+  });
+}
+
 /**
  * 서버가 읽어도 되는 글 주소. 네이버 블로그는 본문이 iframe 안이라 모바일 주소로 바꾼다.
  * 그 밖에는 티스토리·브런치만 (아무 주소나 서버가 열지 않게)
