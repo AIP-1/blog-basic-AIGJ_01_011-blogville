@@ -84,6 +84,14 @@ describe("다른 곳 후기 (parseKakaoReviews · reviewKey)", () => {
     expect(r).toMatchObject({ title: "마피아 후기", summary: "맛있&좋아", blogger: "에이", date: "2026-10-14", image: "https://t1.daumcdn.net/x.jpg", source: "daum" });
     expect(parseKakaoReviews({ documents: [{ title: "x", url: "javascript:1" }] }, "cafe")).toEqual([]);
   });
+  it("다음 검색에 섞여 온 네이버 블로그 글은 네이버로 표시", async () => {
+    const { parseKakaoReviews } = await import("@/lib/food");
+    const list = parseKakaoReviews(
+      { documents: [{ title: "사월의파랑", url: "https://blog.naver.com/abc/224430592675", blogname: "에이" }, { title: "사월의파랑", url: "http://m.blog.naver.com/abc/1" }, { title: "사월의파랑", url: "https://a.tistory.com/1" }] },
+      "daum",
+    );
+    expect(list.map((r) => r.source)).toEqual(["naver", "naver", "daum"]);
+  });
   it("네이버 블로그 PC·모바일 주소는 같은 글", async () => {
     const { reviewKey } = await import("@/lib/food");
     expect(reviewKey("https://blog.naver.com/abc/1234")).toBe(reviewKey("https://m.blog.naver.com/abc/1234?x=1"));
