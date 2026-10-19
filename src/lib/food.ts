@@ -53,7 +53,8 @@ export function parseKakaoReviews(json: unknown, source: "daum" | "cafe"): FoodR
         date,
         image: thumb,
         sponsor: null,
-        source,
+        // 다음 검색에도 네이버 블로그 글이 섞여 온다: 어디 글인지는 주소로 정한다
+        source: /^https?:\/\/(m\.)?blog\.naver\.com\//i.test(url) ? ("naver" as const) : source,
       },
     ];
   });
