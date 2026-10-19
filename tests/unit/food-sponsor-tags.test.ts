@@ -27,3 +27,13 @@ describe("네이버 블로그 태그로 밝힌 협찬 (#협찬)", () => {
     expect(tagsSponsored([])).toBe(false);
   });
 });
+
+describe("체험단 사이트 공정위 표시 그림", () => {
+  it("리뷰노트 새 주소(reviewnote.cloud)의 공정 표시 그림이 있으면 협찬", async () => {
+    const { detectSponsor } = await import("@/lib/food-sponsor");
+    const html = '<p>망고빙수 맛있어요</p><img src="https://reviewnote.cloud/gongjeong/v1/image.webp?applyId=2fca80d2" class="se-image-resource">';
+    expect(detectSponsor(html)).toBe("sponsored");
+    expect(detectSponsor('<img src="https://cdn.example.com/gongjeong/banner.png">')).toBe("sponsored");
+    expect(detectSponsor("<p>망고빙수 맛있어요</p>")).toBeNull();
+  });
+});
