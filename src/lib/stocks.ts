@@ -16,8 +16,8 @@ export type StockQuote = StockItem & {
   session?: StockSession | null;
 };
 
-export type StockSession = "pre" | "after";
-export const STOCK_SESSION_LABELS: Record<StockSession, string> = { pre: "프리", after: "애프터" };
+export type StockSession = "pre" | "after" | "afterClose";
+export const STOCK_SESSION_LABELS: Record<StockSession, string> = { pre: "프리", after: "애프터", afterClose: "애프터 마감" };
 
 /** 증시 지수 (코스피·코스닥): 지금 값과 오늘 분 단위 흐름. 받지 못하면 price가 null */
 export type StockIndex = {
@@ -124,11 +124,17 @@ export function parseNaverQuote(row: unknown): { key: string; price: number | nu
   const overPrice = toNumber(over?.overPrice);
   const type = (str(over?.tradingSessionType) ?? "").toUpperCase();
   const session: StockSession | null = /AFTER/.test(type) ? "after" : /PRE|BEFORE/.test(type) ? "pre" : null;
-  if (!over || str(over.overMarketStatus)?.toUpperCase() !== "OPEN" || overPrice === null || !session) return base;
+  if (!over || overPrice === null || !session) return base;
+  const overOpen = str(over.overMarketStatus)?.toUpperCase() === "OPEN";
+  // 장이 다 닫힌 뒤(미국 애프터 20:00 마감 ~ 다음 프리 전)에는 정규장 종가보다 애프터 마지막 가격이 더 최근 가격이다
+  const overAt = Date.parse(str(over.localTradedAt) ?? "");
+  const regularAt = Date.parse(str(r.localTradedAt) ?? "");
+  const afterClose = !overOpen && session === "after" && overAt > regularAt && overPrice !== price;
+  if (!overOpen && !afterClose) return base;
   const overDirection = str(rec(over.compareToPreviousPrice)?.name) ?? str(rec(over.compareToPreviousPrice)?.code);
   const overFalling = overDirection === "FALLING" || overDirection === "LOWER_LIMIT" || overDirection === "5" || overDirection === "4";
   const overSign = (n: number | null) => (n === null ? null : overFalling ? -Math.abs(n) : overDirection === "EVEN" || overDirection === "3" ? 0 : overDirection ? Math.abs(n) : n);
-  return { ...base, price: overPrice, change: overSign(toNumber(over.compareToPreviousClosePrice)), rate: overSign(toNumber(over.fluctuationsRatio)), session };
+  return { ...base, price: overPrice, change: overSign(toNumber(over.compareToPreviousClosePrice)), rate: overSign(toNumber(over.fluctuationsRatio)), session: afterClose ? "afterClose" : session };
 }
 
 /** 네이버 증권 검색 자동 완성(ac.stock.naver.com/ac) 한 줄 → 넣을 수 있는 종목. 국내·미국 주식만 */
