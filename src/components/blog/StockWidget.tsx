@@ -203,7 +203,7 @@ export function StockWidget({
                     ) : (
                       <span className={`flex shrink-0 items-baseline gap-2 rounded-md px-1 tabular-nums transition-colors duration-700 ${flashOf(k)}`}>
                         {q.session && (
-                          <span className="rounded border border-line px-1 text-[10px] font-semibold text-ink-soft" data-stock-session={q.session} title={`${STOCK_SESSION_LABELS[q.session]}마켓 가격 (정규장 밖 거래)`}>
+                          <span className="rounded border border-line px-1 text-[10px] font-semibold text-ink-soft" data-stock-session={q.session} title={q.session === "afterClose" ? "어제 애프터마켓 마지막 가격 (정규장 종가 대비)" : `${STOCK_SESSION_LABELS[q.session]}마켓 가격 (정규장 밖 거래)`}>
                             {STOCK_SESSION_LABELS[q.session]}
                           </span>
                         )}

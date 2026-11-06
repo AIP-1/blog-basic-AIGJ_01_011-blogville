@@ -108,4 +108,20 @@ describe("정규장 밖 거래 (애프터마켓)", () => {
     const up = { ...row, overMarketPriceInfo: { ...row.overMarketPriceInfo, compareToPreviousPrice: { code: "2", name: "RISING" }, compareToPreviousClosePrice: "1.20", fluctuationsRatio: "0.35" } };
     expect(parseNaverQuote(up)).toMatchObject({ change: 1.2, rate: 0.35 });
   });
+
+  it("미국 애프터마켓이 끝난 뒤에는 정규장 종가 대신 애프터 마지막 가격을 [애프터 마감]으로", () => {
+    const row = {
+      reutersCode: "MU.O",
+      closePrice: "656.39",
+      compareToPreviousClosePrice: "10.00",
+      compareToPreviousPrice: { code: "2", name: "RISING" },
+      fluctuationsRatio: "1.55",
+      marketStatus: "CLOSE",
+      localTradedAt: "2026-11-05T16:00:00-05:00",
+      overMarketPriceInfo: { tradingSessionType: "AFTER_MARKET", overMarketStatus: "CLOSE", overPrice: "683.40", compareToPreviousPrice: { code: "2", name: "RISING" }, compareToPreviousClosePrice: "27.01", fluctuationsRatio: "4.11", localTradedAt: "2026-11-05T20:00:00-05:00" },
+    };
+    expect(parseNaverQuote(row)).toMatchObject({ price: 683.4, change: 27.01, rate: 4.11, session: "afterClose" });
+    // 애프터 기록이 정규장보다 옛것이면(다음 날 정규장 중) 정규장 값
+    expect(parseNaverQuote({ ...row, marketStatus: "OPEN", localTradedAt: "2026-11-06T10:00:00-05:00" })).toMatchObject({ price: 656.39, session: null });
+  });
 });
