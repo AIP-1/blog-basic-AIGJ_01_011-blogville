@@ -56,6 +56,67 @@ export function parseYahooOvernight(html: string): { price: number; change: numb
   return { price, change, rate };
 }
 
+/** 야후 실시간 스트림(streamer.finance.yahoo.com) 한 줄: 프로토콜 버퍼(PricingData)를 base64로 보낸다 */
+export type YahooTick = { id: string; price: number; time: number; marketHours: number | null; changePercent: number | null; change: number | null };
+
+/**
+ * 야후 실시간 스트림의 PricingData(base64 프로토콜 버퍼)에서 필요한 칸만 읽는다.
+ * 1 종목(문자), 2 가격(float), 3 시각(ms, zigzag), 7 시간대(4 = 데이마켓), 8 등락률(float), 12 등락(float). 못 읽으면 null
+ */
+export function parseYahooTick(base64: string): YahooTick | null {
+  let b: Uint8Array;
+  try {
+    b = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  } catch {
+    return null;
+  }
+  const view = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  let i = 0;
+  // 시각(ms)도 2^53 안이라 BigInt 없이 센다
+  const varint = (): number => {
+    let v = 0;
+    let scale = 1;
+    for (;;) {
+      if (i >= b.length) throw new Error("eof");
+      const c = b[i++];
+      v += (c & 0x7f) * scale;
+      scale *= 128;
+      if (c < 0x80) return v;
+    }
+  };
+  const out: Partial<YahooTick> & { marketHours?: number | null } = {};
+  try {
+    while (i < b.length) {
+      const key = varint();
+      const field = key >> 3;
+      const type = key & 7;
+      if (type === 0) {
+        const v = varint();
+        // zigzag: 짝수는 양수, 홀수는 음수
+        if (field === 3) out.time = v % 2 === 0 ? v / 2 : -(v + 1) / 2;
+        else if (field === 7) out.marketHours = v;
+      } else if (type === 5) {
+        if (i + 4 > b.length) break;
+        const f = Math.round(view.getFloat32(i, true) * 10000) / 10000;
+        i += 4;
+        if (field === 2) out.price = f;
+        else if (field === 8) out.changePercent = Math.round(f * 100) / 100;
+        else if (field === 12) out.change = Math.round(f * 100) / 100;
+      } else if (type === 1) {
+        i += 8;
+      } else if (type === 2) {
+        const len = varint();
+        if (field === 1) out.id = new TextDecoder().decode(b.subarray(i, i + len));
+        i += len;
+      } else break;
+    }
+  } catch {
+    return null;
+  }
+  if (!out.id || !out.price || out.price <= 0) return null;
+  return { id: out.id, price: Math.round(out.price * 100) / 100, time: out.time ?? 0, marketHours: out.marketHours ?? null, changePercent: out.changePercent ?? null, change: out.change ?? null };
+}
+
 /** 네이버 로이터 코드(MU.O) → 크라켄 xStocks 페어 이름(MUxUSD). 모르면 null */
 export function krakenPair(code: string): string | null {
   const m = /^([A-Z]{1,6})\.[ONAK]$/.exec(code.toUpperCase());

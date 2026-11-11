@@ -6,6 +6,7 @@ import { isUniqueViolation } from "./names";
 import { getDayPrice, kisEnabled } from "./kis";
 import { getTokenPrices } from "./kraken";
 import { getYahooOvernight } from "./yahoo";
+import { getStreamOvernight } from "./yahoo-stream";
 import { isUsDayMarketTime, parseIndexChart, parseNaverQuote, parseNaverSearchItem, STOCK_ERRORS, STOCK_INDEXES, STOCK_MAX, type StockIndex, type StockIndexCode, type StockItem, type StockQuote } from "@/lib/stocks";
 
 // 블로그 관심 종목 (📈 위젯). 시세는 네이버 증권이 화면에 쓰는 공개 주소에서 서버가 받아 잠깐 기억해 둔다.
@@ -111,13 +112,14 @@ const closeOf = (q: Parsed): number | null => (q.price !== null && q.change !== 
 export async function getQuotes(items: StockItem[]): Promise<StockQuote[]> {
   const rows = await Promise.all(items.map(fetchOne));
   // 미국 데이마켓 시간(한국 낮): 네이버에 그 시간 가격이 없다. 한국투자증권 열쇠가 있으면 주간거래 시세,
-  // 없으면 야후 파이낸스의 데이마켓(블루오션) 가격, 그것도 못 받으면 크라켄 주식 토큰(xStocks) 참고 가격. 등락은 정규장 종가 대비
+  // 없으면 야후 파이낸스의 데이마켓(블루오션) 실시간 가격, 그것도 못 받으면 크라켄 주식 토큰(xStocks) 참고 가격. 등락은 정규장 종가 대비
   const dayTime = isUsDayMarketTime();
   const dayWanted = (i: number) => dayTime && items[i].market === "US" && !!rows[i] && (!rows[i]!.session || rows[i]!.session === "afterClose");
   const kis = kisEnabled();
   const [kisDays, yahoos] = await Promise.all([
     Promise.all(items.map((item, i) => (kis && dayWanted(i) ? getDayPrice(item.code) : null))),
-    Promise.all(items.map((item, i) => (!kis && dayWanted(i) ? getYahooOvernight(item.code) : null))),
+    // 야후 실시간 스트림(체결마다, 기다림 없음) → 못 받으면 야후 시세 화면(15초마다)
+    Promise.all(items.map(async (item, i) => (!kis && dayWanted(i) ? ((await getStreamOvernight(item.code)) ?? (await getYahooOvernight(item.code))) : null))),
   ]);
   const needToken = items.map((_, i) => dayWanted(i) && !kisDays[i] && !yahoos[i]);
   const tokens = needToken.some(Boolean) ? await getTokenPrices(items.filter((_, i) => needToken[i]).map((it) => it.code)) : new Map<string, number>();
