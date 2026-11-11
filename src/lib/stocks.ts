@@ -16,8 +16,8 @@ export type StockQuote = StockItem & {
   session?: StockSession | null;
 };
 
-export type StockSession = "pre" | "after" | "afterClose" | "day" | "dayToken";
-export const STOCK_SESSION_LABELS: Record<StockSession, string> = { pre: "프리", after: "애프터", afterClose: "애프터 마감", day: "데이", dayToken: "데이" };
+export type StockSession = "pre" | "after" | "afterClose" | "day" | "dayYahoo" | "dayToken";
+export const STOCK_SESSION_LABELS: Record<StockSession, string> = { pre: "프리", after: "애프터", afterClose: "애프터 마감", day: "데이", dayYahoo: "데이", dayToken: "데이" };
 
 /**
  * 미국 주식 데이마켓(주간거래, 블루오션) 시간인가: 미국 동부 일~목 20:00부터 다음 날 04:00까지 (한국 낮 시간).
@@ -38,6 +38,22 @@ export function kisDaySymbol(code: string): { excd: "BAQ" | "BAY" | "BAA"; symb:
   if (!m) return null;
   const excd = m[2] === "O" ? "BAQ" : m[2] === "N" ? "BAY" : "BAA";
   return { excd, symb: m[1].replace(/-/g, "/") };
+}
+
+/** 네이버 로이터 코드(MU.O, BRK-B.N) → 야후 티커(MU, BRK-B). 모르면 null */
+export function yahooTicker(code: string): string | null {
+  const m = /^([A-Z]{1,6}(?:-[A-Z])?)\.[ONAK]$/.exec(code.toUpperCase());
+  return m ? m[1] : null;
+}
+
+/** 야후 시세 화면(HTML)의 데이마켓(Overnight, 블루오션) 가격·등락(정규장 종가 대비). 데이마켓 시간이 아니거나 없으면 null */
+export function parseYahooOvernight(html: string): { price: number; change: number | null; rate: number | null } | null {
+  const pick = (id: string) => new RegExp(`data-testid="${id}"[^>]*>\\s*([^<]+?)\\s*<`).exec(html)?.[1] ?? null;
+  const price = toNumber(pick("qsp-overnight-price"));
+  if (price === null || price <= 0) return null;
+  const change = toNumber((pick("qsp-overnight-price-change") ?? "").replace(/^\+/, ""));
+  const rate = toNumber((pick("qsp-overnight-price-change-percent") ?? "").replace(/[()%+]/g, ""));
+  return { price, change, rate };
 }
 
 /** 네이버 로이터 코드(MU.O) → 크라켄 xStocks 페어 이름(MUxUSD). 모르면 null */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { krakenPair, parseKrakenTicker, isUsDayMarketTime, kisDaySymbol, parseKisPrice, checkStock, formatChange, formatPrice, parseIndexChart, parseNaverQuote, parseNaverSearchItem, toNumber } from "@/lib/stocks";
+import { yahooTicker, parseYahooOvernight, krakenPair, parseKrakenTicker, isUsDayMarketTime, kisDaySymbol, parseKisPrice, checkStock, formatChange, formatPrice, parseIndexChart, parseNaverQuote, parseNaverSearchItem, toNumber } from "@/lib/stocks";
 
 describe("관심 종목 규칙", () => {
   it("국내 6자리·미국 로이터 코드만 받는다", () => {
@@ -168,5 +168,23 @@ describe("크라켄 주식 토큰 (데이마켓 참고 가격)", () => {
     expect(parseKrakenTicker({ a: ["760.00", "1", "1"], b: ["737.62", "1", "1"], c: ["735.93", "0.04"] })).toBe(735.93);
     expect(parseKrakenTicker({ c: ["0", "0"] })).toBeNull();
     expect(parseKrakenTicker(null)).toBeNull();
+  });
+});
+
+describe("야후 데이마켓(Overnight) 가격", () => {
+  it("로이터 코드 → 야후 티커", () => {
+    expect(yahooTicker("MU.O")).toBe("MU");
+    expect(yahooTicker("BRK-B.N")).toBe("BRK-B");
+    expect(yahooTicker("005930")).toBeNull();
+  });
+  it("시세 화면의 데이마켓 가격·등락", () => {
+    const html =
+      '<span class="price" data-testid="qsp-price">725.11 </span><span data-testid="qsp-price-change">-8.04 </span>' +
+      '<span class="price yf-1n64cj base" data-testid="qsp-overnight-price">748.49 </span> <span class="priceChange" data-testid="qsp-overnight-price-change">+23.38 </span> ' +
+      '<span class="priceChangePercent" data-testid="qsp-overnight-price-change-percent">(+3.22%) </span>';
+    expect(parseYahooOvernight(html)).toEqual({ price: 748.49, change: 23.38, rate: 3.22 });
+    const down = html.replace("+23.38", "-1.50").replace("(+3.22%)", "(-0.21%)");
+    expect(parseYahooOvernight(down)).toEqual({ price: 748.49, change: -1.5, rate: -0.21 });
+    expect(parseYahooOvernight('<span data-testid="qsp-price">725.11 </span>')).toBeNull();
   });
 });
