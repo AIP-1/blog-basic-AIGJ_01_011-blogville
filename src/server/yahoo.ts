@@ -13,6 +13,8 @@ const MAX_BYTES = 800_000;
 
 type Overnight = { price: number; change: number | null; rate: number | null };
 const cache = new Map<string, { at: number; value: Promise<Overnight | null> }>();
+// 운영 점검용 (/api/stocks/status): 마지막으로 시세 화면을 받은 결과
+let lastResult: string | null = null;
 
 async function readHead(res: Response): Promise<string> {
   const reader = res.body?.getReader();
@@ -65,12 +67,22 @@ function load(ticker: string): Promise<Overnight | null> {
       cache: "no-store",
     });
     if (!res.ok) {
+      lastResult = `${new Date().toISOString()} ${ticker} HTTP ${res.status} ${res.url}`;
       await res.body?.cancel().catch(() => {});
       return null;
     }
-    return parseYahooOvernight(await readHead(res));
+    const html = await readHead(res);
+    const v = parseYahooOvernight(html);
+    lastResult = `${new Date().toISOString()} ${ticker} ${v ? `가격 ${v.price}` : `데이마켓 값 없음 (${html.length}자, ${res.url})`}`;
+    return v;
   })().catch((e: unknown) => {
+    lastResult = `${new Date().toISOString()} ${ticker} 오류 ${e instanceof Error ? e.message : String(e)}`;
     console.warn("[yahoo] 데이마켓 가격을 못 받음", ticker, e instanceof Error ? e.message : e);
     return null;
   });
+}
+
+/** 운영 점검용: 마지막으로 야후 시세 화면을 받은 결과 */
+export function yahooPageStatus(): string | null {
+  return lastResult;
 }
