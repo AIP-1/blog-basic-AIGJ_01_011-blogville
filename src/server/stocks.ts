@@ -3,7 +3,8 @@ import { and, asc, count, eq, max } from "drizzle-orm";
 import { db } from "@/db";
 import { blogs, blogStocks } from "@/db/schema";
 import { isUniqueViolation } from "./names";
-import { parseIndexChart, parseNaverQuote, parseNaverSearchItem, STOCK_ERRORS, STOCK_INDEXES, STOCK_MAX, type StockIndex, type StockIndexCode, type StockItem, type StockQuote } from "@/lib/stocks";
+import { getDayPrice, kisEnabled } from "./kis";
+import { isUsDayMarketTime, parseIndexChart, parseNaverQuote, parseNaverSearchItem, STOCK_ERRORS, STOCK_INDEXES, STOCK_MAX, type StockIndex, type StockIndexCode, type StockItem, type StockQuote } from "@/lib/stocks";
 
 // 블로그 관심 종목 (📈 위젯). 시세는 네이버 증권이 화면에 쓰는 공개 주소에서 서버가 받아 잠깐 기억해 둔다.
 // 공식 API가 아니라 응답 모양이 바뀌거나 막히면 price가 null인 줄로 보여 준다(위젯이 "시세를 못 받았어요").
@@ -104,8 +105,14 @@ function fetchOne(item: StockItem): Promise<Parsed | null> {
 /** 종목들의 시세 (넣은 순서 그대로). 받지 못한 종목은 price가 null */
 export async function getQuotes(items: StockItem[]): Promise<StockQuote[]> {
   const rows = await Promise.all(items.map(fetchOne));
+  // 미국 데이마켓 시간(한국 낮): 네이버에 그 시간 가격이 없어 한국투자증권 주간거래 시세로 채운다 (열쇠가 있을 때만)
+  const dayTime = kisEnabled() && isUsDayMarketTime();
+  const days = await Promise.all(
+    items.map((item, i) => (dayTime && item.market === "US" && (!rows[i]?.session || rows[i]?.session === "afterClose") ? getDayPrice(item.code) : null)),
+  );
   return items.map((item, i) => {
-    const q = rows[i];
+    const day = days[i];
+    const q = day && rows[i] ? { ...rows[i]!, price: day.price, change: day.change, rate: day.rate, session: "day" as const } : rows[i];
     return {
       market: item.market,
       code: item.code,

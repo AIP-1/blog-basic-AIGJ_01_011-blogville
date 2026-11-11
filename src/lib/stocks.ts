@@ -16,8 +16,42 @@ export type StockQuote = StockItem & {
   session?: StockSession | null;
 };
 
-export type StockSession = "pre" | "after" | "afterClose";
-export const STOCK_SESSION_LABELS: Record<StockSession, string> = { pre: "프리", after: "애프터", afterClose: "애프터 마감" };
+export type StockSession = "pre" | "after" | "afterClose" | "day";
+export const STOCK_SESSION_LABELS: Record<StockSession, string> = { pre: "프리", after: "애프터", afterClose: "애프터 마감", day: "데이" };
+
+/**
+ * 미국 주식 데이마켓(주간거래, 블루오션) 시간인가: 미국 동부 일~목 20:00부터 다음 날 04:00까지 (한국 낮 시간).
+ * 네이버 증권은 이 시간 가격을 주지 않아 한국투자증권 시세로 채운다
+ */
+export function isUsDayMarketTime(now: Date = new Date()): boolean {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short", hour: "numeric", hourCycle: "h23" }).formatToParts(now);
+  const day = parts.find((p) => p.type === "weekday")?.value ?? "";
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? NaN);
+  if (hour >= 20) return ["Sun", "Mon", "Tue", "Wed", "Thu"].includes(day);
+  if (hour < 4) return ["Mon", "Tue", "Wed", "Thu", "Fri"].includes(day);
+  return false;
+}
+
+/** 네이버 로이터 코드(AAPL.O, BRK-B.N) → 한국투자증권 주간거래 시세 거래소·종목 (나스닥 BAQ, 뉴욕 BAY, 아멕스 BAA). 모르면 null */
+export function kisDaySymbol(code: string): { excd: "BAQ" | "BAY" | "BAA"; symb: string } | null {
+  const m = /^([A-Z0-9.-]+?)\.([ONAK])$/.exec(code.toUpperCase());
+  if (!m) return null;
+  const excd = m[2] === "O" ? "BAQ" : m[2] === "N" ? "BAY" : "BAA";
+  return { excd, symb: m[1].replace(/-/g, "/") };
+}
+
+/** 한국투자증권 해외주식 현재체결가(HHDFS00000300) 응답 → 가격·등락(전날 종가 대비). 값이 없으면 null */
+export function parseKisPrice(json: unknown): { price: number; change: number | null; rate: number | null } | null {
+  const r = rec(json);
+  if (!r || str(r.rt_cd) !== "0") return null;
+  const o = rec(r.output);
+  const price = toNumber(o?.last);
+  if (!o || price === null || price <= 0) return null;
+  // 대비 기호: 1 상한, 2 상승, 3 보합, 4 하한, 5 하락
+  const sign = str(o.sign);
+  const signed = (n: number | null) => (n === null ? null : sign === "4" || sign === "5" ? -Math.abs(n) : sign === "3" ? 0 : sign === "1" || sign === "2" ? Math.abs(n) : n);
+  return { price, change: signed(toNumber(o.diff)), rate: signed(toNumber(o.rate)) };
+}
 
 /** 증시 지수 (코스피·코스닥): 지금 값과 오늘 분 단위 흐름. 받지 못하면 price가 null */
 export type StockIndex = {

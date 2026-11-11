@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkStock, formatChange, formatPrice, parseIndexChart, parseNaverQuote, parseNaverSearchItem, toNumber } from "@/lib/stocks";
+import { isUsDayMarketTime, kisDaySymbol, parseKisPrice, checkStock, formatChange, formatPrice, parseIndexChart, parseNaverQuote, parseNaverSearchItem, toNumber } from "@/lib/stocks";
 
 describe("관심 종목 규칙", () => {
   it("국내 6자리·미국 로이터 코드만 받는다", () => {
@@ -123,5 +123,35 @@ describe("정규장 밖 거래 (애프터마켓)", () => {
     expect(parseNaverQuote(row)).toMatchObject({ price: 683.4, change: 27.01, rate: 4.11, session: "afterClose" });
     // 애프터 기록이 정규장보다 옛것이면(다음 날 정규장 중) 정규장 값
     expect(parseNaverQuote({ ...row, marketStatus: "OPEN", localTradedAt: "2026-11-06T10:00:00-05:00" })).toMatchObject({ price: 656.39, session: null });
+  });
+});
+
+describe("미국 데이마켓 (한국투자증권 주간거래 시세)", () => {
+  it("데이마켓 시간: 미국 동부 일~목 20:00 ~ 다음 날 04:00", () => {
+    // 2026-11-11(수) 01:00 UTC = 미국 동부 10일(화) 20:00 (EST)
+    expect(isUsDayMarketTime(new Date("2026-11-11T01:00:00Z"))).toBe(true);
+    // 수 08:59 UTC = 03:59 ET
+    expect(isUsDayMarketTime(new Date("2026-11-11T08:59:00Z"))).toBe(true);
+    // 수 09:00 UTC = 04:00 ET → 프리마켓
+    expect(isUsDayMarketTime(new Date("2026-11-11T09:00:00Z"))).toBe(false);
+    // 정규장 중
+    expect(isUsDayMarketTime(new Date("2026-11-11T16:00:00Z"))).toBe(false);
+    // 금 20:00 ET(토 01:00 UTC)는 쉰다, 일 20:00 ET(월 01:00 UTC)부터 다시
+    expect(isUsDayMarketTime(new Date("2026-11-14T01:00:00Z"))).toBe(false);
+    expect(isUsDayMarketTime(new Date("2026-11-16T01:00:00Z"))).toBe(true);
+  });
+
+  it("로이터 코드 → 주간거래 거래소·종목", () => {
+    expect(kisDaySymbol("AAPL.O")).toEqual({ excd: "BAQ", symb: "AAPL" });
+    expect(kisDaySymbol("BRK-B.N")).toEqual({ excd: "BAY", symb: "BRK/B" });
+    expect(kisDaySymbol("SPY.K")).toEqual({ excd: "BAA", symb: "SPY" });
+    expect(kisDaySymbol("005930")).toBeNull();
+  });
+
+  it("현재체결가 응답: 하락 기호면 음수, 값이 없으면 null", () => {
+    expect(parseKisPrice({ rt_cd: "0", output: { last: "683.4000", diff: "27.0100", rate: "4.11", sign: "2" } })).toEqual({ price: 683.4, change: 27.01, rate: 4.11 });
+    expect(parseKisPrice({ rt_cd: "0", output: { last: "340.67", diff: "1.33", rate: "0.39", sign: "5" } })).toEqual({ price: 340.67, change: -1.33, rate: -0.39 });
+    expect(parseKisPrice({ rt_cd: "0", output: { last: "", diff: "", rate: "" } })).toBeNull();
+    expect(parseKisPrice({ rt_cd: "1", msg1: "토큰 만료" })).toBeNull();
   });
 });
