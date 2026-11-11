@@ -18,6 +18,10 @@ type State = {
   waited: Set<string>;
   retryMs: number;
   timer: ReturnType<typeof setInterval> | null;
+  // 운영 점검용 (/api/stocks/status)
+  lastMessageAt?: number;
+  lastError?: string;
+  opens?: number;
 };
 
 // 개발 서버가 다시 읽어도 연결이 하나만 남게 globalThis에 둔다
@@ -39,6 +43,7 @@ function connect() {
   state.socket = ws;
   ws.onopen = () => {
     state.retryMs = 2_000;
+    state.opens = (state.opens ?? 0) + 1;
     send({ subscribe: [...state.wanted.keys()] });
   };
   ws.onmessage = (e) => {
@@ -51,11 +56,13 @@ function connect() {
     }
     const tick = typeof message === "string" ? parseYahooTick(message) : null;
     if (!tick) return;
+    state.lastMessageAt = Date.now();
     state.latest.set(tick.id, { ...tick, at: Date.now() });
     for (const done of state.waiters.get(tick.id) ?? []) done();
     state.waiters.delete(tick.id);
   };
-  ws.onclose = () => {
+  ws.onclose = (e) => {
+    if (e.code !== 1000) state.lastError = `${new Date().toISOString()} 닫힘 ${e.code} ${e.reason}`.trim();
     if (state.socket === ws) state.socket = null;
     // 아직 찾는 종목이 있으면 조금 기다렸다 다시 연결 (2초부터 1분까지 늘려 가며)
     if (state.wanted.size > 0) {
@@ -63,7 +70,8 @@ function connect() {
       state.retryMs = Math.min(state.retryMs * 2, 60_000);
     }
   };
-  ws.onerror = () => {
+  ws.onerror = (e) => {
+    state.lastError = `${new Date().toISOString()} ${(e as ErrorEvent).message || "연결 오류"}`;
     try {
       ws.close();
     } catch {}
@@ -126,4 +134,16 @@ export async function getStreamOvernight(code: string, waitMs = 1_500): Promise<
   }
   const t = fresh();
   return t ? { price: t.price, change: t.change, rate: t.changePercent } : null;
+}
+
+/** 운영 점검용: 스트림 연결 상태 */
+export function yahooStreamStatus() {
+  return {
+    state: state.socket ? ["연결 중", "열림", "닫는 중", "닫힘"][state.socket.readyState] : "없음",
+    opens: state.opens ?? 0,
+    wanted: [...state.wanted.keys()],
+    lastMessageAt: state.lastMessageAt ? new Date(state.lastMessageAt).toISOString() : null,
+    lastError: state.lastError ?? null,
+    latest: [...state.latest.values()].map((t) => ({ id: t.id, price: t.price, marketHours: t.marketHours, at: new Date(t.at).toISOString() })),
+  };
 }
