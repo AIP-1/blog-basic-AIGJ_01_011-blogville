@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isUsDayMarketTime, kisDaySymbol, parseKisPrice, checkStock, formatChange, formatPrice, parseIndexChart, parseNaverQuote, parseNaverSearchItem, toNumber } from "@/lib/stocks";
+import { krakenPair, parseKrakenTicker, isUsDayMarketTime, kisDaySymbol, parseKisPrice, checkStock, formatChange, formatPrice, parseIndexChart, parseNaverQuote, parseNaverSearchItem, toNumber } from "@/lib/stocks";
 
 describe("관심 종목 규칙", () => {
   it("국내 6자리·미국 로이터 코드만 받는다", () => {
@@ -153,5 +153,20 @@ describe("미국 데이마켓 (한국투자증권 주간거래 시세)", () => {
     expect(parseKisPrice({ rt_cd: "0", output: { last: "340.67", diff: "1.33", rate: "0.39", sign: "5" } })).toEqual({ price: 340.67, change: -1.33, rate: -0.39 });
     expect(parseKisPrice({ rt_cd: "0", output: { last: "", diff: "", rate: "" } })).toBeNull();
     expect(parseKisPrice({ rt_cd: "1", msg1: "토큰 만료" })).toBeNull();
+  });
+});
+
+describe("크라켄 주식 토큰 (데이마켓 참고 가격)", () => {
+  it("로이터 코드 → xStocks 페어", () => {
+    expect(krakenPair("MU.O")).toBe("MUxUSD");
+    expect(krakenPair("AAPL.O")).toBe("AAPLxUSD");
+    expect(krakenPair("BRK-B.N")).toBeNull();
+    expect(krakenPair("005930")).toBeNull();
+  });
+  it("호가 차이가 1% 안이면 가운데 값, 넓으면 마지막 체결가", () => {
+    expect(parseKrakenTicker({ a: ["348.08", "2", "2.000"], b: ["348.07", "20", "20.000"], c: ["348.20", "0.06"] })).toBe(348.08);
+    expect(parseKrakenTicker({ a: ["760.00", "1", "1"], b: ["737.62", "1", "1"], c: ["735.93", "0.04"] })).toBe(735.93);
+    expect(parseKrakenTicker({ c: ["0", "0"] })).toBeNull();
+    expect(parseKrakenTicker(null)).toBeNull();
   });
 });
