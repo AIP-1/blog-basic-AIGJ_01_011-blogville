@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { yahooTicker, parseYahooOvernight, krakenPair, parseKrakenTicker, isUsDayMarketTime, kisDaySymbol, parseKisPrice, checkStock, formatChange, formatPrice, parseIndexChart, parseNaverQuote, parseNaverSearchItem, toNumber } from "@/lib/stocks";
+import { parseYahooTick, yahooTicker, parseYahooOvernight, krakenPair, parseKrakenTicker, isUsDayMarketTime, kisDaySymbol, parseKisPrice, checkStock, formatChange, formatPrice, parseIndexChart, parseNaverQuote, parseNaverSearchItem, toNumber } from "@/lib/stocks";
 
 describe("관심 종목 규칙", () => {
   it("국내 6자리·미국 로이터 코드만 받는다", () => {
@@ -186,5 +186,21 @@ describe("야후 데이마켓(Overnight) 가격", () => {
     const down = html.replace("+23.38", "-1.50").replace("(+3.22%)", "(-0.21%)");
     expect(parseYahooOvernight(down)).toEqual({ price: 748.49, change: -1.5, rate: -0.21 });
     expect(parseYahooOvernight('<span data-testid="qsp-price">725.11 </span>')).toBeNull();
+  });
+});
+
+describe("야후 실시간 스트림 (PricingData)", () => {
+  it("데이마켓 체결: 종목·가격·시각·시간대·등락", () => {
+    expect(parseYahooTick("CgJNVRX2aDpEGNDgjIW5aCoDTk1TMAg4BEX/MzVAZYA9pEHYAQT1AgDXR0H9AsYP2j8=")).toEqual({
+      id: "MU",
+      price: 745.64,
+      time: 1794362153000,
+      marketHours: 4,
+      changePercent: 2.83,
+      change: 20.53,
+    });
+    expect(parseYahooTick("CgRBQVBMFXsUrkMYwI+NhbloKgNOTVMwCDgERd6tzb1lADSzvtgBBPUCgOshwP0C7684vw==")).toMatchObject({ id: "AAPL", price: 348.16, changePercent: -0.1, change: -0.35 });
+    expect(parseYahooTick("!!")).toBeNull();
+    expect(parseYahooTick("")).toBeNull();
   });
 });
