@@ -5,6 +5,7 @@ import { blogs, blogStocks } from "@/db/schema";
 import { isUniqueViolation } from "./names";
 import { getDayPrice, kisEnabled } from "./kis";
 import { getTokenPrices } from "./kraken";
+import { getYahooOvernight } from "./yahoo";
 import { isUsDayMarketTime, parseIndexChart, parseNaverQuote, parseNaverSearchItem, STOCK_ERRORS, STOCK_INDEXES, STOCK_MAX, type StockIndex, type StockIndexCode, type StockItem, type StockQuote } from "@/lib/stocks";
 
 // 블로그 관심 종목 (📈 위젯). 시세는 네이버 증권이 화면에 쓰는 공개 주소에서 서버가 받아 잠깐 기억해 둔다.
@@ -110,23 +111,27 @@ const closeOf = (q: Parsed): number | null => (q.price !== null && q.change !== 
 export async function getQuotes(items: StockItem[]): Promise<StockQuote[]> {
   const rows = await Promise.all(items.map(fetchOne));
   // 미국 데이마켓 시간(한국 낮): 네이버에 그 시간 가격이 없다. 한국투자증권 열쇠가 있으면 주간거래 시세,
-  // 없으면 크라켄 주식 토큰(xStocks) 공개 시세를 참고 가격으로 쓴다. 등락은 직전 정규장 종가 대비
+  // 없으면 야후 파이낸스의 데이마켓(블루오션) 가격, 그것도 못 받으면 크라켄 주식 토큰(xStocks) 참고 가격. 등락은 정규장 종가 대비
   const dayTime = isUsDayMarketTime();
   const dayWanted = (i: number) => dayTime && items[i].market === "US" && !!rows[i] && (!rows[i]!.session || rows[i]!.session === "afterClose");
   const kis = kisEnabled();
-  const [kisDays, tokens] = await Promise.all([
+  const [kisDays, yahoos] = await Promise.all([
     Promise.all(items.map((item, i) => (kis && dayWanted(i) ? getDayPrice(item.code) : null))),
-    !kis && items.some((_, i) => dayWanted(i)) ? getTokenPrices(items.filter((_, i) => dayWanted(i)).map((it) => it.code)) : Promise.resolve(new Map<string, number>()),
+    Promise.all(items.map((item, i) => (!kis && dayWanted(i) ? getYahooOvernight(item.code) : null))),
   ]);
+  const needToken = items.map((_, i) => dayWanted(i) && !kisDays[i] && !yahoos[i]);
+  const tokens = needToken.some(Boolean) ? await getTokenPrices(items.filter((_, i) => needToken[i]).map((it) => it.code)) : new Map<string, number>();
   return items.map((item, i) => {
     const base = rows[i];
     let q = base;
     if (base && dayWanted(i)) {
       const k = kisDays[i];
+      const y = yahoos[i];
       const t = tokens.get(item.code);
       // 직전 정규장 종가 = 네이버 정규장 가격 (정규장이 끝난 뒤라 closePrice가 그날 종가)
       const regularClose = base.session === "afterClose" ? null : base.price;
       if (k) q = { ...base, price: k.price, change: k.change, rate: k.rate, session: "day" as const };
+      else if (y) q = { ...base, price: y.price, change: y.change, rate: y.rate, session: "dayYahoo" as const };
       else if (t !== undefined) {
         const close = regularClose ?? closeOf(base);
         const change = close ? Math.round((t - close) * 100) / 100 : null;
